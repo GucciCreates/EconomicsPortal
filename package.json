@@ -1,0 +1,13 @@
+{
+  "name": "economics-portal",
+  "version": "1.0.0",
+  "description": "Free static class portal for Dr. Numan's Economics class, powered by Google Apps Script and GitHub Pages.",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "python3 -m http.server 3000",
+    "test": "node --check js/app.js && node --check js/api.js && node --check js/config.js && echo 'Syntax check passed!'"
+  },
+  "keywords": ["economics", "education", "google-apps-script", "github-pages", "class-portal"],
+  "author": "Shehroz's Team",
+  "license": "MIT"
+}
