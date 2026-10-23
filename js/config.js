@@ -1,10 +1,9 @@
 /**
  * EconomicsPortal — Configuration
  * 
- * Replace PASTE_YOUR_APPS_SCRIPT_URL_HERE with your deployed Google Apps Script Web App URL.
- * See SETUP_GUIDE.md for step-by-step instructions.
+ * Google Apps Script Web App Endpoint
  */
-export const API_URL = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
+export const API_URL = "https://script.google.com/macros/s/AKfycbyertPqD_BRcBp-94ZecGWYQrf_tbLJmBEjXkVckYI/exec";
 
 // Helper to determine if we are in demo/fallback mode
 export const isDemoMode = () => {
