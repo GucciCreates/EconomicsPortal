@@ -51,13 +51,25 @@ function renderBanner() {
         <span>
           ⚡ <strong>Demo / Offline Mode Active</strong> — Simulated backend is running with instant sample data.
         </span>
-        <div style="display: flex; gap: 0.75rem; align-items: center;">
-          <a href="./SETUP_GUIDE.md" target="_blank" style="font-weight: 600;">Connect Apps Script ↗</a>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          ${
+            localStorage.getItem("economics_portal_force_demo") === "true"
+              ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Try Live API</button>`
+              : `<a href="./SETUP_GUIDE.md" target="_blank" style="font-weight: 600;">Connect Apps Script ↗</a>`
+          }
           <button id="btn-reset-demo" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Reset Data</button>
         </div>
       </div>
     `;
     bannerEl.style.display = "block";
+
+    const retryLiveBtn = document.getElementById("btn-retry-live");
+    if (retryLiveBtn) {
+      retryLiveBtn.addEventListener("click", () => {
+        localStorage.removeItem("economics_portal_force_demo");
+        refreshApp();
+      });
+    }
 
     const resetBtn = document.getElementById("btn-reset-demo");
     if (resetBtn) {
@@ -221,7 +233,25 @@ function renderLogin() {
         errorBox.innerHTML = `<div class="alert alert-error">${res.error || "Invalid name or PIN."}</div>`;
       }
     } catch (err) {
-      errorBox.innerHTML = `<div class="alert alert-error">Connection error: ${err.message}</div>`;
+      errorBox.innerHTML = `
+        <div class="alert alert-error" style="line-height: 1.45;">
+          <strong>Connection error: ${err.message}</strong>
+          <div style="font-size: 0.8rem; margin: 0.35rem 0;">
+            Google is blocking this request because the Apps Script Web App still requires a Google account login.
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-force-demo" style="width: 100%; margin-top: 0.5rem; background: #fff; font-weight: 600;">
+            ⚡ Continue in Demo Mode for now
+          </button>
+        </div>
+      `;
+
+      const forceDemoBtn = document.getElementById("btn-force-demo");
+      if (forceDemoBtn) {
+        forceDemoBtn.addEventListener("click", () => {
+          localStorage.setItem("economics_portal_force_demo", "true");
+          refreshApp();
+        });
+      }
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = "Log In";
