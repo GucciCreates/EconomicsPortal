@@ -3,7 +3,7 @@
  * 
  * Google Apps Script Web App Endpoint
  */
-export const API_URL = "https://script.google.com/macros/s/AKfycbyertPqD_BRcBp-94ZecGWYQrf_tbLJmBEjXkVckYI/exec";
+export const API_URL = "https://script.google.com/macros/s/AKfycbwhnUI96IN3yYP9kx53SyfzEgjLHLjKpe_gqPet97Tm0XocvBbbqvDBW5tHOxm8udx8/exec";
 
 // Helper to determine if we are in demo/fallback mode
 export const isDemoMode = () => {
@@ -13,4 +13,3 @@ export const isDemoMode = () => {
     localStorage.getItem("economics_portal_force_demo") === "true"
   );
 };
-
