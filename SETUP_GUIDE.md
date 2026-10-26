@@ -1,4 +1,4 @@
-# EconomicsPortal — Backend Setup Guide (Google Apps Script)
+# EconomicsPortal — Backend Setup & Upgrade Guide (Google Apps Script)
 
 This system uses a **Google Sheet + Google Apps Script Web App** as a free, 24/7 serverless JSON backend. It requires no server, no database hosting, and no credit card.
 
@@ -7,78 +7,38 @@ This system uses a **Google Sheet + Google Apps Script Web App** as a free, 24/7
 
 ---
 
-## 1. Create the Database Spreadsheet
+## ⚡ UPGRADING FROM v1 to v2
+
+If you already created `EconomicsPortalDB` in v1, the **Marks** tab has new columns in v2:
+`mockNumber`, `previewDone`, `peerRating`, `punctual`, `editedBy`.
+
+### Option A: Clean Re-seed (Fastest)
+1. Open your `EconomicsPortalDB` sheet.
+2. Go to **Extensions > Apps Script**.
+3. Replace the entire code with the contents of [`backend/Code.gs`](./backend/Code.gs).
+4. In the function dropdown, select **`setup`** and click **▶ Run**.
+5. This re-creates the tabs and populates the updated headers automatically.
+6. Click **Deploy > Manage deployments > Edit > Version: New version > Deploy**.
+
+### Option B: Manual Column Update (Preserves Existing Marks)
+If you already have real student marks entered and want to preserve them:
+1. Open the **Marks** tab in your Google Sheet.
+2. Update row 1 so the column headers match this exact order (14 columns):
+   ```
+   id | member | team | cycle | mockNumber | quizScore | submission | attendance | previewDone | peerRating | punctual | notes | editedBy | timestamp
+   ```
+3. Update Apps Script with [`backend/Code.gs`](./backend/Code.gs) and deploy a **New version**.
+
+---
+
+## 1. Initial Setup (New Spreadsheet)
 1. Sign in to your browser with **`bahriabatch30@gmail.com`**.
-2. Open a new tab and go to **[sheets.new](https://sheets.new)**.
-3. Rename the sheet at the top left to:
-   ```
-   EconomicsPortalDB
-   ```
-4. By default, there is a tab named `Sheet1`. Rename and add tabs until you have these **5 tabs** (exact names, case-sensitive):
-   * `Users`
-   * `Marks`
-   * `Tasks`
-   * `Submissions`
-   * `Escalations`
-
----
-
-## 2. Add the Apps Script Code
-1. In your Google Sheet, click **Extensions > Apps Script**.
-2. A new editor tab will open.
-3. Delete any default code inside `Code.gs`.
-4. Copy the entire contents of [`backend/Code.gs`](./backend/Code.gs) and paste it into the editor.
-5. Click the **Save** icon (diskette) or press `Cmd+S` / `Ctrl+S`.
-
----
-
-## 3. Seed Users & Headers (One-time Setup)
-1. In the Apps Script toolbar at the top, locate the function dropdown (it probably says `myFunction` or `doGet`).
-2. Select **`setup`** from the dropdown.
-3. Click **▶ Run**.
-4. Google will ask for permission ("Authorization Required"):
-   * Click **Review Permissions**.
-   * Choose your account `bahriabatch30@gmail.com`.
-   * Click **Advanced** (in small text).
-   * Click **Go to EconomicsPortal (unsafe)** (Google shows this warning for personal scripts you create yourself).
-   * Click **Allow**.
-5. The script will run. Check the Execution log — it will say:
-   `Setup complete. 17 users created.`
-6. Return to your Google Sheet: you will see all 5 tabs populated with their column headers, and the `Users` tab populated with the 17 class members and PINs.
-
----
-
-## 4. Deploy as a Web App (Public JSON API)
-1. In the Apps Script editor, click the blue **Deploy** button (top right) > **New deployment**.
-2. Click the gear icon next to "Select type" and choose **Web app**.
-3. Fill in the deployment details:
-   * **Description**: `EconomicsPortal API v1`
-   * **Execute as**: `Me (bahriabatch30@gmail.com)`
-   * **Who has access**: **`Anyone`** *(Important: Must be "Anyone" so the static web app can read/write)*.
-4. Click **Deploy**.
-5. Google will provide a **Web app URL** formatted like:
-   ```
-   https://script.google.com/macros/s/AKfycbx.../exec
-   ```
-6. **Copy this URL**.
-
----
-
-## 5. Connect Frontend
-1. Open [`js/config.js`](./js/config.js) in this repo.
-2. Replace `"PASTE_YOUR_APPS_SCRIPT_URL_HERE"` with your copied Web App URL:
-   ```javascript
-   export const API_URL = "https://script.google.com/macros/s/AKfycbx.../exec";
-   ```
-3. Commit and push the change to GitHub.
-
----
-
-## Verification
-You can verify your backend in your browser by visiting:
-`https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec?action=login&name=Shehroz&pin=1111`
-
-It should return:
-```json
-{"ok":true,"user":{"name":"Shehroz","role":"group_leader","team":"Shehroz"}}
-```
+2. Open [sheets.new](https://sheets.new) and name the spreadsheet `EconomicsPortalDB`.
+3. Create these 5 tabs: `Users`, `Marks`, `Tasks`, `Submissions`, `Escalations`.
+4. Go to **Extensions > Apps Script**, paste [`backend/Code.gs`](./backend/Code.gs), and save.
+5. Select **`setup`** from the function dropdown and click **▶ Run** (approve permissions).
+6. Click **Deploy > New deployment**:
+   * Type: **Web app**
+   * Execute as: **`Me (bahriabatch30@gmail.com)`**
+   * Who has access: **`Anyone`**
+7. Copy the Web app URL and paste it into `js/config.js`.

@@ -1,5 +1,5 @@
 /**
- * EconomicsPortal — API Client
+ * EconomicsPortal — API Client (v2)
  * 
  * Supports both:
  * 1. Live Google Apps Script Web App (production)
@@ -13,11 +13,12 @@ import {
   MOCK_MARKS,
   MOCK_SUBMISSIONS,
   MOCK_ESCALATIONS,
-  computeMockTeamAverages
+  computeMockTeamAverages,
+  computeMockMemberMetrics,
 } from "./mockData.js";
 
 // Persistent in-memory/localStorage store for Demo Mode
-const DEMO_STORAGE_KEY = "economics_portal_demo_db_v1";
+const DEMO_STORAGE_KEY = "economics_portal_demo_db_v2";
 
 function getDemoStore() {
   try {
@@ -52,8 +53,7 @@ export function resetDemoData() {
 
 /**
  * Universal POST helper
- * Google Apps Script Web Apps require 'text/plain;charset=utf-8' with stringified body
- * to prevent CORS preflight OPTIONS failures.
+ * Uses 'text/plain;charset=utf-8' with stringified body to avoid Apps Script CORS preflight issues.
  */
 async function postToAppsScript(body) {
   const response = await fetch(API_URL, {
@@ -96,7 +96,10 @@ export async function apiLogin(name, pin) {
         String(u.pin).trim() === cleanPin
     );
     if (!user) {
-      return { ok: false, error: "Invalid name or PIN. (Demo mode: try Shehroz / 1111, Amina / 2001, or Ramesh / 2002)" };
+      return {
+        ok: false,
+        error: "Invalid name or PIN. (Demo: Shehroz / 1111, Dr. Numan / 0000, Amina / 2001, Ramesh / 2002)",
+      };
     }
     return {
       ok: true,
@@ -123,6 +126,24 @@ export async function apiGetDashboard(role, team, name) {
     const subs = store.submissions;
     const escalations = store.escalations;
     const teamAverages = computeMockTeamAverages(marks);
+    const memberMetrics = computeMockMemberMetrics(marks, escalations);
+    const atRiskMembers = Object.values(memberMetrics).filter((m) => m.atRisk);
+
+    if (role === "instructor") {
+      return {
+        ok: true,
+        data: {
+          tasks,
+          marks,
+          submissions: subs,
+          escalations,
+          teamAverages,
+          memberMetrics,
+          atRiskMembers,
+          canEdit: true,
+        },
+      };
+    }
 
     if (role === "group_leader" || role === "assistant") {
       return {
@@ -133,11 +154,18 @@ export async function apiGetDashboard(role, team, name) {
           submissions: subs,
           escalations,
           teamAverages,
+          memberMetrics,
+          atRiskMembers,
+          canEdit: role === "group_leader",
         },
       };
     }
 
     if (role === "team_leader") {
+      const teamMetrics = {};
+      Object.keys(memberMetrics).forEach((m) => {
+        if (memberMetrics[m].team === team) teamMetrics[m] = memberMetrics[m];
+      });
       return {
         ok: true,
         data: {
@@ -146,11 +174,13 @@ export async function apiGetDashboard(role, team, name) {
           submissions: subs.filter((s) => s.team === team),
           escalations: escalations.filter((es) => es.team === team),
           teamAverage: teamAverages[team] || null,
+          memberMetrics: teamMetrics,
+          atRiskMembers: Object.values(teamMetrics).filter((m) => m.atRisk),
         },
       };
     }
 
-    // member / instructor
+    // member
     return {
       ok: true,
       data: {
@@ -158,6 +188,7 @@ export async function apiGetDashboard(role, team, name) {
         myMarks: marks.filter((m) => m.member.toLowerCase() === name.toLowerCase()),
         teamAverage: teamAverages[team] || null,
         mySubmissions: subs.filter((s) => s.member.toLowerCase() === name.toLowerCase()),
+        myMetrics: memberMetrics[name] || null,
       },
     };
   }
@@ -182,10 +213,15 @@ export async function apiAddMark(payload) {
       member: payload.member,
       team: payload.team,
       cycle: payload.cycle,
+      mockNumber: payload.mockNumber || "",
       quizScore: Number(payload.quizScore),
-      submission: payload.submission,
-      attendance: payload.attendance,
+      submission: payload.submission || "Yes",
+      attendance: payload.attendance || "100%",
+      previewDone: payload.previewDone || "",
+      peerRating: payload.peerRating || "",
+      punctual: payload.punctual || "",
       notes: payload.notes || "",
+      editedBy: payload.editedBy || payload.name || "",
       timestamp: new Date().toISOString(),
     };
     store.marks.unshift(newMark);
@@ -195,6 +231,40 @@ export async function apiAddMark(payload) {
 
   return await postToAppsScript({
     action: "addMark",
+    ...payload,
+  });
+}
+
+export async function apiEditMark(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    const mark = store.marks.find((m) => m.id === payload.id);
+    if (mark) {
+      Object.assign(mark, payload.fields);
+      if (payload.editedBy || payload.name) {
+        mark.editedBy = payload.editedBy || payload.name;
+      }
+      saveDemoStore(store);
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "editMark",
+    ...payload,
+  });
+}
+
+export async function apiDeleteMark(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    store.marks = store.marks.filter((m) => m.id !== payload.id);
+    saveDemoStore(store);
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "deleteMark",
     ...payload,
   });
 }
@@ -220,6 +290,23 @@ export async function apiAddTask(payload) {
 
   return await postToAppsScript({
     action: "addTask",
+    ...payload,
+  });
+}
+
+export async function apiEditTask(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    const task = store.tasks.find((t) => t.id === payload.id);
+    if (task) {
+      Object.assign(task, payload.fields);
+      saveDemoStore(store);
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "editTask",
     ...payload,
   });
 }

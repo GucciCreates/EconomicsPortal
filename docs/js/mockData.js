@@ -1,6 +1,6 @@
 /**
- * EconomicsPortal — Seed Mock Data
- * Used for instant preview and offline demo before Apps Script is deployed.
+ * EconomicsPortal — Seed Mock Data (v2)
+ * Used for instant preview and offline demo.
  */
 
 export const MOCK_USERS = [
@@ -37,12 +37,12 @@ export const MOCK_TASKS = [
   },
   {
     id: "tsk-102",
-    title: "Inflation & Philips Curve Case Analysis",
+    title: "Inflation & Phillips Curve Case Analysis",
     description: "Analyze the 2020-2023 stagflation data across developing economies.",
     team: "Ayesha",
     dueDate: "2026-11-05",
     fileUrl: "https://drive.google.com/drive/folders/economics-portal-demo",
-    createdBy: "Shehroz",
+    createdBy: "Dr. Numan",
     status: "open",
     timestamp: "2026-10-21T14:30:00.000Z"
   },
@@ -71,24 +71,35 @@ export const MOCK_TASKS = [
 ];
 
 export const MOCK_MARKS = [
-  { id: "mk-1", member: "Ramesh", team: "Amina", cycle: "Cycle 1", quizScore: 88, submission: "100%", attendance: "95%", notes: "Great grasp of Keynesian cross", timestamp: "2026-10-15" },
-  { id: "mk-2", member: "Mamoon", team: "Amina", cycle: "Cycle 1", quizScore: 74, submission: "85%", attendance: "90%", notes: "Review multiplier formula", timestamp: "2026-10-15" },
-  { id: "mk-3", member: "Tazneem", team: "Amina", cycle: "Cycle 1", quizScore: 92, submission: "100%", attendance: "100%", notes: "Outstanding analytical work", timestamp: "2026-10-15" },
-  
-  { id: "mk-4", member: "Minal", team: "Ayesha", cycle: "Cycle 1", quizScore: 82, submission: "95%", attendance: "90%", notes: "Well structured argument", timestamp: "2026-10-15" },
-  { id: "mk-5", member: "Anika", team: "Ayesha", cycle: "Cycle 1", quizScore: 68, submission: "80%", attendance: "85%", notes: "Needs focus on balance of payments", timestamp: "2026-10-15" },
-  { id: "mk-6", member: "Ahmed bin Nasir", team: "Ayesha", cycle: "Cycle 1", quizScore: 78, submission: "90%", attendance: "88%", notes: "Solid overall effort", timestamp: "2026-10-15" },
-  
-  { id: "mk-7", member: "Shaiman", team: "Lareb", cycle: "Cycle 1", quizScore: 85, submission: "100%", attendance: "95%", notes: "Clear diagrams and math", timestamp: "2026-10-15" },
-  { id: "mk-8", member: "Aisha Amjad", team: "Lareb", cycle: "Cycle 1", quizScore: 91, submission: "100%", attendance: "100%", notes: "Top paper in cohort", timestamp: "2026-10-15" },
-  { id: "mk-9", member: "Haseeb", team: "Lareb", cycle: "Cycle 1", quizScore: 72, submission: "85%", attendance: "80%", notes: "Good, revise liquidity preference", timestamp: "2026-10-15" },
-  
-  { id: "mk-10", member: "Gorsi", team: "Shehroz", cycle: "Cycle 1", quizScore: 89, submission: "100%", attendance: "100%", notes: "Excellent consistency", timestamp: "2026-10-15" },
-  { id: "mk-11", member: "Haris", team: "Shehroz", cycle: "Cycle 1", quizScore: 86, submission: "95%", attendance: "95%", notes: "Strong quantitative presentation", timestamp: "2026-10-15" },
+  // Cycle 1
+  { id: "mk-1", member: "Ramesh", team: "Amina", cycle: "Cycle 1", mockNumber: "", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Great grasp of Keynesian cross", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-2", member: "Mamoon", team: "Amina", cycle: "Cycle 1", mockNumber: "", quizScore: 48, submission: "No", attendance: "80%", previewDone: "No", peerRating: "3.0", punctual: "No", notes: "Missed submission deadline", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-3", member: "Tazneem", team: "Amina", cycle: "Cycle 1", mockNumber: "", quizScore: 92, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Outstanding analytical work", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-4", member: "Minal", team: "Ayesha", cycle: "Cycle 1", mockNumber: "", quizScore: 82, submission: "Yes", attendance: "90%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Well structured argument", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-5", member: "Anika", team: "Ayesha", cycle: "Cycle 1", mockNumber: "", quizScore: 45, submission: "No", attendance: "75%", previewDone: "No", peerRating: "3.2", punctual: "No", notes: "Needs focus on balance of payments", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-6", member: "Ahmed bin Nasir", team: "Ayesha", cycle: "Cycle 1", mockNumber: "", quizScore: 78, submission: "Yes", attendance: "88%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Solid overall effort", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-7", member: "Shaiman", team: "Lareb", cycle: "Cycle 1", mockNumber: "", quizScore: 85, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Clear diagrams and math", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-8", member: "Aisha Amjad", team: "Lareb", cycle: "Cycle 1", mockNumber: "", quizScore: 91, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Top paper in cohort", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-9", member: "Haseeb", team: "Lareb", cycle: "Cycle 1", mockNumber: "", quizScore: 72, submission: "Yes", attendance: "80%", previewDone: "Yes", peerRating: "3.8", punctual: "Yes", notes: "Revise liquidity preference", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-10", member: "Gorsi", team: "Shehroz", cycle: "Cycle 1", mockNumber: "", quizScore: 89, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.8", punctual: "Yes", notes: "Excellent consistency", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-11", member: "Haris", team: "Shehroz", cycle: "Cycle 1", mockNumber: "", quizScore: 86, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Strong quantitative presentation", editedBy: "", timestamp: "2026-10-10" },
+
+  // Cycle 2 (Recent - gives historical trend and delta)
+  { id: "mk-12", member: "Ramesh", team: "Amina", cycle: "Cycle 2", mockNumber: "1", quizScore: 92, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.8", punctual: "Yes", notes: "+4 delta, mastered IS-LM shifts", editedBy: "Dr. Numan", timestamp: "2026-10-18" },
+  { id: "mk-13", member: "Mamoon", team: "Amina", cycle: "Cycle 2", mockNumber: "1", quizScore: 46, submission: "No", attendance: "70%", previewDone: "No", peerRating: "2.8", punctual: "No", notes: "Support plan needed, second low cycle", editedBy: "Dr. Numan", timestamp: "2026-10-18" },
+  { id: "mk-14", member: "Tazneem", team: "Amina", cycle: "Cycle 2", mockNumber: "1", quizScore: 95, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Consistent excellence", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-15", member: "Minal", team: "Ayesha", cycle: "Cycle 2", mockNumber: "1", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Strong improvement (+6)", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-16", member: "Anika", team: "Ayesha", cycle: "Cycle 2", mockNumber: "1", quizScore: 44, submission: "No", attendance: "65%", previewDone: "No", peerRating: "3.0", punctual: "No", notes: "At-risk; consult group leader", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-17", member: "Ahmed bin Nasir", team: "Ayesha", cycle: "Cycle 2", mockNumber: "1", quizScore: 82, submission: "Yes", attendance: "90%", previewDone: "Yes", peerRating: "4.2", punctual: "Yes", notes: "Solid advance (+4)", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-18", member: "Shaiman", team: "Lareb", cycle: "Cycle 2", mockNumber: "1", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "High accuracy", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-19", member: "Aisha Amjad", team: "Lareb", cycle: "Cycle 2", mockNumber: "1", quizScore: 94, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Highest quiz score in cohort", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-20", member: "Haseeb", team: "Lareb", cycle: "Cycle 2", mockNumber: "1", quizScore: 76, submission: "Yes", attendance: "85%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Good upward trend (+4)", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-21", member: "Gorsi", team: "Shehroz", cycle: "Cycle 2", mockNumber: "1", quizScore: 91, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.9", punctual: "Yes", notes: "Steady performance", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-22", member: "Haris", team: "Shehroz", cycle: "Cycle 2", mockNumber: "1", quizScore: 89, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.6", punctual: "Yes", notes: "Very thorough analysis", editedBy: "", timestamp: "2026-10-18" }
 ];
 
 export const MOCK_SUBMISSIONS = [
-  { id: "sub-1", taskId: "tsk-101", member: "Ramesh", team: "Amina", content: "Submitted summary notes. Added key equilibrium shifts in Google Doc.", fileUrl: "https://drive.google.com", timestamp: "2026-10-21T18:00:00.000Z" },
+  { id: "sub-1", taskId: "tsk-101", member: "Ramesh", team: "Amina", content: "Submitted summary notes on IS-LM model.", fileUrl: "https://drive.google.com", timestamp: "2026-10-21T18:00:00.000Z" },
   { id: "sub-2", taskId: "tsk-101", member: "Minal", team: "Ayesha", content: "IS-LM shifts analyzed with 4 scenarios.", fileUrl: "", timestamp: "2026-10-22T08:30:00.000Z" },
   { id: "sub-3", taskId: "tsk-101", member: "Gorsi", team: "Shehroz", content: "Completed and checked by team leader.", fileUrl: "https://drive.google.com", timestamp: "2026-10-22T19:45:00.000Z" }
 ];
@@ -139,6 +150,82 @@ export function computeMockTeamAverages(marks) {
   Object.keys(byTeam).forEach(team => {
     const arr = byTeam[team];
     result[team] = Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10;
+  });
+  return result;
+}
+
+function isYes(v) {
+  const s = String(v).trim().toLowerCase();
+  return s === "yes" || s === "true" || s === "done" || s === "1" || s === "on time" || s === "100%";
+}
+
+function rateOfYes(rows, field) {
+  const relevant = rows.filter(r => r[field] !== "" && r[field] !== undefined && r[field] !== null);
+  if (!relevant.length) return null;
+  const yesCount = relevant.filter(r => isYes(r[field])).length;
+  return Math.round((yesCount / relevant.length) * 100);
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
+export function computeMockMemberMetrics(marks, escalations) {
+  const byMember = {};
+  marks.forEach(m => {
+    if (!byMember[m.member]) byMember[m.member] = [];
+    byMember[m.member].push(m);
+  });
+
+  const result = {};
+  Object.keys(byMember).forEach(member => {
+    const rows = byMember[member].slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const team = rows[rows.length - 1].team;
+
+    let streak = 0;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const passed = Number(rows[i].quizScore) >= 50 && isYes(rows[i].submission);
+      if (passed) streak++; else break;
+    }
+
+    let improvementDelta = null;
+    const scored = rows.filter(r => r.quizScore !== "" && !isNaN(Number(r.quizScore)));
+    if (scored.length >= 2) {
+      improvementDelta = round1(Number(scored[scored.length - 1].quizScore) - Number(scored[scored.length - 2].quizScore));
+    }
+
+    let mockDelta = null;
+    const mocks = rows.filter(r => r.mockNumber !== "" && r.mockNumber !== undefined && r.mockNumber !== null)
+      .sort((a, b) => Number(a.mockNumber) - Number(b.mockNumber));
+    if (mocks.length >= 2) {
+      mockDelta = round1(Number(mocks[mocks.length - 1].quizScore) - Number(mocks[mocks.length - 2].quizScore));
+    }
+
+    const ratings = rows.map(r => Number(r.peerRating)).filter(v => !isNaN(v) && v > 0);
+    const avgPeerRating = ratings.length ? round1(ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
+
+    const previewRate = rateOfYes(rows, "previewDone");
+    const punctualityRate = rateOfYes(rows, "punctual");
+
+    const doubtCount = escalations.filter(es => es.raisedBy === member).length;
+
+    const lastTwo = rows.slice(-2);
+    const atRisk = lastTwo.length === 2 && lastTwo.every(r =>
+      !isYes(r.submission) || (r.quizScore !== "" && Number(r.quizScore) < 50)
+    );
+
+    result[member] = {
+      member,
+      team,
+      streak,
+      improvementDelta,
+      mockDelta,
+      avgPeerRating,
+      previewRate,
+      punctualityRate,
+      doubtCount,
+      atRisk,
+    };
   });
   return result;
 }

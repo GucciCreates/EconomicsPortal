@@ -1,5 +1,5 @@
 /**
- * EconomicsPortal — Main Application Controller
+ * EconomicsPortal — Main Application Controller (v2)
  */
 
 import { API_URL, isDemoMode } from "./config.js";
@@ -49,15 +49,15 @@ function renderBanner() {
     bannerEl.innerHTML = `
       <div class="demo-banner">
         <span>
-          ⚡ <strong>Demo / Offline Mode Active</strong> — Simulated backend is running with instant sample data.
+          ⚡ <strong>Demo / Offline Mode Active</strong> — Running with interactive sample data.
         </span>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
           ${
             localStorage.getItem("economics_portal_force_demo") === "true"
               ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Try Live API</button>`
-              : `<a href="./SETUP_GUIDE.md" target="_blank" style="font-weight: 600;">Connect Apps Script ↗</a>`
+              : `<a href="./SETUP_GUIDE.md" target="_blank" style="font-weight: 600;">Upgrade to v2 ↗</a>`
           }
-          <button id="btn-reset-demo" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Reset Data</button>
+          <button id="btn-reset-demo" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Reset Demo Data</button>
         </div>
       </div>
     `;
@@ -94,7 +94,7 @@ function renderHeader() {
   headerEl.innerHTML = `
     <div class="header-container">
       <a href="#" class="brand-wrapper" id="brand-link">
-        <div class="brand-icon">📈</div>
+        <div class="brand-mark">E</div>
         <span>EconomicsPortal</span>
       </a>
 
@@ -152,11 +152,13 @@ function renderFooter() {
 // ─────────────────────────────────────────────────────────────────────────────
 function renderLogin() {
   mainEl.innerHTML = `
-    <div class="login-screen">
-      <div class="login-header">
-        <div style="font-size: 2.75rem; margin-bottom: 0.5rem;">📈</div>
-        <h1>EconomicsPortal</h1>
-        <p>Sign in with your name and 4-digit PIN</p>
+    <div style="max-width: 440px; margin: 3rem auto; padding: 0 1rem;">
+      <div style="text-align: center; margin-bottom: 2rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📈</div>
+        <h1 style="font-size: 1.65rem; font-weight: 800; color: var(--text-main);">EconomicsPortal</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
+          Dr. Numan's Economics Class Gradebook & Portal
+        </p>
       </div>
 
       <div class="card">
@@ -169,7 +171,7 @@ function renderLogin() {
               type="text"
               id="login-name"
               class="form-control"
-              placeholder="e.g. Shehroz, Amina, or Ramesh"
+              placeholder="e.g. Dr. Numan, Shehroz, or Ramesh"
               autocomplete="name"
               required
             />
@@ -196,15 +198,17 @@ function renderLogin() {
         </form>
 
         <!-- Quick Demo Profiles for instant testing -->
-        <div class="quick-demo-login">
-          <p>Quick Demo Logins (Click to test any role):</p>
-          <div class="demo-chips">
-            <button class="demo-chip" data-name="Shehroz" data-pin="1111">Shehroz (Group Leader)</button>
-            <button class="demo-chip" data-name="Sajal" data-pin="1112">Sajal (Assistant)</button>
-            <button class="demo-chip" data-name="Amina" data-pin="2001">Amina (Team Leader)</button>
-            <button class="demo-chip" data-name="Ramesh" data-pin="2002">Ramesh (Member)</button>
-            <button class="demo-chip" data-name="Ayesha (Quetta)" data-pin="3001">Ayesha (Team Leader)</button>
-            <button class="demo-chip" data-name="Minal" data-pin="3002">Minal (Member)</button>
+        <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); font-size: 0.85rem;">
+          <p style="color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">
+            Quick Role Logins:
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+            <button class="btn btn-secondary btn-sm demo-chip" data-name="Dr. Numan" data-pin="0000">Dr. Numan (Instructor)</button>
+            <button class="btn btn-secondary btn-sm demo-chip" data-name="Shehroz" data-pin="1111">Shehroz (Group Leader)</button>
+            <button class="btn btn-secondary btn-sm demo-chip" data-name="Sajal" data-pin="1112">Sajal (Assistant)</button>
+            <button class="btn btn-secondary btn-sm demo-chip" data-name="Amina" data-pin="2001">Amina (Team Leader)</button>
+            <button class="btn btn-secondary btn-sm demo-chip" data-name="Ramesh" data-pin="2002">Ramesh (Member)</button>
+            <button class="btn btn-secondary btn-sm demo-chip" data-name="Mamoon" data-pin="2003">Mamoon (At-Risk Member)</button>
           </div>
         </div>
       </div>
@@ -237,7 +241,7 @@ function renderLogin() {
         <div class="alert alert-error" style="line-height: 1.45;">
           <strong>Connection error: ${err.message}</strong>
           <div style="font-size: 0.8rem; margin: 0.35rem 0;">
-            Google is blocking this request because the Apps Script Web App still requires a Google account login.
+            Could not reach the Apps Script backend. You can continue in offline demo mode.
           </div>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-force-demo" style="width: 100%; margin-top: 0.5rem; background: #fff; font-weight: 600;">
             ⚡ Continue in Demo Mode for now
@@ -280,8 +284,8 @@ async function loadDashboard() {
 
   mainEl.innerHTML = `
     <div style="text-align: center; padding: 4rem 1rem;">
-      <div style="font-size: 2rem; margin-bottom: 0.5rem; animation: pulse 1.5s infinite;">⏳</div>
-      <p style="color: var(--text-muted); font-size: 0.95rem;">Loading dashboard data for ${user.name}...</p>
+      <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">📊</div>
+      <p style="color: var(--text-muted); font-size: 0.95rem;">Loading ledger for ${user.name}...</p>
     </div>
   `;
 
@@ -302,12 +306,12 @@ async function loadDashboard() {
 
     const data = res.data || {};
 
-    if (user.role === "group_leader" || user.role === "assistant") {
+    if (user.role === "instructor" || user.role === "group_leader" || user.role === "assistant") {
       renderGroupLeaderDashboard(mainEl, user, data, loadDashboard);
     } else if (user.role === "team_leader") {
       renderTeamLeaderDashboard(mainEl, user, data, loadDashboard);
     } else {
-      // member or instructor
+      // member
       renderMemberDashboard(mainEl, user, data, loadDashboard);
     }
   } catch (err) {

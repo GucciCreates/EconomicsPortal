@@ -3,33 +3,20 @@
  * Account to use: bahriabatch30@gmail.com
  * Repo:           https://github.com/GucciCreates/EconomicsPortal
  *
- * This script turns a Google Sheet into a free JSON API for the three
- * dashboards (Group Leader, Team Leader, Member). It costs nothing,
- * never pauses, and needs no credit card.
+ * v2: adds extra performance metrics (streak, improvement delta, at-risk
+ * flag, mock-to-mock delta, preview completion, peer rating, punctuality,
+ * doubt count) and a full instructor role for Dr. Numan with edit rights
+ * over marks and tasks.
  *
  * ───────────────────────────────────────────────────────────────────
- * ONE-TIME SETUP (see SETUP_GUIDE.md for screenshots-level detail)
+ * ONE-TIME SETUP (see SETUP_GUIDE.md)
  * ───────────────────────────────────────────────────────────────────
- * 1. Sign in to bahriabatch30@gmail.com
- * 2. Go to sheets.new — create a blank Google Sheet, name it "EconomicsPortalDB"
- * 3. Create these tabs (exact names, case-sensitive):
- *      Users, Marks, Tasks, Submissions, Escalations
- * 4. Add header rows exactly as shown in HEADERS below (row 1 of each tab)
- * 5. Extensions > Apps Script. Delete the sample code. Paste this whole file.
- * 6. Click the gear icon (Project Settings) > check "Show appsscript.json"
- *    not required; just click Deploy.
- * 7. Deploy > New deployment > type: Web app
- *      - Execute as: Me (bahriabatch30@gmail.com)
- *      - Who has access: Anyone
- * 8. Copy the Web App URL it gives you — that is API_URL for the frontend.
- * 9. Run the function `setup()` once from the Apps Script editor (select it
- *    in the dropdown, click Run) to seed header rows and the 17 people.
- *    The first run will ask you to authorize — approve it (it's your own script).
+ * Same as v1. If you already set up v1, see "UPGRADING FROM v1" in
+ * SETUP_GUIDE.md before pasting this in — the Marks tab gets new columns.
  */
 
 // ─────────────────────────────────────────────────────────────────────────
 // CONFIG — edit this list once, right now, with real names and PINs.
-// PINs are 4 digits, chosen by you, given out privately to each person.
 // ─────────────────────────────────────────────────────────────────────────
 const PEOPLE = [
   // name,              role,          team,     pin
@@ -60,9 +47,11 @@ const SHEET_NAMES = {
   ESCALATIONS: "Escalations",
 };
 
+// Marks now carries new input fields: mockNumber, previewDone, peerRating,
+// punctual, editedBy — on top of the original quizScore/submission/attendance.
 const HEADERS = {
   Users:       ["name", "role", "team", "pin"],
-  Marks:       ["id", "member", "team", "cycle", "quizScore", "submission", "attendance", "notes", "timestamp"],
+  Marks:       ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
   Tasks:       ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
   Submissions: ["id", "taskId", "member", "team", "content", "fileUrl", "timestamp"],
   Escalations: ["id", "raisedBy", "team", "topic", "details", "severity", "status", "timestamp"],
@@ -91,8 +80,6 @@ function setup() {
 
 // ─────────────────────────────────────────────────────────────────────────
 // WEB API
-// doGet handles: login, dashboard data, lists
-// doPost handles: adding marks, tasks, submissions, escalations
 // ─────────────────────────────────────────────────────────────────────────
 
 function doGet(e) {
@@ -116,8 +103,9 @@ function doGet(e) {
     }
 
     if (action === "users") {
-      // group leader only — pass role check from frontend, double-checked here
-      if (e.parameter.role !== "group_leader") return json({ ok: false, error: "Not authorized." });
+      if (!["group_leader", "instructor"].includes(e.parameter.role)) {
+        return json({ ok: false, error: "Not authorized." });
+      }
       return json({ ok: true, users: sheetToObjects(ss.getSheetByName(SHEET_NAMES.USERS)) });
     }
 
@@ -134,17 +122,33 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     if (action === "addMark") {
-      requireRole(body, ["group_leader", "team_leader"]);
+      requireRole(body, ["group_leader", "team_leader", "instructor"]);
       appendRow(ss, SHEET_NAMES.MARKS, [
-        newId(), body.member, body.team, body.cycle,
-        body.quizScore, body.submission, body.attendance, body.notes || "",
-        new Date(),
+        newId(), body.member, body.team, body.cycle, body.mockNumber || "",
+        body.quizScore, body.submission, body.attendance,
+        body.previewDone || "", body.peerRating || "", body.punctual || "",
+        body.notes || "", body.editedBy || body.name || "", new Date(),
       ]);
       return json({ ok: true });
     }
 
+    // NEW: edit an existing mark — instructor and group leader only.
+    // body.fields = {columnName: newValue, ...} — any Marks column.
+    if (action === "editMark") {
+      requireRole(body, ["group_leader", "instructor"]);
+      updateRow(ss, SHEET_NAMES.MARKS, body.id, body.fields, body.editedBy || body.name);
+      return json({ ok: true });
+    }
+
+    // NEW: delete a mark row entirely — instructor only (correcting bad data).
+    if (action === "deleteMark") {
+      requireRole(body, ["instructor"]);
+      deleteRow(ss, SHEET_NAMES.MARKS, body.id);
+      return json({ ok: true });
+    }
+
     if (action === "addTask") {
-      requireRole(body, ["group_leader"]);
+      requireRole(body, ["group_leader", "instructor"]);
       appendRow(ss, SHEET_NAMES.TASKS, [
         newId(), body.title, body.description || "", body.team,
         body.dueDate || "", body.fileUrl || "", body.createdBy, "open",
@@ -154,8 +158,15 @@ function doPost(e) {
     }
 
     if (action === "updateTaskStatus") {
-      requireRole(body, ["group_leader", "team_leader"]);
+      requireRole(body, ["group_leader", "team_leader", "instructor"]);
       updateCell(ss, SHEET_NAMES.TASKS, body.id, "status", body.status);
+      return json({ ok: true });
+    }
+
+    // NEW: instructor/group leader can edit any task field (title, due date, etc).
+    if (action === "editTask") {
+      requireRole(body, ["group_leader", "instructor"]);
+      updateRow(ss, SHEET_NAMES.TASKS, body.id, body.fields, null);
       return json({ ok: true });
     }
 
@@ -176,7 +187,7 @@ function doPost(e) {
     }
 
     if (action === "updateEscalationStatus") {
-      requireRole(body, ["group_leader"]);
+      requireRole(body, ["group_leader", "instructor"]);
       updateCell(ss, SHEET_NAMES.ESCALATIONS, body.id, "status", body.status);
       return json({ ok: true });
     }
@@ -210,28 +221,45 @@ function buildDashboard(ss, role, team, name) {
   const marks = sheetToObjects(ss.getSheetByName(SHEET_NAMES.MARKS));
   const subs = sheetToObjects(ss.getSheetByName(SHEET_NAMES.SUBMISSIONS));
   const escalations = sheetToObjects(ss.getSheetByName(SHEET_NAMES.ESCALATIONS));
+  const metrics = computeMemberMetrics(marks, escalations);
+
+  // Instructor sees everything the group leader sees, plus canEdit so the
+  // frontend shows edit/delete controls on every mark and task.
+  if (role === "instructor") {
+    return {
+      tasks: tasks, marks: marks, submissions: subs, escalations: escalations,
+      teamAverages: computeTeamAverages(marks),
+      memberMetrics: metrics,
+      atRiskMembers: Object.values(metrics).filter(m => m.atRisk),
+      canEdit: true,
+    };
+  }
 
   if (role === "group_leader" || role === "assistant") {
     return {
-      tasks: tasks,
-      marks: marks,
-      submissions: subs,
-      escalations: escalations,
+      tasks: tasks, marks: marks, submissions: subs, escalations: escalations,
       teamAverages: computeTeamAverages(marks),
+      memberMetrics: metrics,
+      atRiskMembers: Object.values(metrics).filter(m => m.atRisk),
+      canEdit: role === "group_leader", // Sajal (assistant) stays read-only
     };
   }
 
   if (role === "team_leader") {
+    const teamMetrics = {};
+    Object.keys(metrics).forEach(m => { if (metrics[m].team === team) teamMetrics[m] = metrics[m]; });
     return {
       tasks: tasks.filter(t => t.team === team || t.team === "ALL"),
       marks: marks.filter(m => m.team === team),
       submissions: subs.filter(s => s.team === team),
       escalations: escalations.filter(es => es.team === team),
       teamAverage: computeTeamAverages(marks)[team] || null,
+      memberMetrics: teamMetrics,
+      atRiskMembers: Object.values(teamMetrics).filter(m => m.atRisk),
     };
   }
 
-  // member or instructor
+  // member — sees only their own metrics, plus team average
   const myMarks = marks.filter(m => m.member === name);
   const teamAvg = computeTeamAverages(marks)[team] || null;
   return {
@@ -239,6 +267,7 @@ function buildDashboard(ss, role, team, name) {
     myMarks: myMarks,
     teamAverage: teamAvg,
     mySubmissions: subs.filter(s => s.member === name),
+    myMetrics: metrics[name] || null,
   };
 }
 
@@ -253,9 +282,92 @@ function computeTeamAverages(marks) {
   const result = {};
   Object.keys(byTeam).forEach(team => {
     const arr = byTeam[team];
-    result[team] = Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10;
+    result[team] = round1(arr.reduce((a, b) => a + b, 0) / arr.length);
   });
   return result;
+}
+
+/**
+ * Per-member metrics beyond the raw marks table:
+ *   streak           — consecutive most-recent cycles with quizScore >= 50
+ *                       AND submission marked done/yes
+ *   improvementDelta — latest quizScore minus the cycle before it
+ *   mockDelta        — latest mockNumber's score minus the previous
+ *                       mockNumber's score (sprint weeks only)
+ *   avgPeerRating    — mean of peerRating entries (1-5 scale)
+ *   previewRate      — % of cycles where previewDone was marked yes
+ *   punctualityRate  — % of cycles where punctual was marked yes
+ *   doubtCount       — number of escalations raisedBy this member
+ *   atRisk           — true if the two most recent cycles each failed
+ *                       (missing submission OR quizScore < 50)
+ */
+function computeMemberMetrics(marks, escalations) {
+  const byMember = {};
+  marks.forEach(m => {
+    if (!byMember[m.member]) byMember[m.member] = [];
+    byMember[m.member].push(m);
+  });
+
+  const result = {};
+  Object.keys(byMember).forEach(member => {
+    const rows = byMember[member].slice().sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const team = rows[rows.length - 1].team;
+
+    let streak = 0;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const passed = Number(rows[i].quizScore) >= 50 && isYes(rows[i].submission);
+      if (passed) streak++; else break;
+    }
+
+    let improvementDelta = null;
+    const scored = rows.filter(r => r.quizScore !== "" && !isNaN(Number(r.quizScore)));
+    if (scored.length >= 2) {
+      improvementDelta = round1(Number(scored[scored.length - 1].quizScore) - Number(scored[scored.length - 2].quizScore));
+    }
+
+    let mockDelta = null;
+    const mocks = rows.filter(r => r.mockNumber !== "" && r.mockNumber !== undefined && r.mockNumber !== null)
+      .sort((a, b) => Number(a.mockNumber) - Number(b.mockNumber));
+    if (mocks.length >= 2) {
+      mockDelta = round1(Number(mocks[mocks.length - 1].quizScore) - Number(mocks[mocks.length - 2].quizScore));
+    }
+
+    const ratings = rows.map(r => Number(r.peerRating)).filter(v => !isNaN(v) && v > 0);
+    const avgPeerRating = ratings.length ? round1(ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
+
+    const previewRate = rateOfYes(rows, "previewDone");
+    const punctualityRate = rateOfYes(rows, "punctual");
+
+    const doubtCount = escalations.filter(es => es.raisedBy === member).length;
+
+    const lastTwo = rows.slice(-2);
+    const atRisk = lastTwo.length === 2 && lastTwo.every(r =>
+      !isYes(r.submission) || (r.quizScore !== "" && Number(r.quizScore) < 50)
+    );
+
+    result[member] = {
+      member,
+      team, streak, improvementDelta, mockDelta, avgPeerRating,
+      previewRate, punctualityRate, doubtCount, atRisk,
+    };
+  });
+  return result;
+}
+
+function isYes(v) {
+  const s = String(v).trim().toLowerCase();
+  return s === "yes" || s === "true" || s === "done" || s === "1" || s === "on time" || s === "100%";
+}
+
+function rateOfYes(rows, field) {
+  const relevant = rows.filter(r => r[field] !== "" && r[field] !== undefined && r[field] !== null);
+  if (!relevant.length) return null;
+  const yesCount = relevant.filter(r => isYes(r[field])).length;
+  return Math.round((yesCount / relevant.length) * 100);
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
 }
 
 function sheetToObjects(sheet) {
@@ -283,6 +395,44 @@ function updateCell(ss, sheetName, id, columnName, value) {
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][idCol]) === String(id)) {
       sheet.getRange(i + 1, targetCol + 1).setValue(value);
+      return;
+    }
+  }
+  throw new Error("Row with id " + id + " not found in " + sheetName);
+}
+
+// NEW: patch several fields on one row at once, e.g. fields = {quizScore: 72, notes: "re-marked"}.
+// If editedByName is given and the sheet has an "editedBy" column, stamps who made the edit.
+function updateRow(ss, sheetName, id, fields, editedByName) {
+  const sheet = ss.getSheetByName(sheetName);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf("id");
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(id)) {
+      Object.keys(fields).forEach(col => {
+        const colIndex = headers.indexOf(col);
+        if (colIndex !== -1) sheet.getRange(i + 1, colIndex + 1).setValue(fields[col]);
+      });
+      const editedByCol = headers.indexOf("editedBy");
+      if (editedByCol !== -1 && editedByName) {
+        sheet.getRange(i + 1, editedByCol + 1).setValue(editedByName);
+      }
+      return;
+    }
+  }
+  throw new Error("Row with id " + id + " not found in " + sheetName);
+}
+
+// NEW: delete a row by id.
+function deleteRow(ss, sheetName, id) {
+  const sheet = ss.getSheetByName(sheetName);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf("id");
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(id)) {
+      sheet.deleteRow(i + 1);
       return;
     }
   }

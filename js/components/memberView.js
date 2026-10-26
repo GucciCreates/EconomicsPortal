@@ -1,23 +1,17 @@
 /**
- * EconomicsPortal — Member Dashboard Component
+ * EconomicsPortal — Member Dashboard Component (v2)
  */
 
 import { apiAddSubmission, apiAddEscalation } from "../api.js";
-
-export function getScoreBand(score) {
-  const num = Number(score);
-  if (isNaN(num)) return { label: "N/A", cls: "badge-attention" };
-  if (num >= 85) return { label: "Outstanding", cls: "badge-outstanding" };
-  if (num >= 70) return { label: "Strong", cls: "badge-strong" };
-  if (num >= 50) return { label: "Needs attention", cls: "badge-attention" };
-  return { label: "Support plan", cls: "badge-support" };
-}
+import { getScoreBand, renderMemberMetricsHTML } from "./metricsPanel.js";
+import { renderSparkline } from "./charts.js";
 
 export function renderMemberDashboard(container, user, data, onRefresh) {
   const tasks = data.tasks || [];
   const myMarks = data.myMarks || [];
   const teamAverage = data.teamAverage;
   const mySubmissions = data.mySubmissions || [];
+  const myMetrics = data.myMetrics;
 
   const avgBand = teamAverage !== null ? getScoreBand(teamAverage) : null;
 
@@ -26,14 +20,15 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     <div class="card" style="margin-bottom: 1.25rem;">
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
         <div>
-          <h2 style="font-size: 1.4rem; font-weight: 700;">Welcome, ${user.name}</h2>
-          <p style="color: var(--text-muted); font-size: 0.9rem;">
-            Team: <strong style="color: var(--text-main);">${user.team}</strong> • Member Workspace
+          <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">${user.name}</h2>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Student Workspace • Team <strong>${user.team}</strong>
+            ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Needs attention</span>` : ""}
           </p>
         </div>
         <div style="text-align: right;">
-          <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Team Average</div>
-          <div style="font-size: 1.75rem; font-weight: 800; color: var(--primary);">
+          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
+          <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
             ${teamAverage !== null ? teamAverage : "—"}
           </div>
           ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ""}
@@ -41,12 +36,30 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
       </div>
     </div>
 
+    <!-- Performance Metrics Panel & Sparkline -->
+    <div style="margin-bottom: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h3 style="font-size: 1.05rem; font-weight: 700;">My Performance</h3>
+        ${
+          myMarks.length > 1
+            ? `
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-size: 0.75rem; color: var(--text-muted);">Quiz trend:</span>
+            <canvas id="member-sparkline" width="140" height="38" style="vertical-align: middle;"></canvas>
+          </div>
+        `
+            : ""
+        }
+      </div>
+      ${renderMemberMetricsHTML(myMetrics, { title: "Metrics & Growth" })}
+    </div>
+
     <div class="grid-2">
-      <!-- Left Column: Tasks & Submissions -->
+      <!-- Left Column: Tasks -->
       <div>
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">📝 My Tasks (${tasks.length})</h3>
+            <h3 class="card-title">My Tasks (${tasks.length})</h3>
             <button class="btn btn-secondary btn-sm" id="btn-refresh-tasks">↻ Refresh</button>
           </div>
 
@@ -61,44 +74,43 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                       const isDone = task.status === "done";
 
                       return `
-                      <div class="task-item ${isDone ? "done" : ""}" id="task-card-${task.id}">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem;">
-                          <h4 style="font-size: 1rem; font-weight: 700;">${task.title}</h4>
+                      <div class="task-item ${isDone ? "done" : ""}">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
+                          <h4 style="font-size: 0.95rem; font-weight: 700;">${task.title}</h4>
                           <span class="badge ${isDone ? "badge-done" : "badge-open"}">${task.status}</span>
                         </div>
-                        <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 0.65rem;">
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem;">
                           ${task.description || "No description provided."}
                         </p>
                         
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-                          <span>📅 Due: <strong>${task.dueDate || "Not set"}</strong></span>
-                          <span>👥 Scope: <strong>${task.team === "ALL" ? "All Teams" : "Team " + task.team}</strong></span>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.65rem;">
+                          <span>Due: <strong>${task.dueDate || "Not set"}</strong></span>
+                          <span>Scope: <strong>${task.team === "ALL" ? "All Teams" : "Team " + task.team}</strong></span>
                           ${
                             task.fileUrl
-                              ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">📎 View Attachment / Drive File ↗</a>`
+                              ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Attachment ↗</a>`
                               : ""
                           }
                         </div>
 
-                        <!-- Submission Status or Form -->
-                        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.65rem; margin-top: 0.5rem;">
+                        <!-- Submission Form or Status -->
+                        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.6rem; margin-top: 0.5rem;">
                           ${
                             isSubmitted
                               ? `
                               <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;">
-                                <span style="color: #059669; font-weight: 600;">✓ Submitted</span>
+                                <span style="color: var(--teal); font-weight: 600;">✓ Submitted</span>
                                 <span style="color: var(--text-muted); font-size: 0.75rem;">${new Date(submission.timestamp).toLocaleDateString()}</span>
                               </div>
-                              <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">
+                              <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
                                 <em>"${submission.content || "Marked as completed"}"</em>
                               </p>
-                              ${submission.fileUrl ? `<a href="${submission.fileUrl}" target="_blank" style="font-size: 0.75rem;">Link provided ↗</a>` : ""}
                             `
                               : `
                               <form class="task-submit-form" data-task-id="${task.id}" style="margin-top: 0.4rem;">
                                 <div style="display: flex; gap: 0.5rem;">
                                   <input type="text" name="content" class="form-control" style="font-size: 0.85rem; padding: 0.45rem 0.65rem;" placeholder="Your answer, notes, or Google Drive link..." required />
-                                  <button type="submit" class="btn btn-primary btn-sm" style="white-space: nowrap;">Submit</button>
+                                  <button type="submit" class="btn btn-teal btn-sm" style="white-space: nowrap;">Submit</button>
                                 </div>
                               </form>
                             `
@@ -113,42 +125,42 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
         </div>
       </div>
 
-      <!-- Right Column: My Marks & Escalation/Doubt -->
+      <!-- Right Column: My Marks & Doubt Form -->
       <div>
         <!-- My Marks -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">📊 My Performance & Marks</h3>
+            <h3 class="card-title">Scorecard & Cycles</h3>
           </div>
           <div class="table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Cycle</th>
-                  <th>Quiz Score</th>
+                  <th>Score</th>
                   <th>Submission</th>
                   <th>Attendance</th>
-                  <th>Rating</th>
+                  <th>Band</th>
                 </tr>
               </thead>
               <tbody>
                 ${
                   myMarks.length === 0
-                    ? `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No marks recorded yet for this cycle.</td></tr>`
+                    ? `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No marks recorded yet.</td></tr>`
                     : myMarks
                         .map((m) => {
                           const band = getScoreBand(m.quizScore);
                           return `
                         <tr>
                           <td><strong>${m.cycle || "Cycle 1"}</strong></td>
-                          <td><strong style="font-size: 1rem;">${m.quizScore}</strong>/100</td>
+                          <td><strong style="font-size: 0.95rem;">${m.quizScore}</strong>/100</td>
                           <td>${m.submission || "—"}</td>
                           <td>${m.attendance || "—"}</td>
                           <td><span class="badge ${band.cls}">${band.label}</span></td>
                         </tr>
                         ${
                           m.notes
-                            ? `<tr><td colspan="5" style="font-size: 0.8rem; color: var(--text-muted); background-color: var(--bg-subtle); padding: 0.4rem 0.9rem;">
+                            ? `<tr><td colspan="5" style="font-size: 0.8rem; color: var(--text-muted); background-color: var(--bg-subtle); padding: 0.35rem 0.85rem;">
                                 💬 <em>Notes: ${m.notes}</em>
                               </td></tr>`
                             : ""
@@ -162,10 +174,10 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           </div>
         </div>
 
-        <!-- Raise a Doubt / Escalation -->
+        <!-- Raise a Doubt Form -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">❓ Raise a Doubt / Question</h3>
+            <h3 class="card-title">Raise a Doubt / Question</h3>
           </div>
           <div id="escalation-feedback"></div>
           <form id="form-raise-doubt">
@@ -180,12 +192,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
             </div>
 
             <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
-                <input type="checkbox" id="doubt-urgent" style="width: 17px; height: 17px; accent-color: #ef4444;" />
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; font-weight: 600;">
+                <input type="checkbox" id="doubt-urgent" style="width: 16px; height: 16px; accent-color: var(--red);" />
                 <span>This is urgent / I need the group leader directly</span>
               </label>
-              <p id="doubt-hint" class="form-hint" style="color: var(--text-muted); margin-top: 0.35rem;">
-                ℹ️ This goes to your team leader first.
+              <p id="doubt-hint" class="form-hint" style="color: var(--text-muted); margin-top: 0.3rem;">
+                This goes to your team leader first.
               </p>
             </div>
 
@@ -196,22 +208,28 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     </div>
   `;
 
+  // Render sparkline if multiple cycles exist
+  const sparklineCanvas = container.querySelector("#member-sparkline");
+  if (sparklineCanvas) {
+    renderSparkline(sparklineCanvas, myMarks);
+  }
+
   // Dynamic hint toggle
   const urgentCheckbox = container.querySelector("#doubt-urgent");
   const hintEl = container.querySelector("#doubt-hint");
   urgentCheckbox.addEventListener("change", () => {
     if (urgentCheckbox.checked) {
-      hintEl.textContent = "🚨 This goes straight to the group leader.";
-      hintEl.style.color = "#dc2626";
+      hintEl.textContent = "This goes straight to the group leader.";
+      hintEl.style.color = "var(--red)";
       hintEl.style.fontWeight = "600";
     } else {
-      hintEl.textContent = "ℹ️ This goes to your team leader first.";
+      hintEl.textContent = "This goes to your team leader first.";
       hintEl.style.color = "var(--text-muted)";
       hintEl.style.fontWeight = "normal";
     }
   });
 
-  // Handle task submissions
+  // Task submit listener
   container.querySelectorAll(".task-submit-form").forEach((form) => {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -239,14 +257,14 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           btn.textContent = "Submit";
         }
       } catch (err) {
-        alert("Error submitting task: " + err.message);
+        alert("Error: " + err.message);
         btn.disabled = false;
         btn.textContent = "Submit";
       }
     });
   });
 
-  // Handle Doubt submission
+  // Doubt form listener
   const doubtForm = container.querySelector("#form-raise-doubt");
   doubtForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -271,13 +289,10 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
       if (res.ok) {
         feedback.innerHTML = `
           <div class="alert alert-success">
-            ✓ Your question has been submitted successfully (${isUrgent ? "Sent to Group Leader" : "Sent to Team Leader"}).
+            Question submitted (${isUrgent ? "Sent to Group Leader" : "Sent to Team Leader"}).
           </div>
         `;
         doubtForm.reset();
-        hintEl.textContent = "ℹ️ This goes to your team leader first.";
-        hintEl.style.color = "var(--text-muted)";
-        hintEl.style.fontWeight = "normal";
         setTimeout(() => (feedback.innerHTML = ""), 4000);
       } else {
         feedback.innerHTML = `<div class="alert alert-error">${res.error || "Failed to submit."}</div>`;
@@ -290,7 +305,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     }
   });
 
-  // Refresh button
+  // Refresh
   container.querySelector("#btn-refresh-tasks").addEventListener("click", () => {
     onRefresh();
   });
