@@ -126,7 +126,7 @@ function doPost(e) {
 
     // ── Marks ──
     if (action === "addMark") {
-      requireRole(body, ["group_leader", "team_leader", "instructor"]);
+      requireRole(body, ["group_leader", "team_leader", "instructor", "assistant"]);
       appendRow(ss, SHEET_NAMES.MARKS, [
         newId(), body.member, body.team, body.cycle, body.mockNumber || "",
         body.quizScore, body.submission, body.attendance,
@@ -137,7 +137,7 @@ function doPost(e) {
     }
 
     if (action === "editMark") {
-      requireRole(body, ["group_leader", "instructor"]);
+      requireRole(body, ["group_leader", "instructor", "assistant"]);
       updateRow(ss, SHEET_NAMES.MARKS, body.id, body.fields, body.editedBy || body.name);
       return json({ ok: true });
     }
@@ -272,7 +272,7 @@ function buildDashboard(ss, role, team, name) {
       teamAverages: teamAverages,
       memberMetrics: metrics,
       atRiskMembers: atRiskMembers,
-      canEdit: role === "instructor" || role === "group_leader",
+      canEdit: role === "instructor" || role === "group_leader" || role === "assistant",
     };
   }
 

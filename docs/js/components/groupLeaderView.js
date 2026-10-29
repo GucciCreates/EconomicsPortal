@@ -27,7 +27,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   const isInstructor = user.role === "instructor";
   const isAssistant = user.role === "assistant";
   const isGroupLeader = user.role === "group_leader";
-  const canEdit = isInstructor || isGroupLeader;
+  const canEdit = isInstructor || isGroupLeader || isAssistant;
 
   const tasks = data.tasks || [];
   const marks = data.marks || [];
@@ -62,14 +62,14 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
         <div>
           <h2 style="font-size: 1.35rem; font-weight: 700;">
-            ${isInstructor ? "Instructor Workspace — Dr. Numan" : isAssistant ? "Group Assistant — " + user.name : "Group Leader — " + user.name}
+            ${isInstructor ? "Instructor Workspace — Dr. Numan" : isAssistant ? "Teaching Assistant — " + user.name : "Group Leader — " + user.name}
           </h2>
           <p style="color: var(--text-muted); font-size: 0.875rem;">
             ${
               isInstructor
                 ? "Academic Oversight & Verification • Audit and Direct Edit Rights Enabled"
                 : isAssistant
-                ? "Class Recordkeeping & Support Workspace (Read-only)"
+                ? "Teaching Assistant Workspace — Test Evaluation & Score Editing Rights Enabled"
                 : "Full Class Operations • 17 Members • 4 Teams"
             }
           </p>
@@ -78,6 +78,8 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
           ${
             isInstructor
               ? `<span class="badge" style="background-color: var(--purple-soft); color: var(--purple); font-weight: 600;">Instructor View</span>`
+              : isAssistant
+              ? `<span class="badge" style="background-color: var(--teal-soft); color: var(--teal); font-weight: 600;">Assistant Grading Mode</span>`
               : ""
           }
           <button class="btn btn-secondary btn-sm" id="btn-refresh-gl">↻ Refresh Data</button>

@@ -12,9 +12,9 @@ import { renderLeaderboard } from "./leaderboard.js";
 
 export const TEAM_ROSTER = {
   Shehroz: ["Gorsi", "Haris"],
-  Amina: ["Ramesh", "Mamoon", "Tazneem"],
-  Ayesha: ["Minal", "Anika", "Ahmed bin Nasir"],
-  Lareb: ["Shaiman", "Aisha Amjad", "Haseeb"],
+  Amina: ["Amina", "Ramesh", "Mamoon", "Tazneem"],
+  Ayesha: ["Ayesha (Quetta)", "Minal", "Anika", "Ahmed bin Nasir"],
+  Lareb: ["Lareb", "Shaiman", "Aisha Amjad", "Haseeb"],
 };
 
 export function renderTeamLeaderDashboard(container, user, data, onRefresh) {

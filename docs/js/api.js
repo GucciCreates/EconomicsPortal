@@ -152,7 +152,7 @@ export async function apiGetDashboard(role, team, name) {
           teamAverages,
           memberMetrics,
           atRiskMembers,
-          canEdit: role === "instructor" || role === "group_leader",
+          canEdit: role === "instructor" || role === "group_leader" || role === "assistant",
         },
       };
     }
