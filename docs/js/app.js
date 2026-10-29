@@ -8,6 +8,7 @@ import { apiLogin, apiGetDashboard, resetDemoData } from "./api.js";
 import { renderMemberDashboard } from "./components/memberView.js";
 import { renderTeamLeaderDashboard } from "./components/teamLeaderView.js";
 import { renderGroupLeaderDashboard } from "./components/groupLeaderView.js";
+import { renderModernLogin } from "./components/loginView.js";
 
 // DOM Root Elements
 const headerEl = document.getElementById("site-header");
@@ -151,125 +152,11 @@ function renderFooter() {
 // LOGIN VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 function renderLogin() {
-  mainEl.innerHTML = `
-    <div style="max-width: 440px; margin: 3rem auto; padding: 0 1rem;">
-      <div style="text-align: center; margin-bottom: 2rem;">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📈</div>
-        <h1 style="font-size: 1.65rem; font-weight: 800; color: var(--text-main);">EconomicsPortal</h1>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;">
-          Dr. Numan's Economics Class Gradebook & Portal
-        </p>
-      </div>
-
-      <div class="card">
-        <div id="login-error-box"></div>
-
-        <form id="form-login">
-          <div class="form-group">
-            <label class="form-label" for="login-name">Your Full Name</label>
-            <input
-              type="text"
-              id="login-name"
-              class="form-control"
-              placeholder="e.g. Dr. Numan, Shehroz, or Ramesh"
-              autocomplete="name"
-              required
-            />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="login-pin">4-Digit PIN</label>
-            <input
-              type="password"
-              id="login-pin"
-              class="form-control"
-              placeholder="••••"
-              maxlength="4"
-              pattern="[0-9]{4}"
-              inputmode="numeric"
-              autocomplete="current-password"
-              required
-            />
-          </div>
-
-          <button type="submit" class="btn btn-primary" id="btn-submit-login" style="width: 100%; margin-top: 0.5rem;">
-            Log In
-          </button>
-        </form>
-
-        <!-- Quick Demo Profiles for instant testing -->
-        <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); font-size: 0.85rem;">
-          <p style="color: var(--text-muted); margin-bottom: 0.6rem; font-weight: 500;">
-            Quick Role Logins:
-          </p>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
-            <button class="btn btn-secondary btn-sm demo-chip" data-name="Dr. Numan" data-pin="0000">Dr. Numan (Instructor)</button>
-            <button class="btn btn-secondary btn-sm demo-chip" data-name="Shehroz" data-pin="1111">Shehroz (Group Leader)</button>
-            <button class="btn btn-secondary btn-sm demo-chip" data-name="Sajal" data-pin="1112">Sajal (Assistant)</button>
-            <button class="btn btn-secondary btn-sm demo-chip" data-name="Amina" data-pin="2001">Amina (Team Leader)</button>
-            <button class="btn btn-secondary btn-sm demo-chip" data-name="Ramesh" data-pin="2002">Ramesh (Member)</button>
-            <button class="btn btn-secondary btn-sm demo-chip" data-name="Mamoon" data-pin="2003">Mamoon (At-Risk Member)</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const form = document.getElementById("form-login");
-  const errorBox = document.getElementById("login-error-box");
-  const submitBtn = document.getElementById("btn-submit-login");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = document.getElementById("login-name").value;
-    const pin = document.getElementById("login-pin").value;
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Logging in...";
-    errorBox.innerHTML = "";
-
-    try {
-      const res = await apiLogin(name, pin);
-      if (res.ok && res.user) {
-        setCurrentUser(res.user);
-        refreshApp();
-      } else {
-        errorBox.innerHTML = `<div class="alert alert-error">${res.error || "Invalid name or PIN."}</div>`;
-      }
-    } catch (err) {
-      errorBox.innerHTML = `
-        <div class="alert alert-error" style="line-height: 1.45;">
-          <strong>Connection error: ${err.message}</strong>
-          <div style="font-size: 0.8rem; margin: 0.35rem 0;">
-            Could not reach the Apps Script backend. You can continue in offline demo mode.
-          </div>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-force-demo" style="width: 100%; margin-top: 0.5rem; background: #fff; font-weight: 600;">
-            ⚡ Continue in Demo Mode for now
-          </button>
-        </div>
-      `;
-
-      const forceDemoBtn = document.getElementById("btn-force-demo");
-      if (forceDemoBtn) {
-        forceDemoBtn.addEventListener("click", () => {
-          localStorage.setItem("economics_portal_force_demo", "true");
-          refreshApp();
-        });
-      }
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Log In";
-    }
-  });
-
-  // Demo chips click handlers
-  document.querySelectorAll(".demo-chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      document.getElementById("login-name").value = chip.getAttribute("data-name");
-      document.getElementById("login-pin").value = chip.getAttribute("data-pin");
-      form.requestSubmit();
-    });
-  });
+  renderModernLogin(
+    mainEl,
+    () => refreshApp(),
+    () => refreshApp()
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -213,10 +213,15 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
       <!-- Class Marks Ledger -->
       <div class="card" style="margin-bottom: 1.5rem;" id="ledger-card">
-        <div class="card-header">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.65rem;">
           <h3 class="card-title" id="marks-panel-title">Class Scorecard Ledger</h3>
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <input type="text" id="gl-search-member" class="form-control" placeholder="Search student..." style="width: 170px; padding: 0.3rem 0.6rem; font-size: 0.8rem;" />
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <div class="auth-tabs" style="margin-bottom: 0; padding: 0.15rem; gap: 0.2rem;">
+              <button type="button" class="filter-chip active" id="btn-filter-cycle-all" style="font-size: 0.75rem;">All Cycles</button>
+              <button type="button" class="filter-chip" id="btn-filter-cycle-1" style="font-size: 0.75rem;">Cycle 1</button>
+              <button type="button" class="filter-chip" id="btn-filter-cycle-2" style="font-size: 0.75rem;">Cycle 2</button>
+            </div>
+            <input type="text" id="gl-search-member" class="form-control" placeholder="🔍 Search student..." style="width: 150px; padding: 0.3rem 0.6rem; font-size: 0.8rem; min-height: 32px;" />
             <button class="btn btn-secondary btn-sm" id="btn-show-all-marks">Show All Teams</button>
           </div>
         </div>
@@ -354,31 +359,56 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     const marksTitle = wrap.querySelector("#marks-panel-title");
     const searchInput = wrap.querySelector("#gl-search-member");
 
+    let currentCycleFilter = "all";
+    let currentTeamFilter = null;
+
+    const applyLedgerFilters = () => {
+      let filtered = marks;
+      if (currentTeamFilter) {
+        filtered = filtered.filter((m) => m.team === currentTeamFilter);
+      }
+      if (currentCycleFilter !== "all") {
+        filtered = filtered.filter((m) => String(m.cycle).toLowerCase().includes(currentCycleFilter));
+      }
+      const q = searchInput ? searchInput.value.toLowerCase().trim() : "";
+      if (q) {
+        filtered = filtered.filter((m) => m.member.toLowerCase().includes(q) || m.team.toLowerCase().includes(q));
+      }
+      marksTbody.innerHTML = renderMarksRows(filtered);
+      attachMarksActions();
+    };
+
+    wrap.querySelectorAll("#btn-filter-cycle-all, #btn-filter-cycle-1, #btn-filter-cycle-2").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        wrap.querySelectorAll("#btn-filter-cycle-all, #btn-filter-cycle-1, #btn-filter-cycle-2").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        if (btn.id === "btn-filter-cycle-1") currentCycleFilter = "1";
+        else if (btn.id === "btn-filter-cycle-2") currentCycleFilter = "2";
+        else currentCycleFilter = "all";
+        applyLedgerFilters();
+      });
+    });
+
     teamCards.forEach((card) => {
       card.addEventListener("click", () => {
         teamCards.forEach((c) => c.classList.remove("active"));
         card.classList.add("active");
-        const chosen = card.getAttribute("data-team");
-        marksTitle.textContent = `Scorecard Ledger — Team ${chosen}`;
-        const filtered = marks.filter((m) => m.team === chosen);
-        marksTbody.innerHTML = renderMarksRows(filtered);
-        attachMarksActions();
+        currentTeamFilter = card.getAttribute("data-team");
+        marksTitle.textContent = `Scorecard Ledger — Team ${currentTeamFilter}`;
+        applyLedgerFilters();
       });
     });
 
     wrap.querySelector("#btn-show-all-marks").addEventListener("click", () => {
       teamCards.forEach((c) => c.classList.remove("active"));
+      currentTeamFilter = null;
       marksTitle.textContent = `Class Scorecard Ledger (All Teams)`;
-      marksTbody.innerHTML = renderMarksRows(marks);
-      attachMarksActions();
+      applyLedgerFilters();
     });
 
     if (searchInput) {
-      searchInput.addEventListener("input", (e) => {
-        const q = e.target.value.toLowerCase().trim();
-        const filtered = marks.filter((m) => m.member.toLowerCase().includes(q) || m.team.toLowerCase().includes(q));
-        marksTbody.innerHTML = renderMarksRows(filtered);
-        attachMarksActions();
+      searchInput.addEventListener("input", () => {
+        applyLedgerFilters();
       });
     }
 
