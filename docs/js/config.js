@@ -3,7 +3,7 @@
  * 
  * Google Apps Script Web App Endpoint
  */
-export const API_URL = "https://script.google.com/macros/s/AKfycbwhnUI96IN3yYP9kx53SyfzEgjLHLjKpe_gqPet97Tm0XocvBbbqvDBW5tHOxm8udx8/exec";
+export const API_URL = "https://script.google.com/macros/s/AKfycbzOEBiS8iRwbVvoazNAjv6i3FjSGkbBH5E1sPcOS-XCqV2lRw5w2RIfqgy8pzYzBEnk/exec";
 
 // Helper to determine if we are in demo/fallback mode
 export const isDemoMode = () => {
