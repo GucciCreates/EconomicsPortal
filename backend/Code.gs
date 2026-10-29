@@ -238,6 +238,18 @@ function doPost(e) {
       return json({ ok: true });
     }
 
+    // ── Member Access & PIN Management (Group Leader only) ──
+    if (action === "updatePin") {
+      requireRole(body, ["group_leader"]);
+      const targetMember = String(body.targetMember || "").trim();
+      const newPin = String(body.newPin || "").trim();
+      if (!/^\d{4}$/.test(newPin)) {
+        return json({ ok: false, error: "PIN must be exactly 4 numeric digits." });
+      }
+      updateUserPin(ss, targetMember, newPin);
+      return json({ ok: true });
+    }
+
     return json({ ok: false, error: "Unknown action." });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -260,7 +272,8 @@ function buildDashboard(ss, role, team, name) {
   const metrics = computeMemberMetrics(marks, escalations);
   const atRiskMembers = Object.values(metrics).filter(m => m.atRisk);
 
-  if (role === "instructor" || role === "group_leader" || role === "assistant") {
+  if (role === "group_leader") {
+    const users = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.USERS));
     return {
       tasks: tasks,
       marks: marks,
@@ -272,7 +285,24 @@ function buildDashboard(ss, role, team, name) {
       teamAverages: teamAverages,
       memberMetrics: metrics,
       atRiskMembers: atRiskMembers,
-      canEdit: role === "instructor" || role === "group_leader" || role === "assistant",
+      users: users,
+      canEdit: true,
+    };
+  }
+
+  if (role === "instructor" || role === "assistant") {
+    return {
+      tasks: tasks,
+      marks: marks,
+      submissions: subs,
+      escalations: escalations,
+      announcements: announcements,
+      quizzes: quizzes,
+      goals: goals,
+      teamAverages: teamAverages,
+      memberMetrics: metrics,
+      atRiskMembers: atRiskMembers,
+      canEdit: true,
     };
   }
 
@@ -530,6 +560,18 @@ function requireRole(body, allowed) {
 
 function newId() {
   return "id-" + Utilities.getUuid().slice(0, 8);
+}
+
+function updateUserPin(ss, memberName, newPin) {
+  const sheet = getOrInitSheet(ss, SHEET_NAMES.USERS);
+  const values = sheet.getDataRange().getValues();
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][0]).trim().toLowerCase() === memberName.toLowerCase()) {
+      sheet.getRange(r + 1, 4).setValue("'" + newPin);
+      return;
+    }
+  }
+  throw new Error("Member not found in roster: " + memberName);
 }
 
 function json(obj) {

@@ -10,6 +10,8 @@ import {
   apiDeleteMark,
   apiUpdateTaskStatus,
   apiUpdateEscalationStatus,
+  apiUpdatePin,
+  apiGetUsers,
 } from "../api.js";
 import { getScoreBand } from "./metricsPanel.js";
 import { TEAM_ROSTER } from "./teamLeaderView.js";
@@ -138,6 +140,10 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     { id: "export", label: "Export CSV", icon: "📥" },
   ];
 
+  if (isGroupLeader) {
+    tabs.push({ id: "pins", label: "Member Access & PINs", icon: "🔑" });
+  }
+
   function switchTab(tabId) {
     if (tabId === "ledger") renderLedgerTab(contentShell);
     else if (tabId === "analytics") renderAnalyticsTab(contentShell);
@@ -146,6 +152,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     else if (tabId === "tasks") renderTasksTab(contentShell);
     else if (tabId === "doubts") renderDoubtsTab(contentShell);
     else if (tabId === "export") renderExportTab(contentShell);
+    else if (tabId === "pins") renderPinsTab(contentShell);
   }
 
   createTabNav(container.querySelector(".kpi-grid"), tabs, switchTab);
@@ -829,6 +836,262 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   function renderExportTab(wrap) {
     wrap.innerHTML = `<div id="export-shell"></div>`;
     renderExportToolbar(wrap.querySelector("#export-shell"), { marks, submissions, memberMetrics });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 8: MEMBER ACCESS & PIN MANAGEMENT (Group Leader Only)
+  // ─────────────────────────────────────────────────────────────────────────
+  async function renderPinsTab(wrap) {
+    wrap.innerHTML = `
+      <div class="card">
+        <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h3 class="card-title">🔑 Member Access & Secret PIN Directory</h3>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Confidential • Group Leader Administrative Rights</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="text" id="pins-search" class="form-control" placeholder="🔍 Search member..." style="width: 170px; padding: 0.35rem 0.65rem; font-size: 0.8rem;" />
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-all-pins">👁️ Reveal All</button>
+          </div>
+        </div>
+
+        <div class="alert" style="background-color: var(--purple-soft); color: var(--purple); font-size: 0.85rem; margin-bottom: 1.25rem;">
+          🛡️ <strong>Private Security Policy:</strong> Member credentials are not public. Only you as Group Leader can view, grant, or reset individual 4-digit PINs.
+        </div>
+
+        <div id="pins-table-loading" style="text-align: center; padding: 2rem;">
+          <p style="color: var(--text-muted); font-size: 0.9rem;">Loading member roster...</p>
+        </div>
+
+        <div class="table-responsive" id="pins-table-wrap" style="display: none;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Member Name</th>
+                <th>Role</th>
+                <th>Team</th>
+                <th>Private PIN</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="pins-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PIN Change Modal Container -->
+      <div id="pin-modal-shell"></div>
+    `;
+
+    let roster = data.users || [];
+    if (!roster.length) {
+      try {
+        const uRes = await apiGetUsers(user.role);
+        if (uRes.ok && uRes.users) {
+          roster = uRes.users;
+        }
+      } catch (e) {
+        console.warn("Could not fetch users list:", e);
+      }
+    }
+
+    const loadingEl = wrap.querySelector("#pins-table-loading");
+    const tableWrap = wrap.querySelector("#pins-table-wrap");
+    const tbody = wrap.querySelector("#pins-tbody");
+    const searchInput = wrap.querySelector("#pins-search");
+    const toggleAllBtn = wrap.querySelector("#btn-toggle-all-pins");
+
+    loadingEl.style.display = "none";
+    tableWrap.style.display = "block";
+
+    let revealAll = false;
+
+    function renderRosterRows(list) {
+      if (!list.length) {
+        return `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No members found.</td></tr>`;
+      }
+      return list
+        .map((m) => {
+          const pinStr = String(m.pin !== undefined && m.pin !== null ? m.pin : "0000").padStart(4, "0");
+          return `
+          <tr data-member="${m.name}">
+            <td><strong>${m.name}</strong></td>
+            <td><span class="role-pill role-${m.role}">${m.role.replace("_", " ")}</span></td>
+            <td><span class="badge" style="background-color: var(--bg-subtle);">${m.team}</span></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.45rem;">
+                <span class="pin-display num" style="font-family: monospace; font-size: 0.95rem; font-weight: 700; min-width: 45px;">
+                  ${revealAll ? pinStr : "••••"}
+                </span>
+                <button type="button" class="btn btn-secondary btn-sm btn-peek-pin" data-pin="${pinStr}" style="padding: 0.15rem 0.45rem; font-size: 0.75rem;">
+                  👁️
+                </button>
+              </div>
+            </td>
+            <td>
+              <button class="btn btn-primary btn-sm btn-change-member-pin" data-name="${m.name}" data-team="${m.team}" data-current-pin="${pinStr}">
+                🔑 Reset PIN
+              </button>
+            </td>
+          </tr>
+        `;
+        })
+        .join("");
+    }
+
+    function refreshRosterTable() {
+      const q = searchInput ? searchInput.value.toLowerCase().trim() : "";
+      const filtered = roster.filter((m) => m.name.toLowerCase().includes(q) || m.team.toLowerCase().includes(q) || m.role.toLowerCase().includes(q));
+      tbody.innerHTML = renderRosterRows(filtered);
+      attachPinActions();
+    }
+
+    refreshRosterTable();
+
+    if (searchInput) {
+      searchInput.addEventListener("input", refreshRosterTable);
+    }
+
+    toggleAllBtn.addEventListener("click", () => {
+      revealAll = !revealAll;
+      toggleAllBtn.textContent = revealAll ? "🔒 Mask All" : "👁️ Reveal All";
+      refreshRosterTable();
+    });
+
+    function attachPinActions() {
+      wrap.querySelectorAll(".btn-peek-pin").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const span = btn.parentElement.querySelector(".pin-display");
+          const realPin = btn.getAttribute("data-pin");
+          if (span.textContent.trim() === "••••") {
+            span.textContent = realPin;
+          } else {
+            span.textContent = "••••";
+          }
+        });
+      });
+
+      wrap.querySelectorAll(".btn-change-member-pin").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const targetName = btn.getAttribute("data-name");
+          const targetTeam = btn.getAttribute("data-team");
+          const currentPin = btn.getAttribute("data-current-pin");
+          openChangePinModal(targetName, targetTeam, currentPin);
+        });
+      });
+    }
+
+    function openChangePinModal(targetName, targetTeam, currentPin) {
+      const modalShell = wrap.querySelector("#pin-modal-shell");
+      modalShell.innerHTML = `
+        <div class="modal-overlay" id="pin-modal-overlay">
+          <div class="modal-content" style="max-width: 420px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700;">Grant / Change PIN</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.15rem;">
+                  Updating credentials for <strong>${targetName}</strong> (${targetTeam})
+                </p>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-close-pin-modal">✕</button>
+            </div>
+
+            <div id="pin-modal-feedback"></div>
+
+            <form id="form-update-pin">
+              <div class="form-group">
+                <label class="form-label">New 4-Digit PIN</label>
+                <div style="display: flex; gap: 0.5rem;">
+                  <input
+                    type="text"
+                    id="input-new-pin"
+                    class="form-control"
+                    placeholder="e.g. 5821"
+                    maxlength="4"
+                    pattern="[0-9]{4}"
+                    inputmode="numeric"
+                    style="font-family: monospace; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.2em; text-align: center;"
+                    required
+                  />
+                  <button type="button" class="btn btn-secondary" id="btn-gen-random-pin" title="Generate random PIN">
+                    🎲 Random
+                  </button>
+                </div>
+                <p class="form-hint" style="margin-top: 0.35rem;">
+                  PIN must be exactly 4 numeric digits (0000–9999).
+                </p>
+              </div>
+
+              <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-pin-modal" style="flex: 1;">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-pin" style="flex: 2;">Save & Grant PIN</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+
+      const overlay = modalShell.querySelector("#pin-modal-overlay");
+      const pinInput = modalShell.querySelector("#input-new-pin");
+      const genBtn = modalShell.querySelector("#btn-gen-random-pin");
+      const saveBtn = modalShell.querySelector("#btn-save-pin");
+      const feedback = modalShell.querySelector("#pin-modal-feedback");
+      const form = modalShell.querySelector("#form-update-pin");
+
+      const closeModal = () => {
+        modalShell.innerHTML = "";
+      };
+
+      modalShell.querySelector("#btn-close-pin-modal").addEventListener("click", closeModal);
+      modalShell.querySelector("#btn-cancel-pin-modal").addEventListener("click", closeModal);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeModal();
+      });
+
+      genBtn.addEventListener("click", () => {
+        const rand = String(Math.floor(1000 + Math.random() * 9000));
+        pinInput.value = rand;
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const newPin = pinInput.value.trim();
+        if (!/^\d{4}$/.test(newPin)) {
+          feedback.innerHTML = `<div class="alert alert-error">PIN must be exactly 4 digits.</div>`;
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Updating...";
+
+        try {
+          const res = await apiUpdatePin({
+            role: user.role,
+            name: user.name,
+            targetMember: targetName,
+            newPin,
+          });
+
+          if (res.ok) {
+            feedback.innerHTML = `<div class="alert alert-success">PIN updated successfully for ${targetName}!</div>`;
+            const found = roster.find((u) => u.name.toLowerCase() === targetName.toLowerCase());
+            if (found) found.pin = newPin;
+            refreshRosterTable();
+            setTimeout(closeModal, 1200);
+          } else {
+            feedback.innerHTML = `<div class="alert alert-error">${res.error || "Failed to update PIN."}</div>`;
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Save & Grant PIN";
+          }
+        } catch (err) {
+          feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save & Grant PIN";
+        }
+      });
+
+      pinInput.focus();
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

@@ -550,3 +550,40 @@ export async function apiSetGoal(payload) {
     ...payload,
   });
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PIN MANAGEMENT (Group Leader Only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiUpdatePin(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    const user = store.users.find(
+      (u) => u.name.toLowerCase() === String(payload.targetMember).toLowerCase()
+    );
+    if (user) {
+      user.pin = String(payload.newPin);
+      saveDemoStore(store);
+      return { ok: true };
+    }
+    return { ok: false, error: "Member not found in roster." };
+  }
+
+  return await postToAppsScript({
+    action: "updatePin",
+    ...payload,
+  });
+}
+
+export async function apiGetUsers(role) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    return { ok: true, users: store.users || [] };
+  }
+
+  return await getFromAppsScript({
+    action: "users",
+    role,
+  });
+}
