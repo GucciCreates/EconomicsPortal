@@ -659,3 +659,210 @@ a:hover {
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+
+/* ==========================================================================
+   EconomicsPortal — v3 Features Styles (Tabs, Announcements, Quizzes, Leaderboard, Goals)
+   ========================================================================== */
+
+/* ── Tab Navigation ── */
+.tab-nav {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.35rem 0.25rem 0.75rem 0.25rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+  -webkit-overflow-scrolling: touch;
+}
+.tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+.tab-btn:hover {
+  background-color: var(--bg-subtle);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+.tab-btn.active {
+  background-color: var(--purple);
+  color: #ffffff;
+  border-color: var(--purple);
+  box-shadow: 0 2px 4px rgba(83, 74, 183, 0.25);
+}
+.tab-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ── Executive Summary KPI Grid ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+.kpi-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+.kpi-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+.kpi-val {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.1;
+}
+.kpi-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* ── Announcements ── */
+.announcements-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+.announcement-item {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1.15rem;
+  transition: border-color 0.15s ease;
+}
+.announcement-item.pinned {
+  border-left: 4px solid var(--purple);
+  background-color: var(--bg-surface);
+}
+.ann-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+.pin-badge {
+  background-color: var(--purple-soft);
+  color: var(--purple);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.ann-body {
+  font-size: 0.9rem;
+  color: var(--text-main);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  margin-bottom: 0.65rem;
+}
+.ann-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ── Quiz Countdown Card ── */
+.quiz-countdown-card {
+  border-left: 4px solid var(--teal);
+  padding: 1rem 1.25rem;
+}
+.countdown-timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ── Leaderboard ── */
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius);
+  background-color: var(--bg-subtle);
+}
+.lb-row.lb-first {
+  background-color: var(--primary-soft);
+  border: 1px solid rgba(83, 74, 183, 0.2);
+}
+.lb-rank {
+  font-size: 1.25rem;
+  font-weight: 800;
+  width: 2.25rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+.lb-name {
+  min-width: 130px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+}
+.lb-bar-wrap {
+  flex: 1;
+  background-color: rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+  height: 10px;
+  overflow: hidden;
+}
+.lb-bar {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.6s ease;
+}
+.lb-score {
+  font-size: 1.05rem;
+  font-weight: 800;
+  width: 3.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Goals & Progress ── */
+.progress-bar-track {
+  width: 100%;
+  height: 12px;
+  background-color: var(--bg-subtle);
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+}
+.progress-bar-fill.fill-done {
+  background-color: var(--teal);
+}
+.progress-bar-fill.fill-progress {
+  background-color: var(--purple);
+}

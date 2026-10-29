@@ -1,6 +1,6 @@
 /**
- * EconomicsPortal — Seed Mock Data (v2)
- * Used for instant preview and offline demo.
+ * EconomicsPortal — Seed Mock Data (v3)
+ * Used for instant preview, offline demo, and tests.
  */
 
 export const MOCK_USERS = [
@@ -137,6 +137,61 @@ export const MOCK_ESCALATIONS = [
   }
 ];
 
+export const MOCK_ANNOUNCEMENTS = [
+  {
+    id: "ann-1",
+    title: "Midterm Assessment Schedule & Coverage",
+    body: "The Economics Midterm will cover IS-LM, Aggregate Supply/Demand, and Inflation dynamics. Review session scheduled for Thursday.",
+    pinned: true,
+    postedBy: "Dr. Numan",
+    timestamp: "2026-10-24T10:00:00.000Z"
+  },
+  {
+    id: "ann-2",
+    title: "Cycle 2 Scorecard Audit Complete",
+    body: "All cycle 2 marks and mock scores have been verified. Team leaders please check that all peer ratings have been logged.",
+    pinned: false,
+    postedBy: "Shehroz",
+    timestamp: "2026-10-22T14:00:00.000Z"
+  }
+];
+
+export const MOCK_QUIZZES = [
+  {
+    id: "qz-1",
+    title: "Mock 3: Monetary Policy & Open Economy Macro",
+    scheduledAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+    scope: "ALL",
+    notes: "Duration: 45 mins. 20 MCQs and 1 structured problem.",
+    timestamp: "2026-10-25T09:00:00.000Z"
+  },
+  {
+    id: "qz-2",
+    title: "Cycle 3 Flash Quiz: Exchange Rate Regimes",
+    scheduledAt: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+    scope: "Amina",
+    notes: "Covers Mundell-Fleming model equations.",
+    timestamp: "2026-10-25T11:00:00.000Z"
+  }
+];
+
+export const MOCK_GOALS = [
+  {
+    name: "Ramesh",
+    team: "Amina",
+    target: 95,
+    description: "Maintain score above 90 and achieve 95 in Mock 3",
+    setAt: "2026-10-20T12:00:00.000Z"
+  },
+  {
+    name: "Mamoon",
+    team: "Amina",
+    target: 70,
+    description: "Recover from at-risk status and hit 70+ in Cycle 3",
+    setAt: "2026-10-21T15:00:00.000Z"
+  }
+];
+
 // Helper to compute team averages
 export function computeMockTeamAverages(marks) {
   const byTeam = {};
@@ -188,8 +243,11 @@ export function computeMockMemberMetrics(marks, escalations) {
       if (passed) streak++; else break;
     }
 
-    let improvementDelta = null;
     const scored = rows.filter(r => r.quizScore !== "" && !isNaN(Number(r.quizScore)));
+    const avgScore = scored.length ? round1(scored.reduce((sum, r) => sum + Number(r.quizScore), 0) / scored.length) : 0;
+    const lastCycleScore = scored.length ? Number(scored[scored.length - 1].quizScore) : 0;
+
+    let improvementDelta = null;
     if (scored.length >= 2) {
       improvementDelta = round1(Number(scored[scored.length - 1].quizScore) - Number(scored[scored.length - 2].quizScore));
     }
@@ -218,6 +276,9 @@ export function computeMockMemberMetrics(marks, escalations) {
       member,
       team,
       streak,
+      avgScore,
+      lastCycleScore,
+      delta: improvementDelta !== null ? improvementDelta : 0,
       improvementDelta,
       mockDelta,
       avgPeerRating,
@@ -225,6 +286,7 @@ export function computeMockMemberMetrics(marks, escalations) {
       punctualityRate,
       doubtCount,
       atRisk,
+      cycles: rows.length
     };
   });
   return result;

@@ -3,20 +3,12 @@
  * Account to use: bahriabatch30@gmail.com
  * Repo:           https://github.com/GucciCreates/EconomicsPortal
  *
- * v2: adds extra performance metrics (streak, improvement delta, at-risk
- * flag, mock-to-mock delta, preview completion, peer rating, punctuality,
- * doubt count) and a full instructor role for Dr. Numan with edit rights
- * over marks and tasks.
- *
- * ───────────────────────────────────────────────────────────────────
- * ONE-TIME SETUP (see SETUP_GUIDE.md)
- * ───────────────────────────────────────────────────────────────────
- * Same as v1. If you already set up v1, see "UPGRADING FROM v1" in
- * SETUP_GUIDE.md before pasting this in — the Marks tab gets new columns.
+ * v3: Tab-based structure, Announcements, Quiz Scheduling with live countdowns,
+ * Leaderboard metrics, Personal Goal Tracking, and Instructor Executive Summary.
  */
 
 // ─────────────────────────────────────────────────────────────────────────
-// CONFIG — edit this list once, right now, with real names and PINs.
+// CONFIG — Class roster with names and PINs
 // ─────────────────────────────────────────────────────────────────────────
 const PEOPLE = [
   // name,              role,          team,     pin
@@ -40,25 +32,29 @@ const PEOPLE = [
 ];
 
 const SHEET_NAMES = {
-  USERS: "Users",
-  MARKS: "Marks",
-  TASKS: "Tasks",
-  SUBMISSIONS: "Submissions",
-  ESCALATIONS: "Escalations",
+  USERS:         "Users",
+  MARKS:         "Marks",
+  TASKS:         "Tasks",
+  SUBMISSIONS:   "Submissions",
+  ESCALATIONS:   "Escalations",
+  ANNOUNCEMENTS: "Announcements",
+  QUIZ_SCHEDULE: "QuizSchedule",
+  GOALS:         "Goals",
 };
 
-// Marks now carries new input fields: mockNumber, previewDone, peerRating,
-// punctual, editedBy — on top of the original quizScore/submission/attendance.
 const HEADERS = {
-  Users:       ["name", "role", "team", "pin"],
-  Marks:       ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
-  Tasks:       ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
-  Submissions: ["id", "taskId", "member", "team", "content", "fileUrl", "timestamp"],
-  Escalations: ["id", "raisedBy", "team", "topic", "details", "severity", "status", "timestamp"],
+  Users:         ["name", "role", "team", "pin"],
+  Marks:         ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
+  Tasks:         ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
+  Submissions:   ["id", "taskId", "member", "team", "content", "fileUrl", "timestamp"],
+  Escalations:   ["id", "raisedBy", "team", "topic", "details", "severity", "status", "timestamp"],
+  Announcements: ["id", "title", "body", "pinned", "postedBy", "timestamp"],
+  QuizSchedule:  ["id", "title", "scheduledAt", "scope", "notes", "createdBy", "timestamp"],
+  Goals:         ["name", "team", "target", "description", "setAt"],
 };
 
 // ─────────────────────────────────────────────────────────────────────────
-// SETUP — run this once from the Apps Script editor
+// SETUP — run this once from Apps Script editor
 // ─────────────────────────────────────────────────────────────────────────
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -66,22 +62,26 @@ function setup() {
     const name = SHEET_NAMES[key];
     let sheet = ss.getSheetByName(name);
     if (!sheet) sheet = ss.insertSheet(name);
-    sheet.clear();
-    sheet.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);
-    sheet.setFrozenRows(1);
+    // If it's a new or existing sheet, make sure headers exist
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);
+      sheet.setFrozenRows(1);
+    }
   });
 
   const usersSheet = ss.getSheetByName(SHEET_NAMES.USERS);
-  const rows = PEOPLE.map(p => [p[0], p[1], p[2], p[3]]);
-  usersSheet.getRange(2, 1, rows.length, 4).setValues(rows);
+  if (usersSheet.getLastRow() <= 1) {
+    const rows = PEOPLE.map(p => [p[0], p[1], p[2], p[3]]);
+    usersSheet.getRange(2, 1, rows.length, 4).setValues(rows);
+    Logger.log("Users created.");
+  }
 
-  Logger.log("Setup complete. " + rows.length + " users created.");
+  Logger.log("Setup v3 complete.");
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// WEB API
+// WEB API (GET)
 // ─────────────────────────────────────────────────────────────────────────
-
 function doGet(e) {
   try {
     const action = e.parameter.action;
@@ -115,12 +115,16 @@ function doGet(e) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// WEB API (POST)
+// ─────────────────────────────────────────────────────────────────────────
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     const action = body.action;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+    // ── Marks ──
     if (action === "addMark") {
       requireRole(body, ["group_leader", "team_leader", "instructor"]);
       appendRow(ss, SHEET_NAMES.MARKS, [
@@ -132,21 +136,19 @@ function doPost(e) {
       return json({ ok: true });
     }
 
-    // NEW: edit an existing mark — instructor and group leader only.
-    // body.fields = {columnName: newValue, ...} — any Marks column.
     if (action === "editMark") {
       requireRole(body, ["group_leader", "instructor"]);
       updateRow(ss, SHEET_NAMES.MARKS, body.id, body.fields, body.editedBy || body.name);
       return json({ ok: true });
     }
 
-    // NEW: delete a mark row entirely — instructor only (correcting bad data).
     if (action === "deleteMark") {
       requireRole(body, ["instructor"]);
       deleteRow(ss, SHEET_NAMES.MARKS, body.id);
       return json({ ok: true });
     }
 
+    // ── Tasks ──
     if (action === "addTask") {
       requireRole(body, ["group_leader", "instructor"]);
       appendRow(ss, SHEET_NAMES.TASKS, [
@@ -157,19 +159,19 @@ function doPost(e) {
       return json({ ok: true });
     }
 
-    if (action === "updateTaskStatus") {
-      requireRole(body, ["group_leader", "team_leader", "instructor"]);
-      updateCell(ss, SHEET_NAMES.TASKS, body.id, "status", body.status);
-      return json({ ok: true });
-    }
-
-    // NEW: instructor/group leader can edit any task field (title, due date, etc).
     if (action === "editTask") {
       requireRole(body, ["group_leader", "instructor"]);
       updateRow(ss, SHEET_NAMES.TASKS, body.id, body.fields, null);
       return json({ ok: true });
     }
 
+    if (action === "updateTaskStatus") {
+      requireRole(body, ["group_leader", "team_leader", "instructor"]);
+      updateCell(ss, SHEET_NAMES.TASKS, body.id, "status", body.status);
+      return json({ ok: true });
+    }
+
+    // ── Submissions & Escalations ──
     if (action === "addSubmission") {
       appendRow(ss, SHEET_NAMES.SUBMISSIONS, [
         newId(), body.taskId, body.member, body.team,
@@ -192,6 +194,50 @@ function doPost(e) {
       return json({ ok: true });
     }
 
+    // ── Announcements (v3) ──
+    if (action === "addAnnouncement") {
+      requireRole(body, ["group_leader", "instructor"]);
+      appendRow(ss, SHEET_NAMES.ANNOUNCEMENTS, [
+        newId(), body.title, body.body, body.pinned ? true : false,
+        body.postedBy || body.name, new Date(),
+      ]);
+      return json({ ok: true });
+    }
+
+    if (action === "deleteAnnouncement") {
+      requireRole(body, ["group_leader", "instructor"]);
+      deleteRow(ss, SHEET_NAMES.ANNOUNCEMENTS, body.id);
+      return json({ ok: true });
+    }
+
+    if (action === "pinAnnouncement") {
+      requireRole(body, ["group_leader", "instructor"]);
+      updateCell(ss, SHEET_NAMES.ANNOUNCEMENTS, body.id, "pinned", body.pinned);
+      return json({ ok: true });
+    }
+
+    // ── Quizzes (v3) ──
+    if (action === "addQuiz") {
+      requireRole(body, ["group_leader", "instructor"]);
+      appendRow(ss, SHEET_NAMES.QUIZ_SCHEDULE, [
+        newId(), body.title, body.scheduledAt, body.scope || "ALL",
+        body.notes || "", body.name, new Date(),
+      ]);
+      return json({ ok: true });
+    }
+
+    if (action === "deleteQuiz") {
+      requireRole(body, ["group_leader", "instructor"]);
+      deleteRow(ss, SHEET_NAMES.QUIZ_SCHEDULE, body.id);
+      return json({ ok: true });
+    }
+
+    // ── Goals (v3) ──
+    if (action === "setGoal") {
+      upsertGoal(ss, body.name, body.team, body.target, body.description);
+      return json({ ok: true });
+    }
+
     return json({ ok: false, error: "Unknown action." });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -199,108 +245,77 @@ function doPost(e) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// HELPERS
+// DASHBOARD AGGREGATOR
 // ─────────────────────────────────────────────────────────────────────────
-
-function findUser(ss, name, pin) {
-  const users = sheetToObjects(ss.getSheetByName(SHEET_NAMES.USERS));
-  return users.find(u =>
-    String(u.name).trim().toLowerCase() === name.toLowerCase() &&
-    String(u.pin).trim() === pin
-  );
-}
-
-function requireRole(body, allowed) {
-  if (!allowed.includes(body.role)) {
-    throw new Error("Not authorized for this action.");
-  }
-}
-
 function buildDashboard(ss, role, team, name) {
-  const tasks = sheetToObjects(ss.getSheetByName(SHEET_NAMES.TASKS));
-  const marks = sheetToObjects(ss.getSheetByName(SHEET_NAMES.MARKS));
-  const subs = sheetToObjects(ss.getSheetByName(SHEET_NAMES.SUBMISSIONS));
-  const escalations = sheetToObjects(ss.getSheetByName(SHEET_NAMES.ESCALATIONS));
+  const tasks = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.TASKS));
+  const marks = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.MARKS));
+  const subs = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.SUBMISSIONS));
+  const escalations = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.ESCALATIONS));
+  const announcements = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.ANNOUNCEMENTS));
+  const quizzes = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.QUIZ_SCHEDULE));
+  const goals = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.GOALS));
+
+  const teamAverages = computeTeamAverages(marks);
   const metrics = computeMemberMetrics(marks, escalations);
+  const atRiskMembers = Object.values(metrics).filter(m => m.atRisk);
 
-  // Instructor sees everything the group leader sees, plus canEdit so the
-  // frontend shows edit/delete controls on every mark and task.
-  if (role === "instructor") {
+  if (role === "instructor" || role === "group_leader" || role === "assistant") {
     return {
-      tasks: tasks, marks: marks, submissions: subs, escalations: escalations,
-      teamAverages: computeTeamAverages(marks),
+      tasks: tasks,
+      marks: marks,
+      submissions: subs,
+      escalations: escalations,
+      announcements: announcements,
+      quizzes: quizzes,
+      goals: goals,
+      teamAverages: teamAverages,
       memberMetrics: metrics,
-      atRiskMembers: Object.values(metrics).filter(m => m.atRisk),
-      canEdit: true,
-    };
-  }
-
-  if (role === "group_leader" || role === "assistant") {
-    return {
-      tasks: tasks, marks: marks, submissions: subs, escalations: escalations,
-      teamAverages: computeTeamAverages(marks),
-      memberMetrics: metrics,
-      atRiskMembers: Object.values(metrics).filter(m => m.atRisk),
-      canEdit: role === "group_leader", // Sajal (assistant) stays read-only
+      atRiskMembers: atRiskMembers,
+      canEdit: role === "instructor" || role === "group_leader",
     };
   }
 
   if (role === "team_leader") {
     const teamMetrics = {};
-    Object.keys(metrics).forEach(m => { if (metrics[m].team === team) teamMetrics[m] = metrics[m]; });
+    Object.keys(metrics).forEach(m => {
+      if (metrics[m].team === team) teamMetrics[m] = metrics[m];
+    });
     return {
       tasks: tasks.filter(t => t.team === team || t.team === "ALL"),
       marks: marks.filter(m => m.team === team),
       submissions: subs.filter(s => s.team === team),
       escalations: escalations.filter(es => es.team === team),
-      teamAverage: computeTeamAverages(marks)[team] || null,
+      announcements: announcements,
+      quizzes: quizzes.filter(q => q.scope === "ALL" || q.scope === team),
+      goals: goals.filter(g => g.team === team),
+      teamAverage: teamAverages[team] || null,
+      teamAverages: teamAverages,
       memberMetrics: teamMetrics,
       atRiskMembers: Object.values(teamMetrics).filter(m => m.atRisk),
     };
   }
 
-  // member — sees only their own metrics, plus team average
-  const myMarks = marks.filter(m => m.member === name);
-  const teamAvg = computeTeamAverages(marks)[team] || null;
+  // Member
+  const myGoal = goals.find(g => String(g.name).toLowerCase() === name.toLowerCase()) || null;
   return {
     tasks: tasks.filter(t => t.team === team || t.team === "ALL"),
-    myMarks: myMarks,
-    teamAverage: teamAvg,
-    mySubmissions: subs.filter(s => s.member === name),
+    myMarks: marks.filter(m => String(m.member).toLowerCase() === name.toLowerCase()),
+    marks: marks.filter(m => m.team === team || String(m.member).toLowerCase() === name.toLowerCase()),
+    teamAverage: teamAverages[team] || null,
+    teamAverages: teamAverages,
+    mySubmissions: subs.filter(s => String(s.member).toLowerCase() === name.toLowerCase()),
     myMetrics: metrics[name] || null,
+    memberMetrics: metrics,
+    announcements: announcements,
+    quizzes: quizzes.filter(q => q.scope === "ALL" || q.scope === team),
+    myGoal: myGoal,
   };
 }
 
-function computeTeamAverages(marks) {
-  const byTeam = {};
-  marks.forEach(m => {
-    const score = Number(m.quizScore);
-    if (isNaN(score)) return;
-    if (!byTeam[m.team]) byTeam[m.team] = [];
-    byTeam[m.team].push(score);
-  });
-  const result = {};
-  Object.keys(byTeam).forEach(team => {
-    const arr = byTeam[team];
-    result[team] = round1(arr.reduce((a, b) => a + b, 0) / arr.length);
-  });
-  return result;
-}
-
-/**
- * Per-member metrics beyond the raw marks table:
- *   streak           — consecutive most-recent cycles with quizScore >= 50
- *                       AND submission marked done/yes
- *   improvementDelta — latest quizScore minus the cycle before it
- *   mockDelta        — latest mockNumber's score minus the previous
- *                       mockNumber's score (sprint weeks only)
- *   avgPeerRating    — mean of peerRating entries (1-5 scale)
- *   previewRate      — % of cycles where previewDone was marked yes
- *   punctualityRate  — % of cycles where punctual was marked yes
- *   doubtCount       — number of escalations raisedBy this member
- *   atRisk           — true if the two most recent cycles each failed
- *                       (missing submission OR quizScore < 50)
- */
+// ─────────────────────────────────────────────────────────────────────────
+// METRICS & COMPUTATIONS
+// ─────────────────────────────────────────────────────────────────────────
 function computeMemberMetrics(marks, escalations) {
   const byMember = {};
   marks.forEach(m => {
@@ -319,8 +334,11 @@ function computeMemberMetrics(marks, escalations) {
       if (passed) streak++; else break;
     }
 
-    let improvementDelta = null;
     const scored = rows.filter(r => r.quizScore !== "" && !isNaN(Number(r.quizScore)));
+    const avgScore = scored.length ? round1(scored.reduce((sum, r) => sum + Number(r.quizScore), 0) / scored.length) : 0;
+    const lastCycleScore = scored.length ? Number(scored[scored.length - 1].quizScore) : 0;
+
+    let improvementDelta = null;
     if (scored.length >= 2) {
       improvementDelta = round1(Number(scored[scored.length - 1].quizScore) - Number(scored[scored.length - 2].quizScore));
     }
@@ -337,7 +355,6 @@ function computeMemberMetrics(marks, escalations) {
 
     const previewRate = rateOfYes(rows, "previewDone");
     const punctualityRate = rateOfYes(rows, "punctual");
-
     const doubtCount = escalations.filter(es => es.raisedBy === member).length;
 
     const lastTwo = rows.slice(-2);
@@ -346,12 +363,39 @@ function computeMemberMetrics(marks, escalations) {
     );
 
     result[member] = {
-      member,
-      team, streak, improvementDelta, mockDelta, avgPeerRating,
-      previewRate, punctualityRate, doubtCount, atRisk,
+      member: member,
+      team: team,
+      streak: streak,
+      avgScore: avgScore,
+      lastCycleScore: lastCycleScore,
+      delta: improvementDelta !== null ? improvementDelta : 0,
+      improvementDelta: improvementDelta,
+      mockDelta: mockDelta,
+      avgPeerRating: avgPeerRating,
+      previewRate: previewRate,
+      punctualityRate: punctualityRate,
+      doubtCount: doubtCount,
+      atRisk: atRisk,
+      cycles: rows.length,
     };
   });
   return result;
+}
+
+function computeTeamAverages(marks) {
+  const byTeam = {};
+  marks.forEach(m => {
+    const s = Number(m.quizScore);
+    if (isNaN(s)) return;
+    if (!byTeam[m.team]) byTeam[m.team] = [];
+    byTeam[m.team].push(s);
+  });
+  const res = {};
+  Object.keys(byTeam).forEach(team => {
+    const arr = byTeam[team];
+    res[team] = round1(arr.reduce((a, b) => a + b, 0) / arr.length);
+  });
+  return res;
 }
 
 function isYes(v) {
@@ -370,7 +414,23 @@ function round1(n) {
   return Math.round(n * 10) / 10;
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// SHEET CRUD HELPERS
+// ─────────────────────────────────────────────────────────────────────────
+function getOrInitSheet(ss, name) {
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    if (HEADERS[name]) {
+      sheet.getRange(1, 1, 1, HEADERS[name].length).setValues([HEADERS[name]]);
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
+
 function sheetToObjects(sheet) {
+  if (!sheet || sheet.getLastRow() <= 1) return [];
   const values = sheet.getDataRange().getValues();
   const headers = values[0];
   return values.slice(1)
@@ -382,65 +442,92 @@ function sheetToObjects(sheet) {
     });
 }
 
-function appendRow(ss, sheetName, rowArray) {
-  ss.getSheetByName(sheetName).appendRow(rowArray);
+function appendRow(ss, sheetName, rowData) {
+  const sheet = getOrInitSheet(ss, sheetName);
+  sheet.appendRow(rowData);
 }
 
-function updateCell(ss, sheetName, id, columnName, value) {
+function updateCell(ss, sheetName, id, colName, newValue) {
   const sheet = ss.getSheetByName(sheetName);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf("id");
-  const targetCol = headers.indexOf(columnName);
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === String(id)) {
-      sheet.getRange(i + 1, targetCol + 1).setValue(value);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const colIndex = headers.indexOf(colName);
+  if (colIndex === -1) throw new Error("Column not found: " + colName);
+
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][0]) === String(id)) {
+      sheet.getRange(r + 1, colIndex + 1).setValue(newValue);
       return;
     }
   }
-  throw new Error("Row with id " + id + " not found in " + sheetName);
+  throw new Error("Row not found for id " + id);
 }
 
-// NEW: patch several fields on one row at once, e.g. fields = {quizScore: 72, notes: "re-marked"}.
-// If editedByName is given and the sheet has an "editedBy" column, stamps who made the edit.
-function updateRow(ss, sheetName, id, fields, editedByName) {
+function updateRow(ss, sheetName, id, fields, editorName) {
   const sheet = ss.getSheetByName(sheetName);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf("id");
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === String(id)) {
-      Object.keys(fields).forEach(col => {
-        const colIndex = headers.indexOf(col);
-        if (colIndex !== -1) sheet.getRange(i + 1, colIndex + 1).setValue(fields[col]);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][0]) === String(id)) {
+      Object.keys(fields).forEach(colName => {
+        const c = headers.indexOf(colName);
+        if (c !== -1) {
+          sheet.getRange(r + 1, c + 1).setValue(fields[colName]);
+        }
       });
-      const editedByCol = headers.indexOf("editedBy");
-      if (editedByCol !== -1 && editedByName) {
-        sheet.getRange(i + 1, editedByCol + 1).setValue(editedByName);
+      if (editorName && headers.includes("editedBy")) {
+        const ec = headers.indexOf("editedBy");
+        sheet.getRange(r + 1, ec + 1).setValue(editorName);
       }
       return;
     }
   }
-  throw new Error("Row with id " + id + " not found in " + sheetName);
+  throw new Error("Row not found for id " + id);
 }
 
-// NEW: delete a row by id.
 function deleteRow(ss, sheetName, id) {
   const sheet = ss.getSheetByName(sheetName);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf("id");
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idCol]) === String(id)) {
-      sheet.deleteRow(i + 1);
+  const values = sheet.getDataRange().getValues();
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][0]) === String(id)) {
+      sheet.deleteRow(r + 1);
       return;
     }
   }
-  throw new Error("Row with id " + id + " not found in " + sheetName);
+  throw new Error("Row not found for id " + id);
+}
+
+function upsertGoal(ss, memberName, team, target, description) {
+  const sheet = getOrInitSheet(ss, SHEET_NAMES.GOALS);
+  const values = sheet.getDataRange().getValues();
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][0]).toLowerCase() === memberName.toLowerCase()) {
+      sheet.getRange(r + 1, 3).setValue(target);
+      sheet.getRange(r + 1, 4).setValue(description || "");
+      sheet.getRange(r + 1, 5).setValue(new Date());
+      return;
+    }
+  }
+  sheet.appendRow([memberName, team, target, description || "", new Date()]);
+}
+
+function findUser(ss, name, pin) {
+  const users = sheetToObjects(ss.getSheetByName(SHEET_NAMES.USERS));
+  return users.find(u =>
+    String(u.name).trim().toLowerCase() === name.toLowerCase() &&
+    String(u.pin).trim() === pin
+  );
+}
+
+function requireRole(body, allowed) {
+  if (!allowed.includes(body.role)) {
+    throw new Error("Not authorized for this action.");
+  }
 }
 
 function newId() {
-  return Utilities.getUuid().slice(0, 8);
+  return "id-" + Utilities.getUuid().slice(0, 8);
 }
 
 function json(obj) {

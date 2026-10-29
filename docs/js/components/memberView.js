@@ -1,17 +1,29 @@
 /**
- * EconomicsPortal — Member Dashboard Component (v2)
+ * EconomicsPortal — Member Dashboard Component (v3)
  */
 
 import { apiAddSubmission, apiAddEscalation } from "../api.js";
 import { getScoreBand, renderMemberMetricsHTML } from "./metricsPanel.js";
 import { renderSparkline } from "./charts.js";
+import { createTabNav } from "./tabNav.js";
+import { renderGoalPanel } from "./goalPanel.js";
+import { renderQuizScheduler, cleanupQuizCountdowns } from "./quizScheduler.js";
+import { renderLeaderboard } from "./leaderboard.js";
+import { renderAnnouncementsPanel } from "./announcementsPanel.js";
 
 export function renderMemberDashboard(container, user, data, onRefresh) {
+  cleanupQuizCountdowns();
+
   const tasks = data.tasks || [];
   const myMarks = data.myMarks || [];
   const teamAverage = data.teamAverage;
+  const teamAverages = data.teamAverages || {};
   const mySubmissions = data.mySubmissions || [];
   const myMetrics = data.myMetrics;
+  const memberMetrics = data.memberMetrics || {};
+  const quizzes = data.quizzes || [];
+  const announcements = data.announcements || [];
+  const myGoal = data.myGoal || null;
 
   const avgBand = teamAverage !== null ? getScoreBand(teamAverage) : null;
 
@@ -23,290 +35,348 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">${user.name}</h2>
           <p style="color: var(--text-muted); font-size: 0.875rem;">
             Student Workspace • Team <strong>${user.team}</strong>
-            ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Needs attention</span>` : ""}
+            ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Requires attention</span>` : ""}
           </p>
         </div>
-        <div style="text-align: right;">
-          <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
-          <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
-            ${teamAverage !== null ? teamAverage : "—"}
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+          <div style="text-align: right;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
+            <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
+              ${teamAverage !== null ? teamAverage : "—"}
+            </div>
+            ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ""}
           </div>
-          ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ""}
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-mem">↻ Refresh</button>
         </div>
       </div>
     </div>
 
-    <!-- Performance Metrics Panel & Sparkline -->
-    <div style="margin-bottom: 1.25rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-        <h3 style="font-size: 1.05rem; font-weight: 700;">My Performance</h3>
-        ${
-          myMarks.length > 1
-            ? `
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <span style="font-size: 0.75rem; color: var(--text-muted);">Quiz trend:</span>
-            <canvas id="member-sparkline" width="140" height="38" style="vertical-align: middle;"></canvas>
-          </div>
-        `
-            : ""
-        }
-      </div>
-      ${renderMemberMetricsHTML(myMetrics, { title: "Metrics & Growth" })}
-    </div>
-
-    <div class="grid-2">
-      <!-- Left Column: Tasks -->
-      <div>
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">My Tasks (${tasks.length})</h3>
-            <button class="btn btn-secondary btn-sm" id="btn-refresh-tasks">↻ Refresh</button>
-          </div>
-
-          <div id="tasks-list">
-            ${
-              tasks.length === 0
-                ? `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No active tasks assigned to your team.</p>`
-                : tasks
-                    .map((task) => {
-                      const submission = mySubmissions.find((s) => s.taskId === task.id);
-                      const isSubmitted = !!submission;
-                      const isDone = task.status === "done";
-
-                      return `
-                      <div class="task-item ${isDone ? "done" : ""}">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
-                          <h4 style="font-size: 0.95rem; font-weight: 700;">${task.title}</h4>
-                          <span class="badge ${isDone ? "badge-done" : "badge-open"}">${task.status}</span>
-                        </div>
-                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                          ${task.description || "No description provided."}
-                        </p>
-                        
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.65rem;">
-                          <span>Due: <strong>${task.dueDate || "Not set"}</strong></span>
-                          <span>Scope: <strong>${task.team === "ALL" ? "All Teams" : "Team " + task.team}</strong></span>
-                          ${
-                            task.fileUrl
-                              ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Attachment ↗</a>`
-                              : ""
-                          }
-                        </div>
-
-                        <!-- Submission Form or Status -->
-                        <div style="border-top: 1px dashed var(--border-color); padding-top: 0.6rem; margin-top: 0.5rem;">
-                          ${
-                            isSubmitted
-                              ? `
-                              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;">
-                                <span style="color: var(--teal); font-weight: 600;">✓ Submitted</span>
-                                <span style="color: var(--text-muted); font-size: 0.75rem;">${new Date(submission.timestamp).toLocaleDateString()}</span>
-                              </div>
-                              <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">
-                                <em>"${submission.content || "Marked as completed"}"</em>
-                              </p>
-                            `
-                              : `
-                              <form class="task-submit-form" data-task-id="${task.id}" style="margin-top: 0.4rem;">
-                                <div style="display: flex; gap: 0.5rem;">
-                                  <input type="text" name="content" class="form-control" style="font-size: 0.85rem; padding: 0.45rem 0.65rem;" placeholder="Your answer, notes, or Google Drive link..." required />
-                                  <button type="submit" class="btn btn-teal btn-sm" style="white-space: nowrap;">Submit</button>
-                                </div>
-                              </form>
-                            `
-                          }
-                        </div>
-                      </div>
-                    `;
-                    })
-                    .join("")
-            }
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column: My Marks & Doubt Form -->
-      <div>
-        <!-- My Marks -->
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Scorecard & Cycles</h3>
-          </div>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Cycle</th>
-                  <th>Score</th>
-                  <th>Submission</th>
-                  <th>Attendance</th>
-                  <th>Band</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${
-                  myMarks.length === 0
-                    ? `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No marks recorded yet.</td></tr>`
-                    : myMarks
-                        .map((m) => {
-                          const band = getScoreBand(m.quizScore);
-                          return `
-                        <tr>
-                          <td><strong>${m.cycle || "Cycle 1"}</strong></td>
-                          <td><strong style="font-size: 0.95rem;">${m.quizScore}</strong>/100</td>
-                          <td>${m.submission || "—"}</td>
-                          <td>${m.attendance || "—"}</td>
-                          <td><span class="badge ${band.cls}">${band.label}</span></td>
-                        </tr>
-                        ${
-                          m.notes
-                            ? `<tr><td colspan="5" style="font-size: 0.8rem; color: var(--text-muted); background-color: var(--bg-subtle); padding: 0.35rem 0.85rem;">
-                                💬 <em>Notes: ${m.notes}</em>
-                              </td></tr>`
-                            : ""
-                        }
-                      `;
-                        })
-                        .join("")
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Raise a Doubt Form -->
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Raise a Doubt / Question</h3>
-          </div>
-          <div id="escalation-feedback"></div>
-          <form id="form-raise-doubt">
-            <div class="form-group">
-              <label class="form-label">Topic / Subject</label>
-              <input type="text" id="doubt-topic" class="form-control" placeholder="e.g. Question 3 on IS-LM model" required />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Details / Clarification</label>
-              <textarea id="doubt-details" class="form-control" rows="3" placeholder="Explain what you need help with..." required></textarea>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; font-weight: 600;">
-                <input type="checkbox" id="doubt-urgent" style="width: 16px; height: 16px; accent-color: var(--red);" />
-                <span>This is urgent / I need the group leader directly</span>
-              </label>
-              <p id="doubt-hint" class="form-hint" style="color: var(--text-muted); margin-top: 0.3rem;">
-                This goes to your team leader first.
-              </p>
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Question</button>
-          </form>
-        </div>
-      </div>
-    </div>
+    <!-- Tab Content Shell -->
+    <div id="mem-tab-content"></div>
   `;
 
-  // Render sparkline if multiple cycles exist
-  const sparklineCanvas = container.querySelector("#member-sparkline");
-  if (sparklineCanvas) {
-    renderSparkline(sparklineCanvas, myMarks);
+  const contentShell = container.querySelector("#mem-tab-content");
+
+  const tabs = [
+    { id: "overview", label: "My Scorecard & Metrics", icon: "📊" },
+    { id: "goals", label: "My Goal & Progress", icon: "🎯" },
+    { id: "tasks", label: `Tasks & Submit (${tasks.length})`, icon: "📝" },
+    { id: "quizzes", label: `Quizzes & Tests (${quizzes.length})`, icon: "⏱️" },
+    { id: "leaderboard", label: "Class Leaderboard", icon: "🏆" },
+    { id: "doubts", label: "Ask a Doubt", icon: "❓" },
+    { id: "announcements", label: `Announcements (${announcements.length})`, icon: "📢" },
+  ];
+
+  function switchTab(tabId) {
+    if (tabId === "overview") renderOverviewTab(contentShell);
+    else if (tabId === "goals") renderGoalsTab(contentShell);
+    else if (tabId === "tasks") renderTasksTab(contentShell);
+    else if (tabId === "quizzes") renderQuizzesTab(contentShell);
+    else if (tabId === "leaderboard") renderLeaderboardTab(contentShell);
+    else if (tabId === "doubts") renderDoubtsTab(contentShell);
+    else if (tabId === "announcements") renderAnnouncementsTab(contentShell);
   }
 
-  // Dynamic hint toggle
-  const urgentCheckbox = container.querySelector("#doubt-urgent");
-  const hintEl = container.querySelector("#doubt-hint");
-  urgentCheckbox.addEventListener("change", () => {
-    if (urgentCheckbox.checked) {
-      hintEl.textContent = "This goes straight to the group leader.";
-      hintEl.style.color = "var(--red)";
-      hintEl.style.fontWeight = "600";
-    } else {
-      hintEl.textContent = "This goes to your team leader first.";
-      hintEl.style.color = "var(--text-muted)";
-      hintEl.style.fontWeight = "normal";
-    }
-  });
+  createTabNav(container.querySelector("#mem-tab-content"), tabs, switchTab);
+  switchTab("overview");
 
-  // Task submit listener
-  container.querySelectorAll(".task-submit-form").forEach((form) => {
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const taskId = form.getAttribute("data-task-id");
-      const content = form.querySelector('input[name="content"]').value;
-      const btn = form.querySelector('button[type="submit"]');
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 1: OVERVIEW & SCORECARD
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderOverviewTab(wrap) {
+    wrap.innerHTML = `
+      <div style="margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h3 style="font-size: 1.05rem; font-weight: 700;">Performance & Growth Summary</h3>
+          ${
+            myMarks.length > 1
+              ? `
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Quiz trend:</span>
+              <canvas id="member-sparkline" width="140" height="38" style="vertical-align: middle;"></canvas>
+            </div>
+          `
+              : ""
+          }
+        </div>
+        ${renderMemberMetricsHTML(myMetrics, { title: "Metrics & Growth" })}
+      </div>
 
-      btn.disabled = true;
-      btn.textContent = "Submitting...";
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">My Recorded Cycle Scores</h3></div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Cycle</th>
+                <th>Mock #</th>
+                <th>Score</th>
+                <th>Submission</th>
+                <th>Attendance</th>
+                <th>Preview</th>
+                <th>Peer Rating</th>
+                <th>Punctual</th>
+                <th>Band</th>
+                <th>Feedback / Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                myMarks.length === 0
+                  ? `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No scores recorded yet.</td></tr>`
+                  : myMarks
+                      .map((m) => {
+                        const band = getScoreBand(m.quizScore);
+                        return `
+                      <tr>
+                        <td><strong>${m.cycle}</strong></td>
+                        <td>${m.mockNumber || "—"}</td>
+                        <td><strong class="num" style="font-size: 1.05rem;">${m.quizScore}</strong></td>
+                        <td>${m.submission || "—"}</td>
+                        <td>${m.attendance || "—"}</td>
+                        <td>${m.previewDone || "—"}</td>
+                        <td>${m.peerRating || "—"}</td>
+                        <td>${m.punctual || "—"}</td>
+                        <td><span class="badge ${band.cls}">${band.label}</span></td>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">
+                          ${m.notes || "—"}
+                          ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Verified by: ${m.editedBy}</span>` : ""}
+                        </td>
+                      </tr>
+                    `;
+                      })
+                      .join("")
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
 
-      try {
-        const res = await apiAddSubmission({
-          taskId,
-          member: user.name,
-          team: user.team,
-          content,
-          fileUrl: content.startsWith("http") ? content : "",
-        });
+    setTimeout(() => {
+      if (myMarks.length > 1) {
+        const scores = myMarks.map((m) => Number(m.quizScore)).filter((s) => !isNaN(s));
+        renderSparkline("member-sparkline", scores);
+      }
+    }, 50);
+  }
 
-        if (res.ok) {
-          onRefresh();
-        } else {
-          alert(res.error || "Submission failed.");
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 2: GOALS
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderGoalsTab(wrap) {
+    wrap.innerHTML = `<div id="mem-goals-shell"></div>`;
+    renderGoalPanel(wrap.querySelector("#mem-goals-shell"), user, myGoal, myMetrics, onRefresh);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 3: TASKS & SUBMIT
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderTasksTab(wrap) {
+    wrap.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Assigned Tasks (${tasks.length})</h3></div>
+        <div id="tasks-list">
+          ${
+            tasks.length === 0
+              ? `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No active tasks assigned to your team.</p>`
+              : tasks
+                  .map((task) => {
+                    const submission = mySubmissions.find((s) => s.taskId === task.id);
+                    const isSubmitted = !!submission;
+                    const isDone = task.status === "done";
+
+                    return `
+                    <div class="task-item ${isDone ? "done" : ""}">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
+                        <h4 style="font-size: 0.95rem; font-weight: 700;">${task.title}</h4>
+                        <span class="badge ${isDone ? "badge-done" : "badge-open"}">${task.status}</span>
+                      </div>
+                      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem;">
+                        ${task.description || "No description provided."}
+                      </p>
+                      
+                      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.65rem;">
+                        <span>Due: <strong>${task.dueDate || "Not set"}</strong></span>
+                        <span>Scope: <strong>${task.team === "ALL" ? "All Teams" : "Team " + task.team}</strong></span>
+                        ${task.fileUrl ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Attachment ↗</a>` : ""}
+                      </div>
+
+                      <div style="border-top: 1px dashed var(--border-color); padding-top: 0.6rem; margin-top: 0.5rem;">
+                        ${
+                          isSubmitted
+                            ? `
+                          <div style="font-size: 0.85rem; color: var(--teal); display: flex; justify-content: space-between; align-items: center;">
+                            <span>✓ <strong>Submitted:</strong> ${submission.content || "Uploaded"}</span>
+                            ${submission.fileUrl ? `<a href="${submission.fileUrl}" target="_blank" style="font-size: 0.8rem; font-weight: 600;">View File ↗</a>` : ""}
+                          </div>
+                        `
+                            : `
+                          <form class="form-submit-task" data-task-id="${task.id}">
+                            <div class="form-group" style="margin-bottom: 0.5rem;">
+                              <label class="form-label" style="font-size: 0.8rem;">Submission Notes / Answer summary</label>
+                              <input type="text" class="form-control form-control-sm sub-content" placeholder="e.g. Completed IS-LM problem set questions 1 to 5" required />
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0.65rem;">
+                              <label class="form-label" style="font-size: 0.8rem;">Google Drive Link</label>
+                              <input type="url" class="form-control form-control-sm sub-file" placeholder="https://drive.google.com/file/..." />
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm">Turn In Assignment</button>
+                          </form>
+                        `
+                        }
+                      </div>
+                    </div>
+                  `;
+                  })
+                  .join("")
+          }
+        </div>
+      </div>
+    `;
+
+    wrap.querySelectorAll(".form-submit-task").forEach((form) => {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const taskId = form.getAttribute("data-task-id");
+        const content = form.querySelector(".sub-content").value;
+        const fileUrl = form.querySelector(".sub-file").value;
+        const btn = form.querySelector('button[type="submit"]');
+
+        btn.disabled = true;
+        btn.textContent = "Submitting...";
+
+        try {
+          const res = await apiAddSubmission({
+            taskId,
+            member: user.name,
+            team: user.team,
+            content,
+            fileUrl,
+          });
+
+          if (res.ok) {
+            onRefresh();
+          } else {
+            alert(res.error || "Failed to submit assignment.");
+            btn.disabled = false;
+            btn.textContent = "Turn In Assignment";
+          }
+        } catch (err) {
+          alert("Error: " + err.message);
           btn.disabled = false;
-          btn.textContent = "Submit";
+          btn.textContent = "Turn In Assignment";
         }
-      } catch (err) {
-        alert("Error: " + err.message);
-        btn.disabled = false;
-        btn.textContent = "Submit";
-      }
-    });
-  });
-
-  // Doubt form listener
-  const doubtForm = container.querySelector("#form-raise-doubt");
-  doubtForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const topic = container.querySelector("#doubt-topic").value;
-    const details = container.querySelector("#doubt-details").value;
-    const isUrgent = container.querySelector("#doubt-urgent").checked;
-    const feedback = container.querySelector("#escalation-feedback");
-    const btn = doubtForm.querySelector('button[type="submit"]');
-
-    btn.disabled = true;
-    btn.textContent = "Sending...";
-
-    try {
-      const res = await apiAddEscalation({
-        raisedBy: user.name,
-        team: user.team,
-        topic,
-        details,
-        severity: isUrgent ? "severe" : "normal",
       });
+    });
+  }
 
-      if (res.ok) {
-        feedback.innerHTML = `
-          <div class="alert alert-success">
-            Question submitted (${isUrgent ? "Sent to Group Leader" : "Sent to Team Leader"}).
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 4: QUIZZES
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderQuizzesTab(wrap) {
+    wrap.innerHTML = `<div id="mem-quiz-shell"></div>`;
+    renderQuizScheduler(wrap.querySelector("#mem-quiz-shell"), user, quizzes, onRefresh);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 5: LEADERBOARD
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderLeaderboardTab(wrap) {
+    wrap.innerHTML = `<div id="mem-lb-shell"></div>`;
+    renderLeaderboard(wrap.querySelector("#mem-lb-shell"), memberMetrics, teamAverages, user);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 6: DOUBTS & ESCALATIONS
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderDoubtsTab(wrap) {
+    wrap.innerHTML = `
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">Ask a Doubt / Request Help</h3></div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+          Have a question on theory, upcoming mock exams, or assignment instructions? Raise it here for Dr. Numan and Shehroz.
+        </p>
+
+        <div id="escalation-feedback"></div>
+
+        <form id="form-add-escalation">
+          <div class="form-group">
+            <label class="form-label" for="esc-topic">Topic / Question Subject</label>
+            <input type="text" id="esc-topic" class="form-control" placeholder="e.g. Question 3 derivation on IS-LM curve" required />
           </div>
-        `;
-        doubtForm.reset();
-        setTimeout(() => (feedback.innerHTML = ""), 4000);
-      } else {
-        feedback.innerHTML = `<div class="alert alert-error">${res.error || "Failed to submit."}</div>`;
-      }
-    } catch (err) {
-      feedback.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Submit Question";
-    }
-  });
 
-  // Refresh
-  container.querySelector("#btn-refresh-tasks").addEventListener("click", () => {
+          <div class="form-group">
+            <label class="form-label" for="esc-details">Explanation / Details</label>
+            <textarea id="esc-details" class="form-control" rows="3" placeholder="Describe the question or issue clearly..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="esc-severity">Urgency Level</label>
+            <select id="esc-severity" class="form-control">
+              <option value="normal">Normal (Review before next session)</option>
+              <option value="severe">Urgent (Blocks submission / conflict)</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="btn-submit-esc" style="width: 100%;">
+            Send Question to Instructor & Group Leader
+          </button>
+        </form>
+      </div>
+    `;
+
+    const escForm = wrap.querySelector("#form-add-escalation");
+    if (escForm) {
+      escForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const topic = wrap.querySelector("#esc-topic").value;
+        const details = wrap.querySelector("#esc-details").value;
+        const severity = wrap.querySelector("#esc-severity").value;
+        const feedback = wrap.querySelector("#escalation-feedback");
+        const submitBtn = wrap.querySelector("#btn-submit-esc");
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Submitting...";
+
+        try {
+          const res = await apiAddEscalation({
+            raisedBy: user.name,
+            team: user.team,
+            topic,
+            details,
+            severity,
+          });
+
+          if (res.ok) {
+            feedback.innerHTML = `<div class="alert alert-success">Question sent to Dr. Numan and Shehroz!</div>`;
+            escForm.reset();
+            setTimeout(() => {
+              feedback.innerHTML = "";
+              onRefresh();
+            }, 2500);
+          } else {
+            feedback.innerHTML = `<div class="alert alert-error">${res.error || "Failed to submit."}</div>`;
+          }
+        } catch (err) {
+          feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Send Question to Instructor & Group Leader";
+        }
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TAB 7: ANNOUNCEMENTS
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderAnnouncementsTab(wrap) {
+    wrap.innerHTML = `<div id="mem-ann-shell"></div>`;
+    renderAnnouncementsPanel(wrap.querySelector("#mem-ann-shell"), user, announcements, onRefresh);
+  }
+
+  container.querySelector("#btn-refresh-mem").addEventListener("click", () => {
     onRefresh();
   });
 }

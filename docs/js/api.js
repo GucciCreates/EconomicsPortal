@@ -1,5 +1,5 @@
 /**
- * EconomicsPortal — API Client (v2)
+ * EconomicsPortal — API Client (v3)
  * 
  * Supports both:
  * 1. Live Google Apps Script Web App (production)
@@ -13,12 +13,15 @@ import {
   MOCK_MARKS,
   MOCK_SUBMISSIONS,
   MOCK_ESCALATIONS,
+  MOCK_ANNOUNCEMENTS,
+  MOCK_QUIZZES,
+  MOCK_GOALS,
   computeMockTeamAverages,
   computeMockMemberMetrics,
 } from "./mockData.js";
 
 // Persistent in-memory/localStorage store for Demo Mode
-const DEMO_STORAGE_KEY = "economics_portal_demo_db_v2";
+const DEMO_STORAGE_KEY = "economics_portal_demo_db_v3";
 
 function getDemoStore() {
   try {
@@ -33,6 +36,9 @@ function getDemoStore() {
     marks: [...MOCK_MARKS],
     submissions: [...MOCK_SUBMISSIONS],
     escalations: [...MOCK_ESCALATIONS],
+    announcements: [...MOCK_ANNOUNCEMENTS],
+    quizzes: [...MOCK_QUIZZES],
+    goals: [...MOCK_GOALS],
   };
   saveDemoStore(initial);
   return initial;
@@ -121,15 +127,18 @@ export async function apiLogin(name, pin) {
 export async function apiGetDashboard(role, team, name) {
   if (isDemoMode()) {
     const store = getDemoStore();
-    const tasks = store.tasks;
-    const marks = store.marks;
-    const subs = store.submissions;
-    const escalations = store.escalations;
+    const tasks = store.tasks || [];
+    const marks = store.marks || [];
+    const subs = store.submissions || [];
+    const escalations = store.escalations || [];
+    const announcements = store.announcements || [];
+    const quizzes = store.quizzes || [];
+    const goals = store.goals || [];
     const teamAverages = computeMockTeamAverages(marks);
     const memberMetrics = computeMockMemberMetrics(marks, escalations);
     const atRiskMembers = Object.values(memberMetrics).filter((m) => m.atRisk);
 
-    if (role === "instructor") {
+    if (role === "instructor" || role === "group_leader" || role === "assistant") {
       return {
         ok: true,
         data: {
@@ -137,26 +146,13 @@ export async function apiGetDashboard(role, team, name) {
           marks,
           submissions: subs,
           escalations,
+          announcements,
+          quizzes,
+          goals,
           teamAverages,
           memberMetrics,
           atRiskMembers,
-          canEdit: true,
-        },
-      };
-    }
-
-    if (role === "group_leader" || role === "assistant") {
-      return {
-        ok: true,
-        data: {
-          tasks,
-          marks,
-          submissions: subs,
-          escalations,
-          teamAverages,
-          memberMetrics,
-          atRiskMembers,
-          canEdit: role === "group_leader",
+          canEdit: role === "instructor" || role === "group_leader",
         },
       };
     }
@@ -173,7 +169,11 @@ export async function apiGetDashboard(role, team, name) {
           marks: marks.filter((m) => m.team === team),
           submissions: subs.filter((s) => s.team === team),
           escalations: escalations.filter((es) => es.team === team),
+          announcements,
+          quizzes: quizzes.filter((q) => q.scope === "ALL" || q.scope === team),
+          goals: goals.filter((g) => g.team === team),
           teamAverage: teamAverages[team] || null,
+          teamAverages,
           memberMetrics: teamMetrics,
           atRiskMembers: Object.values(teamMetrics).filter((m) => m.atRisk),
         },
@@ -181,14 +181,21 @@ export async function apiGetDashboard(role, team, name) {
     }
 
     // member
+    const myGoal = goals.find((g) => g.name.toLowerCase() === name.toLowerCase()) || null;
     return {
       ok: true,
       data: {
         tasks: tasks.filter((t) => t.team === team || t.team === "ALL"),
         myMarks: marks.filter((m) => m.member.toLowerCase() === name.toLowerCase()),
+        marks: marks.filter((m) => m.team === team || m.member.toLowerCase() === name.toLowerCase()),
         teamAverage: teamAverages[team] || null,
+        teamAverages,
         mySubmissions: subs.filter((s) => s.member.toLowerCase() === name.toLowerCase()),
         myMetrics: memberMetrics[name] || null,
+        memberMetrics,
+        announcements,
+        quizzes: quizzes.filter((q) => q.scope === "ALL" || q.scope === team),
+        myGoal,
       },
     };
   }
@@ -202,7 +209,7 @@ export async function apiGetDashboard(role, team, name) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MUTATIONS (POST)
+// MARKS MUTATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function apiAddMark(payload) {
@@ -269,6 +276,10 @@ export async function apiDeleteMark(payload) {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TASKS MUTATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function apiAddTask(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
@@ -329,6 +340,10 @@ export async function apiUpdateTaskStatus(id, status, role) {
     status,
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUBMISSIONS & ESCALATIONS
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function apiAddSubmission(payload) {
   if (isDemoMode()) {
@@ -393,5 +408,145 @@ export async function apiUpdateEscalationStatus(id, status, role) {
     role,
     id,
     status,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS (v3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiAddAnnouncement(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (!store.announcements) store.announcements = [];
+    const newAnn = {
+      id: "ann-" + Math.random().toString(36).substr(2, 6),
+      title: payload.title,
+      body: payload.body,
+      pinned: Boolean(payload.pinned),
+      postedBy: payload.postedBy || payload.name,
+      timestamp: new Date().toISOString(),
+    };
+    store.announcements.unshift(newAnn);
+    saveDemoStore(store);
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "addAnnouncement",
+    ...payload,
+  });
+}
+
+export async function apiDeleteAnnouncement(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (store.announcements) {
+      store.announcements = store.announcements.filter((a) => a.id !== payload.id);
+      saveDemoStore(store);
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "deleteAnnouncement",
+    ...payload,
+  });
+}
+
+export async function apiPinAnnouncement(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (store.announcements) {
+      const ann = store.announcements.find((a) => a.id === payload.id);
+      if (ann) {
+        ann.pinned = Boolean(payload.pinned);
+        saveDemoStore(store);
+      }
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "pinAnnouncement",
+    ...payload,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUIZZES / TESTS (v3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiAddQuiz(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (!store.quizzes) store.quizzes = [];
+    const newQuiz = {
+      id: "qz-" + Math.random().toString(36).substr(2, 6),
+      title: payload.title,
+      scheduledAt: payload.scheduledAt,
+      scope: payload.scope || "ALL",
+      notes: payload.notes || "",
+      createdBy: payload.name,
+      timestamp: new Date().toISOString(),
+    };
+    store.quizzes.push(newQuiz);
+    saveDemoStore(store);
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "addQuiz",
+    ...payload,
+  });
+}
+
+export async function apiDeleteQuiz(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (store.quizzes) {
+      store.quizzes = store.quizzes.filter((q) => q.id !== payload.id);
+      saveDemoStore(store);
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "deleteQuiz",
+    ...payload,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GOALS (v3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiSetGoal(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (!store.goals) store.goals = [];
+    const existing = store.goals.find(
+      (g) => g.name.toLowerCase() === payload.name.toLowerCase()
+    );
+    if (existing) {
+      existing.target = payload.target;
+      existing.description = payload.description;
+      existing.setAt = new Date().toISOString();
+    } else {
+      store.goals.push({
+        name: payload.name,
+        team: payload.team,
+        target: payload.target,
+        description: payload.description,
+        setAt: new Date().toISOString(),
+      });
+    }
+    saveDemoStore(store);
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "setGoal",
+    ...payload,
   });
 }
