@@ -212,10 +212,16 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
       btn.addEventListener("click", () => {
         const memName = btn.getAttribute("data-name");
         const nudgeText = `Hi ${memName}! Just checking in from Team ${user.team} for Dr. Numan's Economics class. Please ensure your problem set is submitted so I can forward it for grading!`;
-        navigator.clipboard.writeText(nudgeText).then(() => {
-          btn.textContent = "Copied! ✓";
-          setTimeout(() => (btn.textContent = "🔔 Nudge"), 2000);
-        });
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(nudgeText).then(() => {
+            btn.textContent = "Copied! ✓";
+            setTimeout(() => (btn.textContent = "🔔 Nudge"), 2000);
+          }).catch(() => {
+            prompt("Copy reminder message for " + memName + ":", nudgeText);
+          });
+        } else {
+          prompt("Copy reminder message for " + memName + ":", nudgeText);
+        }
       });
     });
   }

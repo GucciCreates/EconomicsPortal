@@ -17,8 +17,20 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
   const existing = document.getElementById(modalId);
   if (existing) existing.remove();
 
-  const sortedMarks = [...studentMarks].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  const validScores = sortedMarks.map((m) => Number(m.quizScore)).filter((s) => !isNaN(s) && s > 0);
+  const info = typeof studentInfo === "string" 
+    ? { name: studentInfo, team: studentMetrics.team || "-" } 
+    : (studentInfo || { name: "Student", team: "-" });
+
+  const sortedMarks = [...studentMarks].sort((a, b) => {
+    const da = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const db = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return da - db;
+  });
+
+  const validScores = sortedMarks
+    .filter((m) => m.quizScore !== "" && m.quizScore !== null && m.quizScore !== undefined && !isNaN(Number(m.quizScore)))
+    .map((m) => Number(m.quizScore));
+
   const avg = validScores.length
     ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10
     : 0;
@@ -82,11 +94,11 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
         <div class="report-profile-grid">
           <div class="report-field">
             <span class="report-label">Student Name</span>
-            <span class="report-val name">${studentInfo.name}</span>
+            <span class="report-val name">${info.name}</span>
           </div>
           <div class="report-field">
             <span class="report-label">Cohort Team</span>
-            <span class="report-val">Team ${studentInfo.team}</span>
+            <span class="report-val">Team ${info.team}</span>
           </div>
           <div class="report-field">
             <span class="report-label">Class Standing</span>

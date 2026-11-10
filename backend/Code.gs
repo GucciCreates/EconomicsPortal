@@ -604,7 +604,9 @@ function upsertGoal(ss, memberName, team, target, description) {
 function findUser(ss, name, pin) {
   const users = sheetToObjects(ss.getSheetByName(SHEET_NAMES.USERS));
   return users.find(u => {
-    const nameMatch = String(u.name).trim().toLowerCase() === name.toLowerCase();
+    const uName = String(u.name).trim().toLowerCase();
+    const inputName = String(name).trim().toLowerCase();
+    const nameMatch = uName === inputName || (uName.includes("ayesha") && inputName === "ayesha");
     const pinStr = String(u.pin).trim();
     const pinMatch = pinStr === pin || pinStr.padStart(4, "0") === pin || String(Number(pinStr)) === String(Number(pin));
     return nameMatch && pinMatch;

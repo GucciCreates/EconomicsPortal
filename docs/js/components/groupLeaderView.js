@@ -385,7 +385,12 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       }
       const q = searchInput ? searchInput.value.toLowerCase().trim() : "";
       if (q) {
-        filtered = filtered.filter((m) => m.member.toLowerCase().includes(q) || m.team.toLowerCase().includes(q));
+        filtered = filtered.filter((m) => 
+          (m.member && m.member.toLowerCase().includes(q)) || 
+          (m.team && m.team.toLowerCase().includes(q)) ||
+          (m.cycle && String(m.cycle).toLowerCase().includes(q)) ||
+          (m.notes && m.notes.toLowerCase().includes(q))
+        );
       }
       marksTbody.innerHTML = renderMarksRows(filtered);
       attachMarksActions();
