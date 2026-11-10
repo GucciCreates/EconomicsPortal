@@ -160,6 +160,9 @@ html {
 body {
   font-family: var(--font-family);
   background-color: var(--bg-page);
+  background-image: radial-gradient(at 50% 0%, rgba(79, 70, 229, 0.05) 0px, transparent 65%),
+                    radial-gradient(at 100% 100%, rgba(13, 148, 136, 0.04) 0px, transparent 55%);
+  background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.55;
   min-height: 100vh;
@@ -168,6 +171,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+[data-theme="dark"] body {
+  background-image: radial-gradient(at 50% 0%, rgba(79, 70, 229, 0.12) 0px, transparent 65%),
+                    radial-gradient(at 100% 100%, rgba(13, 148, 136, 0.08) 0px, transparent 55%);
 }
 
 /* Tabular numbers for clean ledger columns */
@@ -1139,10 +1147,18 @@ a:hover {
   margin-bottom: 1.5rem;
 }
 .auth-logo-badge {
-  font-size: 2.75rem;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 0.75rem auto;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.12) 0%, rgba(13, 148, 136, 0.12) 100%);
+  border: 1px solid rgba(79, 70, 229, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
   line-height: 1;
-  margin-bottom: 0.5rem;
-  display: inline-block;
+  box-shadow: 0 8px 20px -4px rgba(79, 70, 229, 0.25);
   animation: pulseLogo 3s ease-in-out infinite;
 }
 @keyframes pulseLogo {

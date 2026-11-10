@@ -22,8 +22,13 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           <h1 class="auth-title">EconomicsPortal</h1>
           <p class="auth-subtitle">Dr. Numan's Economics Class • Academic Ledger</p>
           <div style="margin-top: 0.65rem;">
-            <span class="badge" style="background-color: var(--bg-subtle); color: var(--text-muted); font-size: 0.75rem;">
-              🔒 Secure Private Access • Confidential Ledger
+            <span class="badge" style="background-color: var(--primary-soft); color: var(--purple); font-size: 0.75rem; border: 1px solid var(--purple-border); font-weight: 700;">
+              ✨ Eye-Friendly Modern Ledger • v3.2
+            </span>
+          </div>
+          <div style="margin-top: 0.4rem;">
+            <span class="badge" style="background-color: var(--bg-subtle); color: var(--text-muted); font-size: 0.72rem;">
+              🔒 Secure Private Access • Confidential PIN
             </span>
           </div>
         </div>

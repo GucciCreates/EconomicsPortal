@@ -18,8 +18,13 @@
   <!-- Chart.js 4.4.4 via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 
-  <!-- Main Ledger Stylesheet -->
-  <link rel="stylesheet" href="./css/style.css">
+  <!-- Cache Control Meta Tags to ensure immediate update in all browsers -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- Main Ledger Stylesheet (Cache Busted) -->
+  <link rel="stylesheet" href="./css/style.css?v=3.2.1">
 </head>
 <body>
 
@@ -39,7 +44,7 @@
   <!-- Persistent Footer -->
   <footer id="site-footer"></footer>
 
-  <!-- Application Script -->
-  <script type="module" src="./js/app.js"></script>
+  <!-- Application Script (Cache Busted) -->
+  <script type="module" src="./js/app.js?v=3.2.1"></script>
 </body>
 </html>
