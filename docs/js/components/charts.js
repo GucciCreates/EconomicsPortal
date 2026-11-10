@@ -1,15 +1,20 @@
 /**
- * EconomicsPortal — Chart.js Visualizations (v2)
- * Pinned to tokens: #0F6E56 (teal), #534AB7 (purple), #854F0B (amber), #9B2C2C (red)
+ * EconomicsPortal — Chart.js Visualizations (v3)
+ * Modern Eye-Pleasing Palette:
+ *   --teal: #0D9488 (Emerald Teal)
+ *   --mint: #10B981 (Fresh Mint)
+ *   --purple: #4F46E5 (Royal Indigo)
+ *   --amber: #D97706 (Honey Amber)
+ *   --red: #E11D48 (Coral Rose)
  */
 
 export function getBandColor(score) {
   const num = Number(score);
-  if (isNaN(num)) return "#854F0B";
-  if (num >= 85) return "#0F6E56"; // Teal
-  if (num >= 70) return "#0F6E56"; // Strong Teal
-  if (num >= 60) return "#854F0B"; // Amber
-  return "#9B2C2C";               // Red
+  if (isNaN(num)) return "#D97706";
+  if (num >= 85) return "#0D9488"; // Emerald Teal
+  if (num >= 70) return "#10B981"; // Fresh Mint
+  if (num >= 60) return "#D97706"; // Warm Honey Amber
+  return "#E11D48";               // Coral Rose
 }
 
 /**
@@ -108,7 +113,7 @@ export function renderBandDistributionChart(canvasId, memberMetrics, marks) {
       datasets: [
         {
           data: [outstanding, strong, attention, support],
-          backgroundColor: ["#0F6E56", "#149576", "#854F0B", "#9B2C2C"],
+          backgroundColor: ["#0D9488", "#10B981", "#D97706", "#E11D48"],
           borderWidth: 2,
           borderColor: "#ffffff",
         },
