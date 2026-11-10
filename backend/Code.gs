@@ -40,17 +40,21 @@ const SHEET_NAMES = {
   ANNOUNCEMENTS: "Announcements",
   QUIZ_SCHEDULE: "QuizSchedule",
   GOALS:         "Goals",
+  TEAM_MESSAGES: "TeamMessages",
+  MENTORSHIP:    "Mentorship",
 };
 
 const HEADERS = {
   Users:         ["name", "role", "team", "pin"],
   Marks:         ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
   Tasks:         ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
-  Submissions:   ["id", "taskId", "member", "team", "content", "fileUrl", "timestamp"],
+  Submissions:   ["id", "taskId", "member", "team", "content", "fileUrl", "gradingRequested", "requestedBy", "reviewNotes", "timestamp"],
   Escalations:   ["id", "raisedBy", "team", "topic", "details", "severity", "status", "timestamp"],
   Announcements: ["id", "title", "body", "pinned", "postedBy", "timestamp"],
   QuizSchedule:  ["id", "title", "scheduledAt", "scope", "notes", "createdBy", "timestamp"],
   Goals:         ["name", "team", "target", "description", "setAt"],
+  TeamMessages:  ["id", "team", "author", "message", "timestamp"],
+  Mentorship:    ["id", "student", "mentor", "team", "milestones", "status", "assignedBy", "timestamp"],
 };
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -250,6 +254,46 @@ function doPost(e) {
       return json({ ok: true });
     }
 
+    // ── Team Leader Powers & Mentorship (v3) ──
+    if (action === "requestGrading") {
+      requireRole(body, ["team_leader", "group_leader"]);
+      updateRow(ss, SHEET_NAMES.SUBMISSIONS, body.submissionId, {
+        gradingRequested: true,
+        requestedBy: body.leaderName,
+        reviewNotes: body.reviewNotes || "",
+      }, null);
+      return json({ ok: true });
+    }
+
+    if (action === "addTeamMessage") {
+      requireRole(body, ["team_leader", "group_leader"]);
+      appendRow(ss, SHEET_NAMES.TEAM_MESSAGES, [
+        newId(), body.team, body.author, body.message, new Date(),
+      ]);
+      return json({ ok: true });
+    }
+
+    if (action === "deleteTeamMessage") {
+      requireRole(body, ["team_leader", "group_leader"]);
+      deleteRow(ss, SHEET_NAMES.TEAM_MESSAGES, body.id);
+      return json({ ok: true });
+    }
+
+    if (action === "createMentorshipPlan") {
+      requireRole(body, ["group_leader", "instructor"]);
+      appendRow(ss, SHEET_NAMES.MENTORSHIP, [
+        newId(), body.student, body.mentor, body.team,
+        JSON.stringify(body.milestones || []), "active", body.assignedBy, new Date(),
+      ]);
+      return json({ ok: true });
+    }
+
+    if (action === "updateMentorshipStatus") {
+      requireRole(body, ["group_leader", "instructor"]);
+      updateCell(ss, SHEET_NAMES.MENTORSHIP, body.id, "status", body.status);
+      return json({ ok: true });
+    }
+
     return json({ ok: false, error: "Unknown action." });
   } catch (err) {
     return json({ ok: false, error: String(err) });
@@ -267,6 +311,13 @@ function buildDashboard(ss, role, team, name) {
   const announcements = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.ANNOUNCEMENTS));
   const quizzes = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.QUIZ_SCHEDULE));
   const goals = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.GOALS));
+  const teamMessages = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.TEAM_MESSAGES));
+  const mentorshipRaw = sheetToObjects(getOrInitSheet(ss, SHEET_NAMES.MENTORSHIP));
+  const mentorship = mentorshipRaw.map(p => {
+    let milestones = [];
+    try { milestones = JSON.parse(p.milestones || "[]"); } catch (e) { milestones = []; }
+    return { ...p, milestones };
+  });
 
   const teamAverages = computeTeamAverages(marks);
   const metrics = computeMemberMetrics(marks, escalations);
@@ -282,6 +333,8 @@ function buildDashboard(ss, role, team, name) {
       announcements: announcements,
       quizzes: quizzes,
       goals: goals,
+      teamMessages: teamMessages,
+      mentorship: mentorship,
       teamAverages: teamAverages,
       memberMetrics: metrics,
       atRiskMembers: atRiskMembers,
@@ -299,6 +352,8 @@ function buildDashboard(ss, role, team, name) {
       announcements: announcements,
       quizzes: quizzes,
       goals: goals,
+      teamMessages: teamMessages,
+      mentorship: mentorship,
       teamAverages: teamAverages,
       memberMetrics: metrics,
       atRiskMembers: atRiskMembers,
@@ -319,6 +374,8 @@ function buildDashboard(ss, role, team, name) {
       announcements: announcements,
       quizzes: quizzes.filter(q => q.scope === "ALL" || q.scope === team),
       goals: goals.filter(g => g.team === team),
+      teamMessages: teamMessages.filter(tm => tm.team === team),
+      mentorship: mentorship.filter(mp => mp.team === team),
       teamAverage: teamAverages[team] || null,
       teamAverages: teamAverages,
       memberMetrics: teamMetrics,
@@ -339,6 +396,8 @@ function buildDashboard(ss, role, team, name) {
     memberMetrics: metrics,
     announcements: announcements,
     quizzes: quizzes.filter(q => q.scope === "ALL" || q.scope === team),
+    teamMessages: teamMessages.filter(tm => tm.team === team),
+    mentorship: mentorship.filter(mp => String(mp.student).toLowerCase() === name.toLowerCase() || String(mp.mentor).toLowerCase() === name.toLowerCase()),
     myGoal: myGoal,
   };
 }

@@ -22,6 +22,8 @@ import { renderAnnouncementsPanel } from "./announcementsPanel.js";
 import { renderQuizScheduler, cleanupQuizCountdowns } from "./quizScheduler.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { renderExportToolbar } from "./exportUtils.js";
+import { openReportCardModal } from "./reportCardModal.js";
+import { renderMentorshipPanel } from "./mentorshipPanel.js";
 
 export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -129,9 +131,12 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
   const contentShell = container.querySelector("#gl-tab-content");
 
+  const mentorshipPlans = data.mentorship || [];
+
   // Define tabs
   const tabs = [
     { id: "ledger", label: "Ledger & Scores", icon: "📊" },
+    { id: "mentorship", label: `Recovery & Mentorship (${atRiskMembers.length})`, icon: "🛡️" },
     { id: "analytics", label: "Analytics & Leaderboard", icon: "🏆" },
     { id: "quizzes", label: `Quizzes & Scheduler (${quizzes.length})`, icon: "⏱️" },
     { id: "announcements", label: `Announcements (${announcements.length})`, icon: "📢" },
@@ -146,6 +151,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
   function switchTab(tabId) {
     if (tabId === "ledger") renderLedgerTab(contentShell);
+    else if (tabId === "mentorship") renderMentorshipTab(contentShell);
     else if (tabId === "analytics") renderAnalyticsTab(contentShell);
     else if (tabId === "quizzes") renderQuizzesTab(contentShell);
     else if (tabId === "announcements") renderAnnouncementsTab(contentShell);
@@ -170,7 +176,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
         <div class="at-risk-panel">
           <div class="at-risk-title">⚠️ At-Risk Alert (${atRiskMembers.length} members require immediate support)</div>
           <p style="font-size: 0.85rem; margin-bottom: 0.6rem;">
-            These students scored below 50 or missed submissions in consecutive cycles. Click to highlight in ledger:
+            These students scored below 50 or missed submissions in consecutive units. Click to highlight in ledger:
           </p>
           <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
             ${atRiskMembers
@@ -224,11 +230,11 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
           <h3 class="card-title" id="marks-panel-title">Class Scorecard Ledger</h3>
           <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
             <div class="auth-tabs" style="margin-bottom: 0; padding: 0.15rem; gap: 0.2rem;">
-              <button type="button" class="filter-chip active" id="btn-filter-cycle-all" style="font-size: 0.75rem;">All Cycles</button>
-              <button type="button" class="filter-chip" id="btn-filter-cycle-1" style="font-size: 0.75rem;">Cycle 1</button>
-              <button type="button" class="filter-chip" id="btn-filter-cycle-2" style="font-size: 0.75rem;">Cycle 2</button>
+              <button type="button" class="filter-chip active" id="btn-filter-cycle-all" style="font-size: 0.75rem;">All Topics</button>
+              <button type="button" class="filter-chip" id="btn-filter-cycle-1" style="font-size: 0.75rem;">Unit 1</button>
+              <button type="button" class="filter-chip" id="btn-filter-cycle-2" style="font-size: 0.75rem;">Unit 2</button>
             </div>
-            <input type="text" id="gl-search-member" class="form-control" placeholder="🔍 Search student..." style="width: 150px; padding: 0.3rem 0.6rem; font-size: 0.8rem; min-height: 32px;" />
+            <input type="text" id="gl-search-member" class="form-control" placeholder="🔍 Search student / topic..." style="width: 170px; padding: 0.3rem 0.6rem; font-size: 0.8rem; min-height: 32px;" />
             <button class="btn btn-secondary btn-sm" id="btn-show-all-marks">Show All Teams</button>
           </div>
         </div>
@@ -238,7 +244,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               <tr>
                 <th>Member</th>
                 <th>Team</th>
-                <th>Cycle</th>
+                <th>Tested Topic / Unit</th>
                 <th>Score</th>
                 <th>Sub</th>
                 <th>Att</th>
@@ -287,8 +293,8 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Cycle</label>
-                <input type="text" id="gl-mark-cycle" class="form-control" value="Cycle 2" required />
+                <label class="form-label">Tested Topic / Unit</label>
+                <input type="text" id="gl-mark-cycle" class="form-control" placeholder="e.g. Unit 2: Monetary Policy" value="Unit 2: Monetary Policy" required />
               </div>
               <div class="form-group">
                 <label class="form-label">Mock #</label>
@@ -839,6 +845,21 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // TAB 7.5: AT-RISK RECOVERY & MENTORSHIP
+  // ─────────────────────────────────────────────────────────────────────────
+  function renderMentorshipTab(wrap) {
+    wrap.innerHTML = `<div id="mentorship-shell"></div>`;
+    renderMentorshipPanel(
+      wrap.querySelector("#mentorship-shell"),
+      user,
+      mentorshipPlans,
+      atRiskMembers,
+      memberMetrics,
+      onRefresh
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // TAB 8: MEMBER ACCESS & PIN MANAGEMENT (Group Leader Only)
   // ─────────────────────────────────────────────────────────────────────────
   async function renderPinsTab(wrap) {
@@ -1125,6 +1146,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               ? `
             <td>
               <div style="display: flex; gap: 0.35rem; align-items: center;">
+                <button class="btn btn-secondary btn-sm btn-report-card" data-member="${m.member}" data-team="${m.team}" title="Print student progress report card">📄</button>
                 <button class="btn btn-secondary btn-sm btn-edit-mark" data-id="${m.id}" title="Edit mark">✏️</button>
                 ${
                   isInstructor
@@ -1143,6 +1165,16 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   }
 
   function attachMarksActions() {
+    container.querySelectorAll(".btn-report-card").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const memName = btn.getAttribute("data-member");
+        const memTeam = btn.getAttribute("data-team");
+        const memMarks = marks.filter((m) => m.member.toLowerCase() === memName.toLowerCase());
+        const memData = memberMetrics[memName] || {};
+        openReportCardModal({ name: memName, team: memTeam, role: "member" }, memMarks, memData, user);
+      });
+    });
+
     container.querySelectorAll(".btn-edit-mark").forEach((btn) => {
       btn.addEventListener("click", () => {
         const markId = btn.getAttribute("data-id");

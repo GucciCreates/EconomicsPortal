@@ -51,11 +51,11 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
 
           <div style="display: flex; gap: 1.25rem; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
             <div>
-              <div style="color: var(--text-muted); font-size: 0.75rem;">Last Cycle Score</div>
+              <div style="color: var(--text-muted); font-size: 0.75rem;">Last Test Score</div>
               <div class="num" style="font-weight: 700; font-size: 1.05rem;">${lastScore || "—"}</div>
             </div>
             <div>
-              <div style="color: var(--text-muted); font-size: 0.75rem;">Needed per Cycle</div>
+              <div style="color: var(--text-muted); font-size: 0.75rem;">Needed per Test</div>
               <div class="num" style="font-weight: 700; font-size: 1.05rem;">
                 ${target && !achieved ? Math.max(0, target - avg).toFixed(1) + " more avg" : achieved ? "Done! 🎉" : "—"}
               </div>
@@ -94,7 +94,7 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
               <label class="form-label">Goal Description</label>
               <input
                 type="text" id="goal-desc" class="form-control"
-                placeholder="e.g. Score 85+ by end of Cycle 3"
+                placeholder="e.g. Score 85+ by next topic test"
                 value="${goal ? goal.description || "" : ""}"
               />
             </div>

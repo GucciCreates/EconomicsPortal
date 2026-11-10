@@ -16,6 +16,8 @@ import {
   MOCK_ANNOUNCEMENTS,
   MOCK_QUIZZES,
   MOCK_GOALS,
+  MOCK_TEAM_MESSAGES,
+  MOCK_MENTORSHIP,
   computeMockTeamAverages,
   computeMockMemberMetrics,
 } from "./mockData.js";
@@ -39,6 +41,8 @@ function getDemoStore() {
     announcements: [...MOCK_ANNOUNCEMENTS],
     quizzes: [...MOCK_QUIZZES],
     goals: [...MOCK_GOALS],
+    teamMessages: [...MOCK_TEAM_MESSAGES],
+    mentorship: [...MOCK_MENTORSHIP],
   };
   saveDemoStore(initial);
   return initial;
@@ -134,6 +138,8 @@ export async function apiGetDashboard(role, team, name) {
     const announcements = store.announcements || [];
     const quizzes = store.quizzes || [];
     const goals = store.goals || [];
+    const teamMessages = store.teamMessages || [];
+    const mentorship = store.mentorship || [];
     const teamAverages = computeMockTeamAverages(marks);
     const memberMetrics = computeMockMemberMetrics(marks, escalations);
     const atRiskMembers = Object.values(memberMetrics).filter((m) => m.atRisk);
@@ -149,10 +155,13 @@ export async function apiGetDashboard(role, team, name) {
           announcements,
           quizzes,
           goals,
+          teamMessages,
+          mentorship,
           teamAverages,
           memberMetrics,
           atRiskMembers,
-          canEdit: role === "instructor" || role === "group_leader" || role === "assistant",
+          users: role === "group_leader" ? store.users : undefined,
+          canEdit: true,
         },
       };
     }
@@ -172,6 +181,8 @@ export async function apiGetDashboard(role, team, name) {
           announcements,
           quizzes: quizzes.filter((q) => q.scope === "ALL" || q.scope === team),
           goals: goals.filter((g) => g.team === team),
+          teamMessages: teamMessages.filter((tm) => tm.team === team),
+          mentorship: mentorship.filter((mp) => mp.team === team),
           teamAverage: teamAverages[team] || null,
           teamAverages,
           memberMetrics: teamMetrics,
@@ -195,6 +206,8 @@ export async function apiGetDashboard(role, team, name) {
         memberMetrics,
         announcements,
         quizzes: quizzes.filter((q) => q.scope === "ALL" || q.scope === team),
+        teamMessages: teamMessages.filter((tm) => tm.team === team),
+        mentorship: mentorship.filter((mp) => mp.student.toLowerCase() === name.toLowerCase() || mp.mentor.toLowerCase() === name.toLowerCase()),
         myGoal,
       },
     };
@@ -584,6 +597,119 @@ export async function apiGetUsers(role) {
 
   return await getFromAppsScript({
     action: "users",
+    role,
+  });
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEAM LEADER POWERS: GRADING REQUESTS & TEAM MESSAGES (v3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiRequestGrading(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    const sub = store.submissions.find((s) => s.id === payload.submissionId);
+    if (sub) {
+      sub.gradingRequested = true;
+      sub.requestedBy = payload.leaderName;
+      sub.reviewNotes = payload.reviewNotes || "";
+      saveDemoStore(store);
+      return { ok: true };
+    }
+    return { ok: false, error: "Submission not found." };
+  }
+
+  return await postToAppsScript({
+    action: "requestGrading",
+    ...payload,
+  });
+}
+
+export async function apiAddTeamMessage(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (!store.teamMessages) store.teamMessages = [];
+    const newMsg = {
+      id: "tm-" + Math.random().toString(36).substr(2, 6),
+      team: payload.team,
+      author: payload.author,
+      message: payload.message,
+      timestamp: new Date().toISOString(),
+    };
+    store.teamMessages.unshift(newMsg);
+    saveDemoStore(store);
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "addTeamMessage",
+    ...payload,
+  });
+}
+
+export async function apiDeleteTeamMessage(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (store.teamMessages) {
+      store.teamMessages = store.teamMessages.filter((m) => m.id !== payload.id);
+      saveDemoStore(store);
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "deleteTeamMessage",
+    ...payload,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AT-RISK MENTORSHIP & RECOVERY (v3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function apiCreateMentorshipPlan(payload) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (!store.mentorship) store.mentorship = [];
+    const newPlan = {
+      id: "mnt-" + Math.random().toString(36).substr(2, 6),
+      student: payload.student,
+      mentor: payload.mentor,
+      team: payload.team,
+      milestones: payload.milestones || [],
+      status: "active",
+      assignedBy: payload.assignedBy,
+      timestamp: new Date().toISOString(),
+    };
+    store.mentorship.unshift(newPlan);
+    saveDemoStore(store);
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "createMentorshipPlan",
+    ...payload,
+  });
+}
+
+export async function apiUpdateMentorshipStatus(id, status, role) {
+  if (isDemoMode()) {
+    const store = getDemoStore();
+    if (store.mentorship) {
+      const plan = store.mentorship.find((p) => p.id === id);
+      if (plan) {
+        plan.status = status;
+        saveDemoStore(store);
+      }
+    }
+    return { ok: true };
+  }
+
+  return await postToAppsScript({
+    action: "updateMentorshipStatus",
+    id,
+    status,
     role,
   });
 }

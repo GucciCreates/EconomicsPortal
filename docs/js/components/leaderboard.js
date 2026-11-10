@@ -40,7 +40,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
       <div class="card" style="margin-bottom: 1.25rem;">
         <div class="card-header">
           <h3 class="card-title">🏆 Team Leaderboard</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Ranked by mean quiz score across all cycles</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Ranked by mean quiz score across all tested units</span>
         </div>
         <div class="leaderboard-list">
           ${
@@ -73,7 +73,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">🎖️ Member Leaderboard</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Individual average — all cycles</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Individual average — all tested units</span>
         </div>
         <div class="table-responsive">
           <table class="data-table">
@@ -113,7 +113,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
                         <td><span class="badge" style="background: var(--bg-subtle);">${m.team}</span></td>
                         <td><strong class="num">${m.avg.toFixed(1)}</strong></td>
                         <td>
-                          ${m.streak > 0 ? `<span title="Consecutive good cycles">🔥 ${m.streak}</span>` : `<span style="color: var(--text-muted);">—</span>`}
+                          ${m.streak > 0 ? `<span title="Consecutive passing units">🔥 ${m.streak}</span>` : `<span style="color: var(--text-muted);">—</span>`}
                         </td>
                         <td>${trendIcon}</td>
                         <td><span class="badge ${band.cls}">${band.label}</span></td>

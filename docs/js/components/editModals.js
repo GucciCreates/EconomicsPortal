@@ -17,6 +17,11 @@ export function openEditMarkModal(mark, onSave) {
       </div>
 
       <form id="form-edit-mark">
+        <div class="form-group">
+          <label class="form-label">Tested Topic / Unit</label>
+          <input type="text" id="edit-mark-cycle" class="form-control" value="${mark.cycle || ""}" required />
+        </div>
+
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
           <div class="form-group">
             <label class="form-label">Quiz Score (0-100)</label>
@@ -90,7 +95,10 @@ export function openEditMarkModal(mark, onSave) {
     const newPunctual = modal.querySelector("#edit-mark-punctual").value;
     const newNotes = modal.querySelector("#edit-mark-notes").value;
 
+    const newCycle = modal.querySelector("#edit-mark-cycle").value.trim();
+
     const fields = {};
+    if (newCycle && newCycle !== mark.cycle) fields.cycle = newCycle;
     if (newQuiz !== Number(mark.quizScore)) fields.quizScore = newQuiz;
     if (newSub !== mark.submission) fields.submission = newSub;
     if (newAtt !== mark.attendance) fields.attendance = newAtt;

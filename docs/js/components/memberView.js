@@ -10,6 +10,7 @@ import { renderGoalPanel } from "./goalPanel.js";
 import { renderQuizScheduler, cleanupQuizCountdowns } from "./quizScheduler.js";
 import { renderLeaderboard } from "./leaderboard.js";
 import { renderAnnouncementsPanel } from "./announcementsPanel.js";
+import { openReportCardModal } from "./reportCardModal.js";
 
 export function renderMemberDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -80,35 +81,90 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   createTabNav(container.querySelector("#mem-tab-content"), tabs, switchTab);
   switchTab("overview");
 
+  const teamMessages = data.teamMessages || [];
+  const mentorshipPlans = data.mentorship || [];
+  const myMentorship = mentorshipPlans.find(
+    (p) => p.student.toLowerCase() === user.name.toLowerCase() || p.mentor.toLowerCase() === user.name.toLowerCase()
+  );
+
   // ─────────────────────────────────────────────────────────────────────────
   // TAB 1: OVERVIEW & SCORECARD
   // ─────────────────────────────────────────────────────────────────────────
   function renderOverviewTab(wrap) {
     wrap.innerHTML = `
+      <!-- Team Leader Notice (if any) -->
+      ${
+        teamMessages.length > 0
+          ? `
+        <div class="card" style="border-left: 4px solid var(--teal); background-color: var(--teal-soft); margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
+            <strong style="color: var(--teal); font-size: 0.95rem;">💬 Notice from Team Leader (${teamMessages[0].author})</strong>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">${new Date(teamMessages[0].timestamp).toLocaleDateString()}</span>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-main); line-height: 1.45;">${teamMessages[0].message}</p>
+        </div>
+      `
+          : ""
+      }
+
+      <!-- Active Mentorship Card (if student is mentee or mentor) -->
+      ${
+        myMentorship
+          ? `
+        <div class="card" style="border-left: 4px solid var(--purple); margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <h4 style="font-size: 1rem; font-weight: 700; color: var(--purple);">
+              🛡️ Active Academic Recovery & Peer Mentorship
+            </h4>
+            <span class="badge ${myMentorship.status === "resolved" ? "badge-closed" : "badge-support"}">${myMentorship.status}</span>
+          </div>
+          <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
+            ${
+              myMentorship.student.toLowerCase() === user.name.toLowerCase()
+                ? `You have been paired with peer mentor <strong>${myMentorship.mentor}</strong> to help you achieve your recovery goals.`
+                : `You are the assigned peer mentor supporting <strong>${myMentorship.student}</strong>.`
+            }
+          </p>
+          <div style="background-color: var(--bg-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius); font-size: 0.8rem;">
+            <strong>Target Milestones:</strong>
+            <ul style="margin: 0.35rem 0 0 1rem; padding: 0; line-height: 1.6;">
+              ${(myMentorship.milestones || ["Weekly concept review", "Pre-check problem sets", "Score 65+ in Mock 3"]).map((m) => `<li>${m}</li>`).join("")}
+            </ul>
+          </div>
+        </div>
+      `
+          : ""
+      }
+
       <div style="margin-bottom: 1.25rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
           <h3 style="font-size: 1.05rem; font-weight: 700;">Performance & Growth Summary</h3>
-          ${
-            myMarks.length > 1
-              ? `
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span style="font-size: 0.75rem; color: var(--text-muted);">Quiz trend:</span>
-              <canvas id="member-sparkline" width="140" height="38" style="vertical-align: middle;"></canvas>
-            </div>
-          `
-              : ""
-          }
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            ${
+              myMarks.length > 1
+                ? `
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 0.75rem; color: var(--text-muted);">Quiz trend:</span>
+                <canvas id="member-sparkline" width="140" height="38" style="vertical-align: middle;"></canvas>
+              </div>
+            `
+                : ""
+            }
+            <button class="btn btn-primary btn-sm" id="btn-print-my-report">
+              📄 View / Print Official Report Card
+            </button>
+          </div>
         </div>
         ${renderMemberMetricsHTML(myMetrics, { title: "Metrics & Growth" })}
       </div>
 
       <div class="card">
-        <div class="card-header"><h3 class="card-title">My Recorded Cycle Scores</h3></div>
+        <div class="card-header"><h3 class="card-title">My Recorded Unit & Topic Scores</h3></div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
               <tr>
-                <th>Cycle</th>
+                <th>Tested Topic / Unit</th>
                 <th>Mock #</th>
                 <th>Score</th>
                 <th>Submission</th>
@@ -159,6 +215,13 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
         renderSparkline("member-sparkline", scores);
       }
     }, 50);
+
+    const reportBtn = wrap.querySelector("#btn-print-my-report");
+    if (reportBtn) {
+      reportBtn.addEventListener("click", () => {
+        openReportCardModal({ name: user.name, team: user.team, role: "member" }, myMarks, myMetrics, user);
+      });
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────

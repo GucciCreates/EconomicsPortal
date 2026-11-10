@@ -67,13 +67,13 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
           ${atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Needs attention</span>` : ""}
         </div>
         <div>
-          ${streak > 0 ? `<span class="badge badge-outstanding">🔥 ${streak}-cycle streak</span>` : `<span style="font-size: 0.75rem; color: var(--text-muted);">No current streak</span>`}
+          ${streak > 0 ? `<span class="badge badge-outstanding">🔥 ${streak}-test streak</span>` : `<span style="font-size: 0.75rem; color: var(--text-muted);">No current streak</span>`}
         </div>
       </div>
 
       <div class="metrics-grid">
         <div class="metric-box">
-          <div class="metric-label">Cycle Delta</div>
+          <div class="metric-label">Score Delta</div>
           <div class="metric-value">${deltaHTML}</div>
         </div>
 
