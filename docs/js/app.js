@@ -170,9 +170,18 @@ async function loadDashboard() {
   }
 
   mainEl.innerHTML = `
-    <div style="text-align: center; padding: 4rem 1rem;">
-      <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">📊</div>
-      <p style="color: var(--text-muted); font-size: 0.95rem;">Loading ledger for ${user.name}...</p>
+    <div class="dashboard-loader-wrap">
+      <div class="kpi-grid" style="margin-bottom: 1.25rem;">
+        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 60px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 90px;"></div></div>
+        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 70px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 80px;"></div></div>
+        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 65px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 85px;"></div></div>
+        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 80px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 75px;"></div></div>
+      </div>
+      <div class="card skeleton-tile" style="padding: 1.5rem; text-align: center;">
+        <div class="auth-spinner" style="border: 3px solid rgba(83, 74, 183, 0.2); border-top-color: var(--purple); width: 32px; height: 32px; margin: 1rem auto;"></div>
+        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">Loading Economics Ledger</h3>
+        <p style="color: var(--text-muted); font-size: 0.85rem;">Authenticating session for <strong>${user.name}</strong>...</p>
+      </div>
     </div>
   `;
 

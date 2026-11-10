@@ -41,6 +41,9 @@ export function createTabNav(container, tabs, onTabChange) {
       const id = btn.getAttribute("data-tab");
       setActive(id);
       onTabChange(id);
+      try {
+        btn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      } catch (e) {}
     });
   });
 
