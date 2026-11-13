@@ -21,15 +21,15 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
         <div class="auth-header">
           <div class="auth-logo-badge">📈</div>
           <h1 class="auth-title">EconomicsPortal</h1>
-          <p class="auth-subtitle">Dr. Numan's Economics Class • Academic Ledger</p>
+          <p class="auth-subtitle">Dr. Numan's Economics Class • Executive Operations</p>
           <div style="margin-top: 0.65rem;">
             <span class="badge" style="background-color: var(--primary-soft); color: var(--purple); font-size: 0.75rem; border: 1px solid var(--purple-border); font-weight: 700;">
-              ✨ Eye-Friendly Modern Ledger • v3.2
+              ✨ Premium Academic Command Layer • v4.0
             </span>
           </div>
           <div style="margin-top: 0.4rem;">
             <span class="badge" style="background-color: var(--bg-subtle); color: var(--text-muted); font-size: 0.72rem;">
-              🔒 Secure Private Access • Confidential PIN
+              🔒 Private Access • Confidential PIN Protection
             </span>
           </div>
         </div>
@@ -40,7 +40,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           <div class="auth-hero-row">
             <div>
               <span class="eyebrow-text">Academic operations</span>
-              <h2>Private access for grades, tasks, and recovery workflows.</h2>
+              <h2>Command center for grades, tasks, and recovery workflows.</h2>
             </div>
             <div class="mini-metric">
               <span>Secure</span>
@@ -64,7 +64,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
         </div>
 
         <div class="quick-login-panel" aria-label="Quick login demo accounts">
-          <p class="quick-login-title">Quick demo access</p>
+          <p class="quick-login-title">Quick access workspace</p>
           <div class="quick-login-grid">
             <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan</button>
             <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz</button>

@@ -20,7 +20,7 @@ const footerEl = document.getElementById('site-footer');
 // THEME SETUP
 // ─────────────────────────────────────────────────────────────────────────────
 function initTheme() {
-  const savedTheme = localStorage.getItem('economics_portal_theme') || 'auto';
+  const savedTheme = localStorage.getItem('economics_portal_theme') || 'dark';
   applyTheme(savedTheme);
 }
 
@@ -90,7 +90,7 @@ function renderBanner() {
 
 function renderHeader() {
   const user = getCurrentUser();
-  const theme = localStorage.getItem('economics_portal_theme') || 'auto';
+  const theme = localStorage.getItem('economics_portal_theme') || 'dark';
   const themeIcons = { auto: '🌓', light: '☀️', dark: '🌙' };
 
   headerEl.innerHTML = `
