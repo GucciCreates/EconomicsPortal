@@ -2,42 +2,43 @@
  * EconomicsPortal — Main Application Controller (v2)
  */
 
-import { API_URL, isDemoMode } from "./config.js";
-import { getCurrentUser, setCurrentUser, clearCurrentUser } from "./auth.js";
-import { apiLogin, apiGetDashboard, resetDemoData } from "./api.js";
-import { renderMemberDashboard } from "./components/memberView.js";
-import { renderTeamLeaderDashboard } from "./components/teamLeaderView.js";
-import { renderGroupLeaderDashboard } from "./components/groupLeaderView.js";
-import { renderModernLogin } from "./components/loginView.js";
+import { API_URL, isDemoMode } from './config.js';
+import { getCurrentUser, setCurrentUser, clearCurrentUser } from './auth.js';
+import { apiLogin, apiGetDashboard, resetDemoData } from './api.js';
+import { renderMemberDashboard } from './components/memberView.js';
+import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';
+import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
+import { renderModernLogin } from './components/loginView.js';
 
 // DOM Root Elements
-const headerEl = document.getElementById("site-header");
-const bannerEl = document.getElementById("demo-banner");
-const mainEl = document.getElementById("main-content");
-const footerEl = document.getElementById("site-footer");
+const headerEl = document.getElementById('site-header');
+const bannerEl = document.getElementById('demo-banner');
+const mainEl = document.getElementById('main-content');
+const footerEl = document.getElementById('site-footer');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // THEME SETUP
 // ─────────────────────────────────────────────────────────────────────────────
 function initTheme() {
-  const savedTheme = localStorage.getItem("economics_portal_theme") || "auto";
+  const savedTheme = localStorage.getItem('economics_portal_theme') || 'auto';
   applyTheme(savedTheme);
 }
 
 function applyTheme(theme) {
-  if (theme === "dark") {
-    document.documentElement.setAttribute("data-theme", "dark");
-  } else if (theme === "light") {
-    document.documentElement.setAttribute("data-theme", "light");
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
   } else {
-    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute('data-theme');
   }
-  localStorage.setItem("economics_portal_theme", theme);
+  localStorage.setItem('economics_portal_theme', theme);
 }
 
 function toggleTheme() {
-  const current = localStorage.getItem("economics_portal_theme") || "auto";
-  const next = current === "dark" ? "light" : current === "light" ? "auto" : "dark";
+  const current = localStorage.getItem('economics_portal_theme') || 'auto';
+  const next =
+    current === 'dark' ? 'light' : current === 'light' ? 'auto' : 'dark';
   applyTheme(next);
   renderHeader();
 }
@@ -54,7 +55,7 @@ function renderBanner() {
         </span>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
           ${
-            localStorage.getItem("economics_portal_force_demo") === "true"
+            localStorage.getItem('economics_portal_force_demo') === 'true'
               ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Try Live API</button>`
               : `<a href="./SETUP_GUIDE.md" target="_blank" style="font-weight: 600;">Upgrade to v2 ↗</a>`
           }
@@ -62,20 +63,20 @@ function renderBanner() {
         </div>
       </div>
     `;
-    bannerEl.style.display = "block";
+    bannerEl.style.display = 'block';
 
-    const retryLiveBtn = document.getElementById("btn-retry-live");
+    const retryLiveBtn = document.getElementById('btn-retry-live');
     if (retryLiveBtn) {
-      retryLiveBtn.addEventListener("click", () => {
-        localStorage.removeItem("economics_portal_force_demo");
+      retryLiveBtn.addEventListener('click', () => {
+        localStorage.removeItem('economics_portal_force_demo');
         refreshApp();
       });
     }
 
-    const resetBtn = document.getElementById("btn-reset-demo");
+    const resetBtn = document.getElementById('btn-reset-demo');
     if (resetBtn) {
-      resetBtn.addEventListener("click", () => {
-        if (confirm("Reset demo data back to default sample state?")) {
+      resetBtn.addEventListener('click', () => {
+        if (confirm('Reset demo data back to default sample state?')) {
           resetDemoData();
           window.location.reload();
         }
@@ -83,25 +84,28 @@ function renderBanner() {
     }
   } else {
     bannerEl.innerHTML = ``;
-    bannerEl.style.display = "none";
+    bannerEl.style.display = 'none';
   }
 }
 
 function renderHeader() {
   const user = getCurrentUser();
-  const theme = localStorage.getItem("economics_portal_theme") || "auto";
-  const themeIcons = { auto: "🌓", light: "☀️", dark: "🌙" };
+  const theme = localStorage.getItem('economics_portal_theme') || 'auto';
+  const themeIcons = { auto: '🌓', light: '☀️', dark: '🌙' };
 
   headerEl.innerHTML = `
     <div class="header-container">
       <a href="#" class="brand-wrapper" id="brand-link">
         <div class="brand-mark">E</div>
-        <span>EconomicsPortal</span>
+        <div class="brand-copy">
+          <span>EconomicsPortal</span>
+          <small>Academic Ops</small>
+        </div>
       </a>
 
       <div class="header-actions">
         <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Switch Theme (Current: ${theme})">
-          ${themeIcons[theme] || "🌓"}
+          ${themeIcons[theme] || '🌓'}
         </button>
 
         ${
@@ -109,31 +113,33 @@ function renderHeader() {
             ? `
           <div class="user-badge">
             <span>${user.name}</span>
-            <span class="role-pill role-${user.role}">${user.role.replace("_", " ")}</span>
+            <span class="role-pill role-${user.role}">${user.role.replace('_', ' ')}</span>
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-logout" title="Log out">
             Log out
           </button>
         `
-            : ""
+            : ''
         }
       </div>
     </div>
   `;
 
-  document.getElementById("btn-theme-toggle").addEventListener("click", toggleTheme);
+  document
+    .getElementById('btn-theme-toggle')
+    .addEventListener('click', toggleTheme);
 
-  const brandLink = document.getElementById("brand-link");
+  const brandLink = document.getElementById('brand-link');
   if (brandLink) {
-    brandLink.addEventListener("click", (e) => {
+    brandLink.addEventListener('click', (e) => {
       e.preventDefault();
       refreshApp();
     });
   }
 
-  const logoutBtn = document.getElementById("btn-logout");
+  const logoutBtn = document.getElementById('btn-logout');
   if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
+    logoutBtn.addEventListener('click', () => {
       clearCurrentUser();
       refreshApp();
     });
@@ -155,7 +161,7 @@ function renderLogin() {
   renderModernLogin(
     mainEl,
     () => refreshApp(),
-    () => refreshApp()
+    () => refreshApp(),
   );
 }
 
@@ -196,15 +202,21 @@ async function loadDashboard() {
           </div>
         </div>
       `;
-      document.getElementById("btn-retry-load").addEventListener("click", loadDashboard);
+      document
+        .getElementById('btn-retry-load')
+        .addEventListener('click', loadDashboard);
       return;
     }
 
     const data = res.data || {};
 
-    if (user.role === "instructor" || user.role === "group_leader" || user.role === "assistant") {
+    if (
+      user.role === 'instructor' ||
+      user.role === 'group_leader' ||
+      user.role === 'assistant'
+    ) {
       renderGroupLeaderDashboard(mainEl, user, data, loadDashboard);
-    } else if (user.role === "team_leader") {
+    } else if (user.role === 'team_leader') {
       renderTeamLeaderDashboard(mainEl, user, data, loadDashboard);
     } else {
       // member
@@ -219,7 +231,9 @@ async function loadDashboard() {
         </div>
       </div>
     `;
-    document.getElementById("btn-retry-load").addEventListener("click", loadDashboard);
+    document
+      .getElementById('btn-retry-load')
+      .addEventListener('click', loadDashboard);
   }
 }
 
@@ -238,6 +252,41 @@ function refreshApp() {
     renderLogin();
   }
 }
+
+function ensureToastHost() {
+  let host = document.getElementById('economics-toast-host');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'economics-toast-host';
+    host.className = 'toast-stack';
+    document.body.appendChild(host);
+  }
+  return host;
+}
+
+window.showEconomicsToast = function showEconomicsToast(
+  message,
+  type = 'info',
+) {
+  const host = ensureToastHost();
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  host.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 260);
+  }, 2800);
+};
+
+window.confirmEconomicsAction = function confirmEconomicsAction(message) {
+  return window.confirm(message);
+};
 
 // Run on page load
 initTheme();

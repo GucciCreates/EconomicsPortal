@@ -1,12 +1,12 @@
 /**
  * EconomicsPortal — API Client (v3)
- * 
+ *
  * Supports both:
  * 1. Live Google Apps Script Web App (production)
  * 2. In-browser simulated database (instant demo / fallback mode)
  */
 
-import { API_URL, isDemoMode } from "./config.js";
+import { API_URL, isDemoMode } from './config.js';
 import {
   MOCK_USERS,
   MOCK_TASKS,
@@ -20,17 +20,28 @@ import {
   MOCK_MENTORSHIP,
   computeMockTeamAverages,
   computeMockMemberMetrics,
-} from "./mockData.js";
+} from './mockData.js';
+
+export function normalizeUserName(value = '') {
+  return String(value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[()]/g, ' ')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 // Persistent in-memory/localStorage store for Demo Mode
-const DEMO_STORAGE_KEY = "economics_portal_demo_db_v3";
+const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v3';
 
 function getDemoStore() {
   try {
     const cached = localStorage.getItem(DEMO_STORAGE_KEY);
     if (cached) return JSON.parse(cached);
   } catch (e) {
-    console.warn("Could not read demo storage", e);
+    console.warn('Could not read demo storage', e);
   }
   const initial = {
     users: [...MOCK_USERS],
@@ -52,7 +63,7 @@ function saveDemoStore(store) {
   try {
     localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
   } catch (e) {
-    console.warn("Could not save demo storage", e);
+    console.warn('Could not save demo storage', e);
   }
 }
 
@@ -67,9 +78,9 @@ export function resetDemoData() {
  */
 async function postToAppsScript(body) {
   const response = await fetch(API_URL, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      "Content-Type": "text/plain;charset=utf-8",
+      'Content-Type': 'text/plain;charset=utf-8',
     },
     body: JSON.stringify(body),
   });
@@ -95,23 +106,24 @@ async function getFromAppsScript(params) {
 // AUTH: LOGIN
 // ─────────────────────────────────────────────────────────────────────────────
 export async function apiLogin(name, pin) {
-  const cleanName = (name || "").trim();
-  const cleanPin = (pin || "").trim();
+  const cleanName = (name || '').trim();
+  const cleanPin = (pin || '').trim();
 
   if (isDemoMode()) {
     const store = getDemoStore();
     const user = store.users.find((u) => {
-      const uName = String(u.name).trim().toLowerCase();
-      const n = cleanName.toLowerCase();
-      const nameMatch = uName === n || (uName.includes("ayesha") && n === "ayesha");
+      const userName = normalizeUserName(u.name);
+      const inputName = normalizeUserName(cleanName);
       const pinStr = String(u.pin).trim();
-      const pinMatch = pinStr === cleanPin || pinStr.padStart(4, "0") === cleanPin;
-      return nameMatch && pinMatch;
+      const pinMatch =
+        pinStr === cleanPin || pinStr.padStart(4, '0') === cleanPin;
+      return userName === inputName && pinMatch;
     });
     if (!user) {
       return {
         ok: false,
-        error: "Invalid name or PIN. (Demo: Shehroz / 1111, Dr. Numan / 0000, Amina / 2001, Ramesh / 2002)",
+        error:
+          'Invalid name or PIN. (Demo: Shehroz / 1111, Dr. Numan / 0000, Amina / 2001, Ramesh / 2002, Ayesha (Quetta) / 3001)',
       };
     }
     return {
@@ -122,7 +134,7 @@ export async function apiLogin(name, pin) {
   }
 
   return await getFromAppsScript({
-    action: "login",
+    action: 'login',
     name: cleanName,
     pin: cleanPin,
   });
@@ -147,7 +159,11 @@ export async function apiGetDashboard(role, team, name) {
     const memberMetrics = computeMockMemberMetrics(marks, escalations);
     const atRiskMembers = Object.values(memberMetrics).filter((m) => m.atRisk);
 
-    if (role === "instructor" || role === "group_leader" || role === "assistant") {
+    if (
+      role === 'instructor' ||
+      role === 'group_leader' ||
+      role === 'assistant'
+    ) {
       return {
         ok: true,
         data: {
@@ -163,13 +179,13 @@ export async function apiGetDashboard(role, team, name) {
           teamAverages,
           memberMetrics,
           atRiskMembers,
-          users: role === "group_leader" ? store.users : undefined,
+          users: role === 'group_leader' ? store.users : undefined,
           canEdit: true,
         },
       };
     }
 
-    if (role === "team_leader") {
+    if (role === 'team_leader') {
       const teamMetrics = {};
       Object.keys(memberMetrics).forEach((m) => {
         if (memberMetrics[m].team === team) teamMetrics[m] = memberMetrics[m];
@@ -177,12 +193,12 @@ export async function apiGetDashboard(role, team, name) {
       return {
         ok: true,
         data: {
-          tasks: tasks.filter((t) => t.team === team || t.team === "ALL"),
+          tasks: tasks.filter((t) => t.team === team || t.team === 'ALL'),
           marks: marks.filter((m) => m.team === team),
           submissions: subs.filter((s) => s.team === team),
           escalations: escalations.filter((es) => es.team === team),
           announcements,
-          quizzes: quizzes.filter((q) => q.scope === "ALL" || q.scope === team),
+          quizzes: quizzes.filter((q) => q.scope === 'ALL' || q.scope === team),
           goals: goals.filter((g) => g.team === team),
           teamMessages: teamMessages.filter((tm) => tm.team === team),
           mentorship: mentorship.filter((mp) => mp.team === team),
@@ -195,29 +211,46 @@ export async function apiGetDashboard(role, team, name) {
     }
 
     // member
-    const myGoal = goals.find((g) => g.name.toLowerCase() === name.toLowerCase()) || null;
+    const searchName = normalizeUserName(name);
+    const myGoal =
+      goals.find((g) => normalizeUserName(g.name) === searchName) || null;
     return {
       ok: true,
       data: {
-        tasks: tasks.filter((t) => t.team === team || t.team === "ALL"),
-        myMarks: marks.filter((m) => m.member.toLowerCase() === name.toLowerCase()),
-        marks: marks.filter((m) => m.team === team || m.member.toLowerCase() === name.toLowerCase()),
+        tasks: tasks.filter((t) => t.team === team || t.team === 'ALL'),
+        myMarks: marks.filter(
+          (m) => normalizeUserName(m.member) === searchName,
+        ),
+        marks: marks.filter(
+          (m) => m.team === team || normalizeUserName(m.member) === searchName,
+        ),
         teamAverage: teamAverages[team] || null,
         teamAverages,
-        mySubmissions: subs.filter((s) => s.member.toLowerCase() === name.toLowerCase()),
-        myMetrics: memberMetrics[name] || null,
+        mySubmissions: subs.filter(
+          (s) => normalizeUserName(s.member) === searchName,
+        ),
+        myMetrics:
+          memberMetrics[name] ||
+          Object.values(memberMetrics).find(
+            (m) => normalizeUserName(m.member || m.name) === searchName,
+          ) ||
+          null,
         memberMetrics,
         announcements,
-        quizzes: quizzes.filter((q) => q.scope === "ALL" || q.scope === team),
+        quizzes: quizzes.filter((q) => q.scope === 'ALL' || q.scope === team),
         teamMessages: teamMessages.filter((tm) => tm.team === team),
-        mentorship: mentorship.filter((mp) => mp.student.toLowerCase() === name.toLowerCase() || mp.mentor.toLowerCase() === name.toLowerCase()),
+        mentorship: mentorship.filter(
+          (mp) =>
+            normalizeUserName(mp.student) === searchName ||
+            normalizeUserName(mp.mentor) === searchName,
+        ),
         myGoal,
       },
     };
   }
 
   return await getFromAppsScript({
-    action: "dashboard",
+    action: 'dashboard',
     role,
     team,
     name,
@@ -232,19 +265,19 @@ export async function apiAddMark(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     const newMark = {
-      id: "mk-" + Math.random().toString(36).substr(2, 6),
+      id: 'mk-' + Math.random().toString(36).substr(2, 6),
       member: payload.member,
       team: payload.team,
       cycle: payload.cycle,
-      mockNumber: payload.mockNumber || "",
+      mockNumber: payload.mockNumber || '',
       quizScore: Number(payload.quizScore),
-      submission: payload.submission || "Yes",
-      attendance: payload.attendance || "100%",
-      previewDone: payload.previewDone || "",
-      peerRating: payload.peerRating || "",
-      punctual: payload.punctual || "",
-      notes: payload.notes || "",
-      editedBy: payload.editedBy || payload.name || "",
+      submission: payload.submission || 'Yes',
+      attendance: payload.attendance || '100%',
+      previewDone: payload.previewDone || '',
+      peerRating: payload.peerRating || '',
+      punctual: payload.punctual || '',
+      notes: payload.notes || '',
+      editedBy: payload.editedBy || payload.name || '',
       timestamp: new Date().toISOString(),
     };
     store.marks.unshift(newMark);
@@ -253,7 +286,7 @@ export async function apiAddMark(payload) {
   }
 
   return await postToAppsScript({
-    action: "addMark",
+    action: 'addMark',
     ...payload,
   });
 }
@@ -273,7 +306,7 @@ export async function apiEditMark(payload) {
   }
 
   return await postToAppsScript({
-    action: "editMark",
+    action: 'editMark',
     ...payload,
   });
 }
@@ -287,7 +320,7 @@ export async function apiDeleteMark(payload) {
   }
 
   return await postToAppsScript({
-    action: "deleteMark",
+    action: 'deleteMark',
     ...payload,
   });
 }
@@ -300,14 +333,14 @@ export async function apiAddTask(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     const newTask = {
-      id: "tsk-" + Math.random().toString(36).substr(2, 6),
+      id: 'tsk-' + Math.random().toString(36).substr(2, 6),
       title: payload.title,
-      description: payload.description || "",
+      description: payload.description || '',
       team: payload.team,
-      dueDate: payload.dueDate || "",
-      fileUrl: payload.fileUrl || "",
+      dueDate: payload.dueDate || '',
+      fileUrl: payload.fileUrl || '',
       createdBy: payload.createdBy,
-      status: "open",
+      status: 'open',
       timestamp: new Date().toISOString(),
     };
     store.tasks.unshift(newTask);
@@ -316,7 +349,7 @@ export async function apiAddTask(payload) {
   }
 
   return await postToAppsScript({
-    action: "addTask",
+    action: 'addTask',
     ...payload,
   });
 }
@@ -333,7 +366,7 @@ export async function apiEditTask(payload) {
   }
 
   return await postToAppsScript({
-    action: "editTask",
+    action: 'editTask',
     ...payload,
   });
 }
@@ -350,7 +383,7 @@ export async function apiUpdateTaskStatus(id, status, role) {
   }
 
   return await postToAppsScript({
-    action: "updateTaskStatus",
+    action: 'updateTaskStatus',
     role,
     id,
     status,
@@ -365,12 +398,12 @@ export async function apiAddSubmission(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     const newSub = {
-      id: "sub-" + Math.random().toString(36).substr(2, 6),
+      id: 'sub-' + Math.random().toString(36).substr(2, 6),
       taskId: payload.taskId,
       member: payload.member,
       team: payload.team,
-      content: payload.content || "",
-      fileUrl: payload.fileUrl || "",
+      content: payload.content || '',
+      fileUrl: payload.fileUrl || '',
       timestamp: new Date().toISOString(),
     };
     store.submissions.unshift(newSub);
@@ -379,7 +412,7 @@ export async function apiAddSubmission(payload) {
   }
 
   return await postToAppsScript({
-    action: "addSubmission",
+    action: 'addSubmission',
     ...payload,
   });
 }
@@ -388,13 +421,13 @@ export async function apiAddEscalation(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     const newEsc = {
-      id: "esc-" + Math.random().toString(36).substr(2, 6),
+      id: 'esc-' + Math.random().toString(36).substr(2, 6),
       raisedBy: payload.raisedBy,
       team: payload.team,
       topic: payload.topic,
       details: payload.details,
-      severity: payload.severity || "normal",
-      status: "open",
+      severity: payload.severity || 'normal',
+      status: 'open',
       timestamp: new Date().toISOString(),
     };
     store.escalations.unshift(newEsc);
@@ -403,7 +436,7 @@ export async function apiAddEscalation(payload) {
   }
 
   return await postToAppsScript({
-    action: "addEscalation",
+    action: 'addEscalation',
     ...payload,
   });
 }
@@ -420,7 +453,7 @@ export async function apiUpdateEscalationStatus(id, status, role) {
   }
 
   return await postToAppsScript({
-    action: "updateEscalationStatus",
+    action: 'updateEscalationStatus',
     role,
     id,
     status,
@@ -436,7 +469,7 @@ export async function apiAddAnnouncement(payload) {
     const store = getDemoStore();
     if (!store.announcements) store.announcements = [];
     const newAnn = {
-      id: "ann-" + Math.random().toString(36).substr(2, 6),
+      id: 'ann-' + Math.random().toString(36).substr(2, 6),
       title: payload.title,
       body: payload.body,
       pinned: Boolean(payload.pinned),
@@ -449,7 +482,7 @@ export async function apiAddAnnouncement(payload) {
   }
 
   return await postToAppsScript({
-    action: "addAnnouncement",
+    action: 'addAnnouncement',
     ...payload,
   });
 }
@@ -458,14 +491,16 @@ export async function apiDeleteAnnouncement(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     if (store.announcements) {
-      store.announcements = store.announcements.filter((a) => a.id !== payload.id);
+      store.announcements = store.announcements.filter(
+        (a) => a.id !== payload.id,
+      );
       saveDemoStore(store);
     }
     return { ok: true };
   }
 
   return await postToAppsScript({
-    action: "deleteAnnouncement",
+    action: 'deleteAnnouncement',
     ...payload,
   });
 }
@@ -484,7 +519,7 @@ export async function apiPinAnnouncement(payload) {
   }
 
   return await postToAppsScript({
-    action: "pinAnnouncement",
+    action: 'pinAnnouncement',
     ...payload,
   });
 }
@@ -498,11 +533,11 @@ export async function apiAddQuiz(payload) {
     const store = getDemoStore();
     if (!store.quizzes) store.quizzes = [];
     const newQuiz = {
-      id: "qz-" + Math.random().toString(36).substr(2, 6),
+      id: 'qz-' + Math.random().toString(36).substr(2, 6),
       title: payload.title,
       scheduledAt: payload.scheduledAt,
-      scope: payload.scope || "ALL",
-      notes: payload.notes || "",
+      scope: payload.scope || 'ALL',
+      notes: payload.notes || '',
       createdBy: payload.name,
       timestamp: new Date().toISOString(),
     };
@@ -512,7 +547,7 @@ export async function apiAddQuiz(payload) {
   }
 
   return await postToAppsScript({
-    action: "addQuiz",
+    action: 'addQuiz',
     ...payload,
   });
 }
@@ -528,7 +563,7 @@ export async function apiDeleteQuiz(payload) {
   }
 
   return await postToAppsScript({
-    action: "deleteQuiz",
+    action: 'deleteQuiz',
     ...payload,
   });
 }
@@ -542,7 +577,7 @@ export async function apiSetGoal(payload) {
     const store = getDemoStore();
     if (!store.goals) store.goals = [];
     const existing = store.goals.find(
-      (g) => g.name.toLowerCase() === payload.name.toLowerCase()
+      (g) => g.name.toLowerCase() === payload.name.toLowerCase(),
     );
     if (existing) {
       existing.target = payload.target;
@@ -562,11 +597,10 @@ export async function apiSetGoal(payload) {
   }
 
   return await postToAppsScript({
-    action: "setGoal",
+    action: 'setGoal',
     ...payload,
   });
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PIN MANAGEMENT (Group Leader Only)
@@ -576,18 +610,19 @@ export async function apiUpdatePin(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     const user = store.users.find(
-      (u) => u.name.toLowerCase() === String(payload.targetMember).toLowerCase()
+      (u) =>
+        u.name.toLowerCase() === String(payload.targetMember).toLowerCase(),
     );
     if (user) {
       user.pin = String(payload.newPin);
       saveDemoStore(store);
       return { ok: true };
     }
-    return { ok: false, error: "Member not found in roster." };
+    return { ok: false, error: 'Member not found in roster.' };
   }
 
   return await postToAppsScript({
-    action: "updatePin",
+    action: 'updatePin',
     ...payload,
   });
 }
@@ -599,11 +634,10 @@ export async function apiGetUsers(role) {
   }
 
   return await getFromAppsScript({
-    action: "users",
+    action: 'users',
     role,
   });
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TEAM LEADER POWERS: GRADING REQUESTS & TEAM MESSAGES (v3)
@@ -616,15 +650,15 @@ export async function apiRequestGrading(payload) {
     if (sub) {
       sub.gradingRequested = true;
       sub.requestedBy = payload.leaderName;
-      sub.reviewNotes = payload.reviewNotes || "";
+      sub.reviewNotes = payload.reviewNotes || '';
       saveDemoStore(store);
       return { ok: true };
     }
-    return { ok: false, error: "Submission not found." };
+    return { ok: false, error: 'Submission not found.' };
   }
 
   return await postToAppsScript({
-    action: "requestGrading",
+    action: 'requestGrading',
     ...payload,
   });
 }
@@ -634,7 +668,7 @@ export async function apiAddTeamMessage(payload) {
     const store = getDemoStore();
     if (!store.teamMessages) store.teamMessages = [];
     const newMsg = {
-      id: "tm-" + Math.random().toString(36).substr(2, 6),
+      id: 'tm-' + Math.random().toString(36).substr(2, 6),
       team: payload.team,
       author: payload.author,
       message: payload.message,
@@ -646,7 +680,7 @@ export async function apiAddTeamMessage(payload) {
   }
 
   return await postToAppsScript({
-    action: "addTeamMessage",
+    action: 'addTeamMessage',
     ...payload,
   });
 }
@@ -655,14 +689,16 @@ export async function apiDeleteTeamMessage(payload) {
   if (isDemoMode()) {
     const store = getDemoStore();
     if (store.teamMessages) {
-      store.teamMessages = store.teamMessages.filter((m) => m.id !== payload.id);
+      store.teamMessages = store.teamMessages.filter(
+        (m) => m.id !== payload.id,
+      );
       saveDemoStore(store);
     }
     return { ok: true };
   }
 
   return await postToAppsScript({
-    action: "deleteTeamMessage",
+    action: 'deleteTeamMessage',
     ...payload,
   });
 }
@@ -676,12 +712,12 @@ export async function apiCreateMentorshipPlan(payload) {
     const store = getDemoStore();
     if (!store.mentorship) store.mentorship = [];
     const newPlan = {
-      id: "mnt-" + Math.random().toString(36).substr(2, 6),
+      id: 'mnt-' + Math.random().toString(36).substr(2, 6),
       student: payload.student,
       mentor: payload.mentor,
       team: payload.team,
       milestones: payload.milestones || [],
-      status: "active",
+      status: 'active',
       assignedBy: payload.assignedBy,
       timestamp: new Date().toISOString(),
     };
@@ -691,7 +727,7 @@ export async function apiCreateMentorshipPlan(payload) {
   }
 
   return await postToAppsScript({
-    action: "createMentorshipPlan",
+    action: 'createMentorshipPlan',
     ...payload,
   });
 }
@@ -710,7 +746,7 @@ export async function apiUpdateMentorshipStatus(id, status, role) {
   }
 
   return await postToAppsScript({
-    action: "updateMentorshipStatus",
+    action: 'updateMentorshipStatus',
     id,
     status,
     role,

@@ -2,15 +2,15 @@
  * EconomicsPortal — Member Dashboard Component (v3)
  */
 
-import { apiAddSubmission, apiAddEscalation } from "../api.js";
-import { getScoreBand, renderMemberMetricsHTML } from "./metricsPanel.js";
-import { renderSparkline } from "./charts.js";
-import { createTabNav } from "./tabNav.js";
-import { renderGoalPanel } from "./goalPanel.js";
-import { renderQuizScheduler, cleanupQuizCountdowns } from "./quizScheduler.js";
-import { renderLeaderboard } from "./leaderboard.js";
-import { renderAnnouncementsPanel } from "./announcementsPanel.js";
-import { openReportCardModal } from "./reportCardModal.js";
+import { apiAddSubmission, apiAddEscalation } from '../api.js';
+import { getScoreBand, renderMemberMetricsHTML } from './metricsPanel.js';
+import { renderSparkline } from './charts.js';
+import { createTabNav } from './tabNav.js';
+import { renderGoalPanel } from './goalPanel.js';
+import { renderQuizScheduler, cleanupQuizCountdowns } from './quizScheduler.js';
+import { renderLeaderboard } from './leaderboard.js';
+import { renderAnnouncementsPanel } from './announcementsPanel.js';
+import { openReportCardModal } from './reportCardModal.js';
 
 export function renderMemberDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -36,16 +36,16 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">${user.name}</h2>
           <p style="color: var(--text-muted); font-size: 0.875rem;">
             Student Workspace • Team <strong>${user.team}</strong>
-            ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Requires attention</span>` : ""}
+            ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Requires attention</span>` : ''}
           </p>
         </div>
         <div style="display: flex; gap: 1.5rem; align-items: center;">
           <div style="text-align: right;">
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
-              ${teamAverage !== null ? teamAverage : "—"}
+              ${teamAverage !== null ? teamAverage : '—'}
             </div>
-            ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ""}
+            ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ''}
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-refresh-mem">↻ Refresh</button>
         </div>
@@ -56,35 +56,41 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     <div id="mem-tab-content"></div>
   `;
 
-  const contentShell = container.querySelector("#mem-tab-content");
+  const contentShell = container.querySelector('#mem-tab-content');
 
   const tabs = [
-    { id: "overview", label: "My Scorecard & Metrics", icon: "📊" },
-    { id: "goals", label: "My Goal & Progress", icon: "🎯" },
-    { id: "tasks", label: `Tasks & Submit (${tasks.length})`, icon: "📝" },
-    { id: "quizzes", label: `Quizzes & Tests (${quizzes.length})`, icon: "⏱️" },
-    { id: "leaderboard", label: "Class Leaderboard", icon: "🏆" },
-    { id: "doubts", label: "Ask a Doubt", icon: "❓" },
-    { id: "announcements", label: `Announcements (${announcements.length})`, icon: "📢" },
+    { id: 'overview', label: 'My Scorecard & Metrics', icon: '📊' },
+    { id: 'goals', label: 'My Goal & Progress', icon: '🎯' },
+    { id: 'tasks', label: `Tasks & Submit (${tasks.length})`, icon: '📝' },
+    { id: 'quizzes', label: `Quizzes & Tests (${quizzes.length})`, icon: '⏱️' },
+    { id: 'leaderboard', label: 'Class Leaderboard', icon: '🏆' },
+    { id: 'doubts', label: 'Ask a Doubt', icon: '❓' },
+    {
+      id: 'announcements',
+      label: `Announcements (${announcements.length})`,
+      icon: '📢',
+    },
   ];
 
   function switchTab(tabId) {
-    if (tabId === "overview") renderOverviewTab(contentShell);
-    else if (tabId === "goals") renderGoalsTab(contentShell);
-    else if (tabId === "tasks") renderTasksTab(contentShell);
-    else if (tabId === "quizzes") renderQuizzesTab(contentShell);
-    else if (tabId === "leaderboard") renderLeaderboardTab(contentShell);
-    else if (tabId === "doubts") renderDoubtsTab(contentShell);
-    else if (tabId === "announcements") renderAnnouncementsTab(contentShell);
+    if (tabId === 'overview') renderOverviewTab(contentShell);
+    else if (tabId === 'goals') renderGoalsTab(contentShell);
+    else if (tabId === 'tasks') renderTasksTab(contentShell);
+    else if (tabId === 'quizzes') renderQuizzesTab(contentShell);
+    else if (tabId === 'leaderboard') renderLeaderboardTab(contentShell);
+    else if (tabId === 'doubts') renderDoubtsTab(contentShell);
+    else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
   }
 
-  createTabNav(container.querySelector("#mem-tab-content"), tabs, switchTab);
-  switchTab("overview");
+  createTabNav(container.querySelector('#mem-tab-content'), tabs, switchTab);
+  switchTab('overview');
 
   const teamMessages = data.teamMessages || [];
   const mentorshipPlans = data.mentorship || [];
   const myMentorship = mentorshipPlans.find(
-    (p) => p.student.toLowerCase() === user.name.toLowerCase() || p.mentor.toLowerCase() === user.name.toLowerCase()
+    (p) =>
+      p.student.toLowerCase() === user.name.toLowerCase() ||
+      p.mentor.toLowerCase() === user.name.toLowerCase(),
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -104,7 +110,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           <p style="font-size: 0.9rem; color: var(--text-main); line-height: 1.45;">${teamMessages[0].message}</p>
         </div>
       `
-          : ""
+          : ''
       }
 
       <!-- Active Mentorship Card (if student is mentee or mentor) -->
@@ -116,7 +122,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
             <h4 style="font-size: 1rem; font-weight: 700; color: var(--purple);">
               🛡️ Active Academic Recovery & Peer Mentorship
             </h4>
-            <span class="badge ${myMentorship.status === "resolved" ? "badge-closed" : "badge-support"}">${myMentorship.status}</span>
+            <span class="badge ${myMentorship.status === 'resolved' ? 'badge-closed' : 'badge-support'}">${myMentorship.status}</span>
           </div>
           <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
             ${
@@ -128,12 +134,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           <div style="background-color: var(--bg-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius); font-size: 0.8rem;">
             <strong>Target Milestones:</strong>
             <ul style="margin: 0.35rem 0 0 1rem; padding: 0; line-height: 1.6;">
-              ${(myMentorship.milestones || ["Weekly concept review", "Pre-check problem sets", "Score 65+ in Mock 3"]).map((m) => `<li>${m}</li>`).join("")}
+              ${(myMentorship.milestones || ['Weekly concept review', 'Pre-check problem sets', 'Score 65+ in Mock 3']).map((m) => `<li>${m}</li>`).join('')}
             </ul>
           </div>
         </div>
       `
-          : ""
+          : ''
       }
 
       <div style="margin-bottom: 1.25rem;">
@@ -148,14 +154,14 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                 <canvas id="member-sparkline" width="140" height="38" style="vertical-align: middle;"></canvas>
               </div>
             `
-                : ""
+                : ''
             }
             <button class="btn btn-primary btn-sm" id="btn-print-my-report">
               📄 View / Print Official Report Card
             </button>
           </div>
         </div>
-        ${renderMemberMetricsHTML(myMetrics, { title: "Metrics & Growth" })}
+        ${renderMemberMetricsHTML(myMetrics, { title: 'Metrics & Growth' })}
       </div>
 
       <div class="card">
@@ -186,22 +192,22 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                         return `
                       <tr>
                         <td><strong>${m.cycle}</strong></td>
-                        <td>${m.mockNumber || "—"}</td>
+                        <td>${m.mockNumber || '—'}</td>
                         <td><strong class="num" style="font-size: 1.05rem;">${m.quizScore}</strong></td>
-                        <td>${m.submission || "—"}</td>
-                        <td>${m.attendance || "—"}</td>
-                        <td>${m.previewDone || "—"}</td>
-                        <td>${m.peerRating || "—"}</td>
-                        <td>${m.punctual || "—"}</td>
+                        <td>${m.submission || '—'}</td>
+                        <td>${m.attendance || '—'}</td>
+                        <td>${m.previewDone || '—'}</td>
+                        <td>${m.peerRating || '—'}</td>
+                        <td>${m.punctual || '—'}</td>
                         <td><span class="badge ${band.cls}">${band.label}</span></td>
                         <td style="font-size: 0.8rem; color: var(--text-muted);">
-                          ${m.notes || "—"}
-                          ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Verified by: ${m.editedBy}</span>` : ""}
+                          ${m.notes || '—'}
+                          ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Verified by: ${m.editedBy}</span>` : ''}
                         </td>
                       </tr>
                     `;
                       })
-                      .join("")
+                      .join('')
               }
             </tbody>
           </table>
@@ -211,15 +217,22 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
 
     setTimeout(() => {
       if (myMarks.length > 1) {
-        const scores = myMarks.map((m) => Number(m.quizScore)).filter((s) => !isNaN(s));
-        renderSparkline("member-sparkline", scores);
+        const scores = myMarks
+          .map((m) => Number(m.quizScore))
+          .filter((s) => !isNaN(s));
+        renderSparkline('member-sparkline', scores);
       }
     }, 50);
 
-    const reportBtn = wrap.querySelector("#btn-print-my-report");
+    const reportBtn = wrap.querySelector('#btn-print-my-report');
     if (reportBtn) {
-      reportBtn.addEventListener("click", () => {
-        openReportCardModal({ name: user.name, team: user.team, role: "member" }, myMarks, myMetrics, user);
+      reportBtn.addEventListener('click', () => {
+        openReportCardModal(
+          { name: user.name, team: user.team, role: 'member' },
+          myMarks,
+          myMetrics,
+          user,
+        );
       });
     }
   }
@@ -229,7 +242,13 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   // ─────────────────────────────────────────────────────────────────────────
   function renderGoalsTab(wrap) {
     wrap.innerHTML = `<div id="mem-goals-shell"></div>`;
-    renderGoalPanel(wrap.querySelector("#mem-goals-shell"), user, myGoal, myMetrics, onRefresh);
+    renderGoalPanel(
+      wrap.querySelector('#mem-goals-shell'),
+      user,
+      myGoal,
+      myMetrics,
+      onRefresh,
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -245,24 +264,26 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
               ? `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No active tasks assigned to your team.</p>`
               : tasks
                   .map((task) => {
-                    const submission = mySubmissions.find((s) => s.taskId === task.id);
+                    const submission = mySubmissions.find(
+                      (s) => s.taskId === task.id,
+                    );
                     const isSubmitted = !!submission;
-                    const isDone = task.status === "done";
+                    const isDone = task.status === 'done';
 
                     return `
-                    <div class="task-item ${isDone ? "done" : ""}">
+                    <div class="task-item ${isDone ? 'done' : ''}">
                       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
                         <h4 style="font-size: 0.95rem; font-weight: 700;">${task.title}</h4>
-                        <span class="badge ${isDone ? "badge-done" : "badge-open"}">${task.status}</span>
+                        <span class="badge ${isDone ? 'badge-done' : 'badge-open'}">${task.status}</span>
                       </div>
                       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                        ${task.description || "No description provided."}
+                        ${task.description || 'No description provided.'}
                       </p>
                       
                       <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.65rem;">
-                        <span>Due: <strong>${task.dueDate || "Not set"}</strong></span>
-                        <span>Scope: <strong>${task.team === "ALL" ? "All Teams" : "Team " + task.team}</strong></span>
-                        ${task.fileUrl ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Attachment ↗</a>` : ""}
+                        <span>Due: <strong>${task.dueDate || 'Not set'}</strong></span>
+                        <span>Scope: <strong>${task.team === 'ALL' ? 'All Teams' : 'Team ' + task.team}</strong></span>
+                        ${task.fileUrl ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Attachment ↗</a>` : ''}
                       </div>
 
                       <div style="border-top: 1px dashed var(--border-color); padding-top: 0.6rem; margin-top: 0.5rem;">
@@ -270,8 +291,8 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                           isSubmitted
                             ? `
                           <div style="font-size: 0.85rem; color: var(--teal); display: flex; justify-content: space-between; align-items: center;">
-                            <span>✓ <strong>Submitted:</strong> ${submission.content || "Uploaded"}</span>
-                            ${submission.fileUrl ? `<a href="${submission.fileUrl}" target="_blank" style="font-size: 0.8rem; font-weight: 600;">View File ↗</a>` : ""}
+                            <span>✓ <strong>Submitted:</strong> ${submission.content || 'Uploaded'}</span>
+                            ${submission.fileUrl ? `<a href="${submission.fileUrl}" target="_blank" style="font-size: 0.8rem; font-weight: 600;">View File ↗</a>` : ''}
                           </div>
                         `
                             : `
@@ -292,22 +313,22 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                     </div>
                   `;
                   })
-                  .join("")
+                  .join('')
           }
         </div>
       </div>
     `;
 
-    wrap.querySelectorAll(".form-submit-task").forEach((form) => {
-      form.addEventListener("submit", async (e) => {
+    wrap.querySelectorAll('.form-submit-task').forEach((form) => {
+      form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const taskId = form.getAttribute("data-task-id");
-        const content = form.querySelector(".sub-content").value;
-        const fileUrl = form.querySelector(".sub-file").value;
+        const taskId = form.getAttribute('data-task-id');
+        const content = form.querySelector('.sub-content').value;
+        const fileUrl = form.querySelector('.sub-file').value;
         const btn = form.querySelector('button[type="submit"]');
 
         btn.disabled = true;
-        btn.textContent = "Submitting...";
+        btn.textContent = 'Submitting...';
 
         try {
           const res = await apiAddSubmission({
@@ -319,16 +340,23 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           });
 
           if (res.ok) {
+            window.showEconomicsToast(
+              'Assignment submitted successfully.',
+              'success',
+            );
             onRefresh();
           } else {
-            alert(res.error || "Failed to submit assignment.");
+            window.showEconomicsToast(
+              res.error || 'Failed to submit assignment.',
+              'error',
+            );
             btn.disabled = false;
-            btn.textContent = "Turn In Assignment";
+            btn.textContent = 'Turn In Assignment';
           }
         } catch (err) {
-          alert("Error: " + err.message);
+          window.showEconomicsToast('Error: ' + err.message, 'error');
           btn.disabled = false;
-          btn.textContent = "Turn In Assignment";
+          btn.textContent = 'Turn In Assignment';
         }
       });
     });
@@ -339,7 +367,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   // ─────────────────────────────────────────────────────────────────────────
   function renderQuizzesTab(wrap) {
     wrap.innerHTML = `<div id="mem-quiz-shell"></div>`;
-    renderQuizScheduler(wrap.querySelector("#mem-quiz-shell"), user, quizzes, onRefresh);
+    renderQuizScheduler(
+      wrap.querySelector('#mem-quiz-shell'),
+      user,
+      quizzes,
+      onRefresh,
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -347,7 +380,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   // ─────────────────────────────────────────────────────────────────────────
   function renderLeaderboardTab(wrap) {
     wrap.innerHTML = `<div id="mem-lb-shell"></div>`;
-    renderLeaderboard(wrap.querySelector("#mem-lb-shell"), memberMetrics, teamAverages, user);
+    renderLeaderboard(
+      wrap.querySelector('#mem-lb-shell'),
+      memberMetrics,
+      teamAverages,
+      user,
+    );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -389,18 +427,18 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
       </div>
     `;
 
-    const escForm = wrap.querySelector("#form-add-escalation");
+    const escForm = wrap.querySelector('#form-add-escalation');
     if (escForm) {
-      escForm.addEventListener("submit", async (e) => {
+      escForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const topic = wrap.querySelector("#esc-topic").value;
-        const details = wrap.querySelector("#esc-details").value;
-        const severity = wrap.querySelector("#esc-severity").value;
-        const feedback = wrap.querySelector("#escalation-feedback");
-        const submitBtn = wrap.querySelector("#btn-submit-esc");
+        const topic = wrap.querySelector('#esc-topic').value;
+        const details = wrap.querySelector('#esc-details').value;
+        const severity = wrap.querySelector('#esc-severity').value;
+        const feedback = wrap.querySelector('#escalation-feedback');
+        const submitBtn = wrap.querySelector('#btn-submit-esc');
 
         submitBtn.disabled = true;
-        submitBtn.textContent = "Submitting...";
+        submitBtn.textContent = 'Submitting...';
 
         try {
           const res = await apiAddEscalation({
@@ -413,19 +451,28 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
 
           if (res.ok) {
             feedback.innerHTML = `<div class="alert alert-success">Question sent to Dr. Numan and Shehroz!</div>`;
+            window.showEconomicsToast(
+              'Your question was sent successfully.',
+              'success',
+            );
             escForm.reset();
             setTimeout(() => {
-              feedback.innerHTML = "";
+              feedback.innerHTML = '';
               onRefresh();
             }, 2500);
           } else {
-            feedback.innerHTML = `<div class="alert alert-error">${res.error || "Failed to submit."}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">${res.error || 'Failed to submit.'}</div>`;
+            window.showEconomicsToast(
+              res.error || 'Failed to submit your question.',
+              'error',
+            );
           }
         } catch (err) {
           feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+          window.showEconomicsToast('Error: ' + err.message, 'error');
         } finally {
           submitBtn.disabled = false;
-          submitBtn.textContent = "Send Question to Instructor & Group Leader";
+          submitBtn.textContent = 'Send Question to Instructor & Group Leader';
         }
       });
     }
@@ -436,10 +483,15 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   // ─────────────────────────────────────────────────────────────────────────
   function renderAnnouncementsTab(wrap) {
     wrap.innerHTML = `<div id="mem-ann-shell"></div>`;
-    renderAnnouncementsPanel(wrap.querySelector("#mem-ann-shell"), user, announcements, onRefresh);
+    renderAnnouncementsPanel(
+      wrap.querySelector('#mem-ann-shell'),
+      user,
+      announcements,
+      onRefresh,
+    );
   }
 
-  container.querySelector("#btn-refresh-mem").addEventListener("click", () => {
+  container.querySelector('#btn-refresh-mem').addEventListener('click', () => {
     onRefresh();
   });
 }

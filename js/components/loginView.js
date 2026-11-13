@@ -1,17 +1,18 @@
 /**
  * EconomicsPortal — Secure Private Login Component
- * 
+ *
  * Strict Privacy:
  * - No public directory or PIN exposure on the login page.
  * - Credentials are verified securely via the backend.
  * - Only the Group Leader has access to view/change PINs.
  */
 
-import { apiLogin } from "../api.js";
-import { setCurrentUser } from "../auth.js";
+import { apiLogin } from '../api.js';
+import { setCurrentUser } from '../auth.js';
 
 export function renderModernLogin(container, onSuccess, onForceDemo) {
-  const rememberedName = localStorage.getItem("economics_portal_remember_name") || "";
+  const rememberedName =
+    localStorage.getItem('economics_portal_remember_name') || '';
 
   container.innerHTML = `
     <div class="auth-wrapper">
@@ -34,6 +35,44 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
         </div>
 
         <div id="login-error-box"></div>
+
+        <div class="auth-hero-box" aria-label="Portal summary">
+          <div class="auth-hero-row">
+            <div>
+              <span class="eyebrow-text">Academic operations</span>
+              <h2>Private access for grades, tasks, and recovery workflows.</h2>
+            </div>
+            <div class="mini-metric">
+              <span>Secure</span>
+              <strong>17 / 4</strong>
+            </div>
+          </div>
+          <div class="session-grid">
+            <div class="session-pill">
+              <span class="session-label">Roster</span>
+              <strong>17 members</strong>
+            </div>
+            <div class="session-pill">
+              <span class="session-label">Teams</span>
+              <strong>4 squads</strong>
+            </div>
+            <div class="session-pill">
+              <span class="session-label">Mode</span>
+              <strong>Secure</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-login-panel" aria-label="Quick login demo accounts">
+          <p class="quick-login-title">Quick demo access</p>
+          <div class="quick-login-grid">
+            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan</button>
+            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz</button>
+            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2001">Amina</button>
+            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha</button>
+            <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh</button>
+          </div>
+        </div>
 
         <!-- Secure Login Form -->
         <form id="form-login" class="auth-form">
@@ -85,7 +124,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
 
           <div class="form-group auth-remember-row">
             <label class="custom-checkbox-label">
-              <input type="checkbox" id="chk-remember" ${rememberedName ? "checked" : ""} />
+              <input type="checkbox" id="chk-remember" ${rememberedName ? 'checked' : ''} />
               <span>Remember my name on this device</span>
             </label>
           </div>
@@ -106,58 +145,76 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
   `;
 
   // Element handles
-  const formLogin = container.querySelector("#form-login");
-  const nameInput = container.querySelector("#login-name");
-  const pinInput = container.querySelector("#login-pin");
-  const submitBtn = container.querySelector("#btn-submit-login");
-  const errorBox = container.querySelector("#login-error-box");
-  const pinDots = container.querySelectorAll(".pin-dot");
-  const togglePinBtn = container.querySelector("#btn-toggle-pin-visibility");
-  const rememberChk = container.querySelector("#chk-remember");
+  const formLogin = container.querySelector('#form-login');
+  const nameInput = container.querySelector('#login-name');
+  const pinInput = container.querySelector('#login-pin');
+  const submitBtn = container.querySelector('#btn-submit-login');
+  const errorBox = container.querySelector('#login-error-box');
+  const pinDots = container.querySelectorAll('.pin-dot');
+  const togglePinBtn = container.querySelector('#btn-toggle-pin-visibility');
+  const rememberChk = container.querySelector('#chk-remember');
+  const quickLoginButtons = container.querySelectorAll('.quick-login-chip');
+
+  quickLoginButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const name = button.dataset.demoName || '';
+      const pin = button.dataset.demoPin || '';
+      nameInput.value = name;
+      pinInput.value = pin;
+      updatePinDots(pin);
+      if (rememberChk) {
+        rememberChk.checked = true;
+        localStorage.setItem('economics_portal_remember_name', name);
+      }
+      submitBtn.classList.add('pulse');
+      setTimeout(() => submitBtn.classList.remove('pulse'), 260);
+      formLogin.requestSubmit();
+    });
+  });
 
   // PIN indicator dots
   function updatePinDots(val) {
     pinDots.forEach((dot, idx) => {
       if (idx < val.length) {
-        dot.classList.add("filled");
+        dot.classList.add('filled');
       } else {
-        dot.classList.remove("filled");
+        dot.classList.remove('filled');
       }
     });
   }
 
-  pinInput.addEventListener("input", (e) => {
+  pinInput.addEventListener('input', (e) => {
     updatePinDots(e.target.value);
     if (e.target.value.length === 4) {
-      submitBtn.classList.add("pulse");
+      submitBtn.classList.add('pulse');
     } else {
-      submitBtn.classList.remove("pulse");
+      submitBtn.classList.remove('pulse');
     }
   });
 
   // Show/Hide PIN toggle
   let isPinVisible = false;
-  togglePinBtn.addEventListener("click", () => {
+  togglePinBtn.addEventListener('click', () => {
     isPinVisible = !isPinVisible;
-    pinInput.type = isPinVisible ? "text" : "password";
-    togglePinBtn.textContent = isPinVisible ? "Hide PIN" : "Show PIN";
+    pinInput.type = isPinVisible ? 'text' : 'password';
+    togglePinBtn.textContent = isPinVisible ? 'Hide PIN' : 'Show PIN';
   });
 
   // Submit Handler
-  formLogin.addEventListener("submit", async (e) => {
+  formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = nameInput.value.trim();
     const pin = pinInput.value.trim();
 
     if (rememberChk.checked) {
-      localStorage.setItem("economics_portal_remember_name", name);
+      localStorage.setItem('economics_portal_remember_name', name);
     } else {
-      localStorage.removeItem("economics_portal_remember_name");
+      localStorage.removeItem('economics_portal_remember_name');
     }
 
     submitBtn.disabled = true;
     submitBtn.innerHTML = `<span class="auth-spinner"></span> Authenticating...`;
-    errorBox.innerHTML = "";
+    errorBox.innerHTML = '';
 
     try {
       const res = await apiLogin(name, pin);
@@ -165,7 +222,9 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
         setCurrentUser(res.user);
         onSuccess();
       } else {
-        triggerError(res.error || "Invalid name or PIN. Please verify with Group Leader.");
+        triggerError(
+          res.error || 'Invalid name or PIN. Please verify with Group Leader.',
+        );
       }
     } catch (err) {
       errorBox.innerHTML = `
@@ -180,10 +239,10 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
         </div>
       `;
 
-      const forceBtn = errorBox.querySelector("#btn-force-demo-login");
+      const forceBtn = errorBox.querySelector('#btn-force-demo-login');
       if (forceBtn) {
-        forceBtn.addEventListener("click", () => {
-          localStorage.setItem("economics_portal_force_demo", "true");
+        forceBtn.addEventListener('click', () => {
+          localStorage.setItem('economics_portal_force_demo', 'true');
           onForceDemo();
         });
       }
@@ -195,12 +254,12 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
 
   function triggerError(msg) {
     errorBox.innerHTML = `<div class="alert alert-error auth-error-alert">${msg}</div>`;
-    const card = container.querySelector(".auth-card");
-    card.classList.remove("shake");
+    const card = container.querySelector('.auth-card');
+    card.classList.remove('shake');
     void card.offsetWidth;
-    card.classList.add("shake");
-    pinInput.value = "";
-    updatePinDots("");
+    card.classList.add('shake');
+    pinInput.value = '';
+    updatePinDots('');
     pinInput.focus();
   }
 }
