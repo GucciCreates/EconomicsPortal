@@ -167,3 +167,22 @@ test('F14: on every tab of every role, heading levels never skip (h1 → h2 → 
     await browser.close();
   }
 });
+
+test('F17: the Demo Mode bar is inside a named landmark (screen readers can find and skip it)', { timeout: 60000 }, async () => {
+  const { browser, page } = await openApp({ demo: true });
+  try {
+    await page.waitForSelector('.demo-banner');
+    const inLandmark = await page.$eval('.demo-banner', (el) => {
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        const role = n.getAttribute('role');
+        if (['banner', 'main', 'contentinfo', 'navigation', 'complementary'].includes(role)) return true;
+        if (role === 'region' || n.tagName === 'SECTION') return Boolean(n.getAttribute('aria-label') || n.getAttribute('aria-labelledby'));
+        if (['HEADER', 'MAIN', 'FOOTER', 'NAV', 'ASIDE'].includes(n.tagName)) return true;
+      }
+      return false;
+    });
+    assert.equal(inLandmark, true);
+  } finally {
+    await browser.close();
+  }
+});

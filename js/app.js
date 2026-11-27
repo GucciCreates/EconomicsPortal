@@ -81,13 +81,13 @@ function toggleTheme() {
 function renderBanner() {
   if (isDemoMode()) {
     bannerEl.innerHTML = `
-      <div class="demo-banner" role="note">
+      <section class="demo-banner" aria-label="Demo Mode">
         <span><strong>Sample data.</strong> Nothing you do here is saved, and it disappears when you close this tab.</span>
         <div class="demo-banner-actions">
           <button id="btn-reset-demo" class="btn btn-secondary btn-sm">Reset sample data</button>
           <button id="btn-exit-demo" class="btn btn-secondary btn-sm">Leave demo</button>
         </div>
-      </div>
+      </section>
     `;
     bannerEl.style.display = 'block';
     document.body.classList.add('is-demo');
