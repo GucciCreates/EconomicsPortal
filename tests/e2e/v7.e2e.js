@@ -136,3 +136,34 @@ test('F13: deadline cards show the countdown once and the real date under it', {
     await browser.close();
   }
 });
+
+test('F14: on every tab of every role, heading levels never skip (h1 → h2 → h3)', { timeout: 180000 }, async () => {
+  const { browser, page, errors } = await openApp({ demo: true });
+  const skips = [];
+  try {
+    for (const who of ['Dr. Numan', 'Shehroz', 'Amina', 'Bilal']) {
+      await page.click(`.quick-login-chip[data-demo-name="${who}"]`);
+      await page.waitForSelector('.tab-nav');
+      const tabs = await page.$$eval('.tab-btn', (b) => b.map((x) => x.dataset.tab));
+      for (const tab of tabs) {
+        await page.click(`.tab-btn[data-tab="${tab}"]`);
+        await page.waitForTimeout(150);
+        const levels = await page.$$eval('main h1, main h2, main h3, main h4, main h5, main h6', (hs) =>
+          hs.filter((h) => h.offsetParent !== null || h.classList.contains('sr-only')).map((h) => [Number(h.tagName[1]), h.textContent.trim().slice(0, 30)]),
+        );
+        let prev = 0;
+        for (const [lvl, text] of levels) {
+          if (prev && lvl > prev + 1) skips.push(`${who}/${tab}: h${prev} → h${lvl} "${text}"`);
+          prev = lvl;
+        }
+      }
+      await page.click('#btn-account-menu');
+      await page.click('#btn-logout');
+      await page.waitForSelector('#form-login');
+    }
+    assert.deepEqual(skips, []);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});

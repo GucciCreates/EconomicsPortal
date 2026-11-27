@@ -56,7 +56,7 @@ export function renderMyScoresTab(panel, ctx) {
     }
 
     <div class="section-head">
-      <h2 class="section-title">How you're doing</h2>
+      <h3 class="section-title">How you're doing</h3>
       <div class="btn-group">
         ${myMarks.length > 1 ? `<canvas id="member-sparkline" class="sparkline" width="140" height="38" role="img" aria-label="Your score trend"></canvas>` : ''}
         <button type="button" class="btn btn-primary btn-sm" id="btn-print-my-report" data-action="report">View report card</button>

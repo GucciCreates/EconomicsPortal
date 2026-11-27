@@ -7,7 +7,7 @@
 
 import { esc } from '../utils.js';
 import { getScoreBand } from './metricsPanel.js';
-import { createTabNav } from './tabNav.js';
+import { createTabNav, openTabPanel } from './tabNav.js';
 import { cleanupQuizCountdowns } from './quizScheduler.js';
 import { countDoubtUpdates } from './doubtThread.js';
 import { loadLastSeen, markSeen, isNewer } from '../lastSeen.js';
@@ -94,11 +94,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     if (id === 'updates') markSeen(user, 'announcements');
     if (id in badges) tabNav.setBadge(id, 0);
     cleanupQuizCountdowns();
-    const panel = document.createElement('div');
-    panel.className = 'tab-panel';
-    panel.setAttribute('role', 'tabpanel');
-    panel.setAttribute('aria-labelledby', `tab-${id}`);
-    content.replaceChildren(panel);
+    const panel = openTabPanel(content, id, tabs);
     (TABS[id] || TABS.overview)(panel, ctx);
   }
 
