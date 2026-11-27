@@ -226,6 +226,9 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
       const res = await apiLogin(name, pin);
       if (res.ok && res.user) {
         setCurrentUser(res.user);
+        try {
+          sessionStorage.removeItem(`economics_portal_tab:${res.user.name}`); // start each login on the first tab
+        } catch (e) {}
         onSuccess();
       } else {
         triggerError(

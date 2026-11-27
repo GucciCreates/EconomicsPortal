@@ -7,6 +7,7 @@
 
 import { apiAddAnnouncement, apiDeleteAnnouncement, apiPinAnnouncement } from "../api.js";
 import { esc } from "../utils.js";
+import { newPill } from "../lastSeen.js";
 
 /**
  * @param {HTMLElement} container
@@ -14,7 +15,11 @@ import { esc } from "../utils.js";
  * @param {Array} announcements  — sorted by pinned desc, timestamp desc
  * @param {Function} onRefresh
  */
-export function renderAnnouncementsPanel(container, user, announcements, onRefresh) {
+/**
+ * @param {object} [opts]
+ * @param {number} [opts.since] - last-seen time; newer posts by others get a "New" pill
+ */
+export function renderAnnouncementsPanel(container, user, announcements, onRefresh, opts = {}) {
   const canManage = user.role === "instructor" || user.role === "group_leader";
   const list = [...announcements].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
@@ -62,7 +67,7 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
             <div class="ann-header">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 ${a.pinned ? `<span class="pin-badge">📌 Pinned</span>` : ""}
-                <strong style="font-size: 0.95rem;">${esc(a.title)}</strong>
+                <strong style="font-size: 0.95rem;">${esc(a.title)}</strong>${a.postedBy !== user.name ? newPill(a.timestamp, opts.since) : ""}
               </div>
               ${
                 canManage

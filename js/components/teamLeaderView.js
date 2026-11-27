@@ -17,6 +17,8 @@ import { renderQuizScheduler, cleanupQuizCountdowns } from './quizScheduler.js';
 import { renderLeaderboard } from './leaderboard.js';
 import { openReportCardModal } from './reportCardModal.js';
 import { renderSubmissionTracker } from './submissionTracker.js';
+import { renderDoubtThreads, countDoubtUpdates } from './doubtThread.js';
+import { loadLastSeen, markSeen, isNewer } from '../lastSeen.js';
 
 export const TEAM_ROSTER = {
   Shehroz: ['Gorsi', 'Haris'],
@@ -38,6 +40,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
   const teamAverages = data.teamAverages || {};
   const memberMetrics = data.memberMetrics || {};
   const atRiskMembers = data.atRiskMembers || [];
+  const escalations = data.escalations || [];
 
   const avgBand = teamAverage !== null ? getScoreBand(teamAverage) : null;
   const teamMembers = (TEAM_ROSTER[user.team] || []).filter(
@@ -123,7 +126,8 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
         : ''
     }
 
-    <!-- Tab Content Shell -->
+    <!-- Tab bar and content are separate so the tab bar sits below the KPI tiles. -->
+    <div id="tl-tab-nav"></div>
     <div id="tl-tab-content"></div>
     <div id="tl-modal-shell"></div>
   `;
@@ -145,6 +149,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     },
     { id: 'tasks', label: `Team Tasks (${tasks.length})`, icon: '📋' },
     { id: 'tracker', label: 'Submission Tracker', icon: '✅' },
+    { id: 'doubts', label: `Team Doubts (${escalations.filter((d) => d.status === 'open').length} open)`, icon: '❓' },
     { id: 'quizzes', label: `Quizzes & Tests (${quizzes.length})`, icon: '⏱️' },
     { id: 'leaderboard', label: 'Class Leaderboard', icon: '🏆' },
     {
@@ -154,8 +159,29 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     },
   ];
 
+  const seen = loadLastSeen(user, ['announcements', 'doubts']);
+  const badges = {
+    announcements: announcements.filter((a) => a.postedBy !== user.name && isNewer(a.timestamp, seen.announcements)).length,
+    doubts: countDoubtUpdates(escalations, seen.doubts, user),
+  };
+
   function switchTab(tabId) {
+    if (tabId in badges) {
+      markSeen(user, tabId);
+      tabNav.setBadge(tabId, 0);
+    }
     if (tabId === 'members') renderMembersTab(contentShell);
+    else if (tabId === 'doubts')
+      renderDoubtThreads(contentShell, {
+        escalations,
+        user,
+        canReply: true,
+        canResolve: false,
+        since: seen.doubts,
+        title: `Team ${user.team} Doubts`,
+        emptyText: 'Nobody on your team has raised a doubt yet.',
+        onRefresh,
+      });
     else if (tabId === 'submissions') renderSubmissionsTab(contentShell);
     else if (tabId === 'noticeboard') renderNoticeboardTab(contentShell);
     else if (tabId === 'tasks') renderTasksTab(contentShell);
@@ -166,8 +192,11 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
   }
 
-  createTabNav(container.querySelector('.kpi-grid'), tabs, switchTab);
-  switchTab('members');
+  const tabNav = createTabNav(container.querySelector('#tl-tab-nav'), tabs, switchTab, {
+    storageKey: `economics_portal_tab:${user.name}`,
+  });
+  Object.entries(badges).forEach(([id, n]) => tabNav.setBadge(id, n));
+  switchTab(tabNav.initialTab);
 
   // ─────────────────────────────────────────────────────────────────────────
   // TAB 1: MEMBERS & REPORT CARDS
@@ -646,6 +675,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
       user,
       announcements,
       onRefresh,
+      { since: seen.announcements },
     );
   }
 

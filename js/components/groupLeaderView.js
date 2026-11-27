@@ -30,6 +30,8 @@ import { openReportCardModal } from './reportCardModal.js';
 import { renderMentorshipPanel } from './mentorshipPanel.js';
 import { renderActivityLog } from './activityLog.js';
 import { renderSubmissionTracker } from './submissionTracker.js';
+import { renderDoubtThreads, countDoubtUpdates } from './doubtThread.js';
+import { loadLastSeen, markSeen, isNewer } from '../lastSeen.js';
 
 export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -176,7 +178,8 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       </div>
     </div>
 
-    <!-- Tab Content Shell -->
+    <!-- Tab bar and content are separate so the tab bar sits below the KPI tiles. -->
+    <div id="gl-tab-nav"></div>
     <div id="gl-tab-content"></div>
   `;
 
@@ -216,7 +219,18 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     tabs.push({ id: 'pins', label: 'Member Access & PINs', icon: '🔑' });
   }
 
+  // "New since your last visit" badges
+  const seen = loadLastSeen(user, ['announcements', 'doubts']);
+  const badges = {
+    announcements: announcements.filter((a) => a.postedBy !== user.name && isNewer(a.timestamp, seen.announcements)).length,
+    doubts: countDoubtUpdates(escalations, seen.doubts, user),
+  };
+
   function switchTab(tabId) {
+    if (tabId in badges) {
+      markSeen(user, tabId);
+      tabNav.setBadge(tabId, 0);
+    }
     if (tabId === 'ledger') renderLedgerTab(contentShell);
     else if (tabId === 'mentorship') renderMentorshipTab(contentShell);
     else if (tabId === 'analytics') renderAnalyticsTab(contentShell);
@@ -231,8 +245,11 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     else if (tabId === 'activity') renderActivityLog(contentShell);
   }
 
-  createTabNav(container.querySelector('.kpi-grid'), tabs, switchTab);
-  switchTab('ledger');
+  const tabNav = createTabNav(container.querySelector('#gl-tab-nav'), tabs, switchTab, {
+    storageKey: `economics_portal_tab:${user.name}`,
+  });
+  Object.entries(badges).forEach(([id, n]) => tabNav.setBadge(id, n));
+  switchTab(tabNav.initialTab);
 
   // ─────────────────────────────────────────────────────────────────────────
   // TAB 1: LEDGER & OVERVIEW
@@ -653,6 +670,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       user,
       announcements,
       onRefresh,
+      { since: seen.announcements },
     );
   }
 
@@ -912,81 +930,13 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   // TAB 6: DOUBTS & ESCALATIONS
   // ─────────────────────────────────────────────────────────────────────────
   function renderDoubtsTab(wrap) {
-    const sorted = [...escalations].sort((a, b) => {
-      if (a.severity === 'severe' && b.severity !== 'severe') return -1;
-      if (a.severity !== 'severe' && b.severity === 'severe') return 1;
-      if (a.status === 'open' && b.status === 'closed') return -1;
-      if (a.status === 'closed' && b.status === 'open') return 1;
-      return new Date(b.timestamp) - new Date(a.timestamp);
-    });
-
-    wrap.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Student Doubts & Escalations Log (${esc(escalations.length)})</h3>
-        </div>
-        <div>
-          ${
-            sorted.length === 0
-              ? `<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No questions or issues reported.</p>`
-              : sorted
-                  .map((item) => {
-                    const isSevere = item.severity === 'severe';
-                    const isClosed = item.status === 'closed';
-                    return `
-                  <div class="escalation-item ${esc(isSevere ? 'severe' : '')}" style="margin-bottom: 0.85rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-                      <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(item.topic)}</h4>
-                      <div style="display: flex; gap: 0.35rem; align-items: center;">
-                        ${isSevere ? `<span class="badge badge-atrisk">URGENT</span>` : ''}
-                        <span class="badge ${esc(isClosed ? 'badge-closed' : 'badge-open')}">${esc(item.status)}</span>
-                      </div>
-                    </div>
-                    <p style="font-size: 0.85rem; margin-bottom: 0.45rem;">${esc(item.details)}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted);">
-                      <span>From: <strong>${esc(item.raisedBy)}</strong> (Team ${esc(item.team)}) • ${esc(new Date(item.timestamp).toLocaleDateString())}</span>
-                      ${
-                        !isClosed && canLead
-                          ? `
-                        <button class="btn btn-teal btn-sm btn-resolve-esc" data-id="${esc(item.id)}">
-                          Mark Resolved ✓
-                        </button>
-                      `
-                          : ''
-                      }
-                    </div>
-                  </div>
-                `;
-                  })
-                  .join('')
-          }
-        </div>
-      </div>
-    `;
-
-    wrap.querySelectorAll('.btn-resolve-esc').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const escId = btn.getAttribute('data-id');
-        btn.disabled = true;
-        try {
-          const res = await apiUpdateEscalationStatus(
-            escId,
-            'closed',
-            user.role,
-          );
-          if (res.ok) {
-            window.showEconomicsToast(
-              'Escalation marked as resolved.',
-              'success',
-            );
-            onRefresh();
-          } else {
-            window.showEconomicsToast(res.error || 'Update failed.', 'error');
-          }
-        } catch (err) {
-          window.showEconomicsToast(err.message, 'error');
-        }
-      });
+    renderDoubtThreads(wrap, {
+      escalations,
+      user,
+      canReply: true,
+      canResolve: canLead,
+      since: seen.doubts,
+      onRefresh,
     });
   }
 

@@ -12,6 +12,9 @@ import { renderLeaderboard } from './leaderboard.js';
 import { renderAnnouncementsPanel } from './announcementsPanel.js';
 import { openReportCardModal } from './reportCardModal.js';
 import { esc, linkHtml } from '../utils.js';
+import { renderDoubtThreads, countDoubtUpdates } from './doubtThread.js';
+import { loadLastSeen, markSeen, isNewer, newPill } from '../lastSeen.js';
+import { dueDeadline } from './submissionTracker.js';
 
 export function renderMemberDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -26,6 +29,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   const quizzes = data.quizzes || [];
   const announcements = data.announcements || [];
   const myGoal = data.myGoal || null;
+  const myEscalations = data.myEscalations || [];
 
   const avgBand = teamAverage !== null ? getScoreBand(teamAverage) : null;
   // Declared before the first switchTab() call below, which reads them.
@@ -75,7 +79,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     { id: 'tasks', label: `Tasks & Submit (${tasks.length})`, icon: '📝' },
     { id: 'quizzes', label: `Quizzes & Tests (${quizzes.length})`, icon: '⏱️' },
     { id: 'leaderboard', label: 'Class Leaderboard', icon: '🏆' },
-    { id: 'doubts', label: 'Ask a Doubt', icon: '❓' },
+    { id: 'doubts', label: 'Ask a Doubt & Replies', icon: '❓' },
     {
       id: 'announcements',
       label: `Announcements (${announcements.length})`,
@@ -83,7 +87,30 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     },
   ];
 
+  // "New since your last visit": snapshot taken once per render so items keep
+  // their "New" pill while you're looking at them; a tab's badge clears when
+  // you open it.
+  const seen = loadLastSeen(user, ['announcements', 'tasks', 'teamMessages', 'doubts']);
+  const badges = {
+    tasks: tasks.filter((t) => isNewer(t.timestamp, seen.tasks)).length,
+    doubts: countDoubtUpdates(myEscalations, seen.doubts, user),
+    announcements: announcements.filter((a) => isNewer(a.timestamp, seen.announcements)).length,
+  };
+
+  // Deadlines: unsubmitted, still-open tasks for my team.
+  const now = new Date();
+  const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const submittedIds = new Set(mySubmissions.map((s) => String(s.taskId)));
+  const isOverdue = (t) => {
+    const d = dueDeadline(t.dueDate);
+    return t.status !== 'done' && !submittedIds.has(String(t.id)) && d && d < now;
+  };
+
   function switchTab(tabId) {
+    if (tabId in badges) {
+      markSeen(user, tabId);
+      tabNav.setBadge(tabId, 0);
+    }
     if (tabId === 'overview') renderOverviewTab(contentShell);
     else if (tabId === 'goals') renderGoalsTab(contentShell);
     else if (tabId === 'tasks') renderTasksTab(contentShell);
@@ -93,21 +120,74 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
   }
 
-  createTabNav(container.querySelector('#mem-tab-nav'), tabs, switchTab);
-  switchTab('overview');
+  const tabNav = createTabNav(container.querySelector('#mem-tab-nav'), tabs, switchTab, {
+    storageKey: `economics_portal_tab:${user.name}`,
+  });
+  Object.entries(badges).forEach(([id, n]) => tabNav.setBadge(id, n));
+  switchTab(tabNav.initialTab);
 
   // ─────────────────────────────────────────────────────────────────────────
   // TAB 1: OVERVIEW & SCORECARD
   // ─────────────────────────────────────────────────────────────────────────
+  function timeLeft(when) {
+    const ms = when - new Date();
+    if (ms <= 0) return 'Now';
+    const d = Math.floor(ms / 86400000);
+    const h = Math.floor((ms % 86400000) / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    if (d > 0) return `in ${d}d ${h}h`;
+    if (h > 0) return `in ${h}h ${m}m`;
+    return `in ${m}m`;
+  }
+
+  function renderDeadlineStrip() {
+    const overdue = tasks.filter(isOverdue);
+    const dueSoon = tasks
+      .filter((t) => t.status !== 'done' && !submittedIds.has(String(t.id)))
+      .map((t) => ({ t, when: dueDeadline(t.dueDate) }))
+      .filter(({ when }) => when && when >= now && when <= weekAhead)
+      .sort((a, b) => a.when - b.when);
+    const quizSoon = quizzes
+      .map((q) => ({ q, when: new Date(q.scheduledAt) }))
+      .filter(({ when }) => when >= now && when <= weekAhead)
+      .sort((a, b) => a.when - b.when);
+    if (!overdue.length && !dueSoon.length && !quizSoon.length) {
+      return `<div class="card" style="margin-bottom: 1.25rem;"><h3 class="card-title" style="margin-bottom: 0.25rem;">🗓️ This week</h3><p style="color: var(--text-muted); font-size: 0.85rem;">Nothing due in the next 7 days. 🎉</p></div>`;
+    }
+    const item = (kind, title, left, extra, cls = '') => `
+      <div class="deadline-item ${cls}">
+        <div class="deadline-kind">${kind}</div>
+        <div class="deadline-title">${esc(title)}</div>
+        <div class="deadline-left">${esc(left)}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${esc(extra)}</div>
+      </div>`;
+    return `
+      <div class="card" style="margin-bottom: 1.25rem;" aria-labelledby="deadline-strip-title">
+        <div class="card-header" style="margin-bottom: 0.6rem;">
+          <h3 class="card-title" id="deadline-strip-title">🗓️ This week</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Tasks you still need to submit and quizzes in the next 7 days</span>
+        </div>
+        <div class="deadline-strip">
+          ${overdue.map((t) => item('⚠️ Overdue task', t.title, 'Overdue', `Was due ${dueDeadline(t.dueDate).toLocaleDateString()} — submit as soon as you can`, 'overdue')).join('')}
+          ${dueSoon.map(({ t, when }) => item('📝 Task due', t.title, timeLeft(when), `Due ${when.toLocaleDateString()}`)).join('')}
+          ${quizSoon.map(({ q, when }) => item('⏱️ Quiz', q.title, timeLeft(when), when.toLocaleString())).join('')}
+        </div>
+      </div>`;
+  }
+
   function renderOverviewTab(wrap) {
+    const noticeIsNew = teamMessages.length > 0 && isNewer(teamMessages[0].timestamp, seen.teamMessages);
+    markSeen(user, 'teamMessages');
     wrap.innerHTML = `
+      ${renderDeadlineStrip()}
+
       <!-- Team Leader Notice (if any) -->
       ${
         teamMessages.length > 0
           ? `
         <div class="card" style="border-left: 4px solid var(--teal); background-color: var(--teal-soft); margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
-            <strong style="color: var(--teal); font-size: 0.95rem;">💬 Notice from Team Leader (${esc(teamMessages[0].author)})</strong>
+            <strong style="color: var(--teal-text, var(--teal)); font-size: 0.95rem;">💬 Notice from Team Leader (${esc(teamMessages[0].author)})${noticeIsNew ? '<span class="new-pill">New</span>' : ''}</strong>
             <span style="font-size: 0.75rem; color: var(--text-muted);">${esc(new Date(teamMessages[0].timestamp).toLocaleDateString())}</span>
           </div>
           <p style="font-size: 0.9rem; color: var(--text-main); line-height: 1.45;">${esc(teamMessages[0].message)}</p>
@@ -272,11 +352,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                     );
                     const isSubmitted = !!submission;
                     const isDone = task.status === 'done';
+                    const overdue = isOverdue(task);
 
                     return `
-                    <div class="task-item ${esc(isDone ? 'done' : '')}">
+                    <div class="task-item ${isDone ? 'done' : ''} ${overdue ? 'overdue' : ''}">
                       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
-                        <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(task.title)}</h4>
+                        <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(task.title)}${newPill(task.timestamp, seen.tasks)}${overdue ? ' <span class="badge badge-atrisk">Overdue</span>' : ''}</h4>
                         <span class="badge ${esc(isDone ? 'badge-done' : 'badge-open')}">${esc(task.status)}</span>
                       </div>
                       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem;">
@@ -428,7 +509,17 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           </button>
         </form>
       </div>
+      <div id="my-doubts" style="margin-top: 1.25rem;"></div>
     `;
+
+    renderDoubtThreads(wrap.querySelector('#my-doubts'), {
+      escalations: myEscalations,
+      user,
+      since: seen.doubts,
+      title: `My Questions (${myEscalations.length})`,
+      emptyText: "You haven't asked anything yet.",
+      onRefresh,
+    });
 
     const escForm = wrap.querySelector('#form-add-escalation');
     if (escForm) {
@@ -491,6 +582,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
       user,
       announcements,
       onRefresh,
+      { since: seen.announcements },
     );
   }
 

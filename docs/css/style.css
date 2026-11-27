@@ -2575,3 +2575,117 @@ a:hover {
   border-color: var(--red-border);
   color: var(--red-text, var(--red));
 }
+
+/* Tab "N new" badges and item "New" pills */
+.tab-badge {
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--red);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+.tab-badge[hidden] {
+  display: none;
+}
+.new-pill {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.02rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--red-soft);
+  border: 1px solid var(--red-border);
+  color: var(--red-text, var(--red));
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+/* Doubt reply threads */
+.doubt-replies {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0 0 0 0.85rem;
+  border-left: 3px solid var(--purple-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.doubt-reply p {
+  font-size: 0.85rem;
+  margin: 0.15rem 0 0;
+  white-space: pre-wrap;
+}
+.doubt-reply-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.doubt-reply-meta strong {
+  color: var(--text-main);
+}
+.doubt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+.doubt-reply-form {
+  display: flex;
+  flex: 1;
+  min-width: 240px;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+.doubt-reply-form textarea {
+  flex: 1;
+}
+
+/* Member "This week" deadline strip */
+.deadline-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+.deadline-item {
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+}
+.deadline-item.overdue {
+  border-color: var(--red-border);
+  background: var(--red-soft);
+}
+.deadline-kind {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.deadline-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin: 0.15rem 0;
+}
+.deadline-left {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--purple-text, var(--purple));
+}
+.deadline-item.overdue .deadline-left {
+  color: var(--red-text, var(--red));
+}
+.task-item.overdue {
+  border-left: 4px solid var(--red);
+  background: var(--red-soft);
+}
