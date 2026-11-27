@@ -9,6 +9,7 @@ import {
   apiDeleteTeamMessage,
 } from '../api.js';
 import { getScoreBand, renderMemberMetricsHTML } from './metricsPanel.js';
+import { esc, linkHtml, slug } from '../utils.js';
 import { renderSparkline } from './charts.js';
 import { createTabNav } from './tabNav.js';
 import { renderAnnouncementsPanel } from './announcementsPanel.js';
@@ -575,11 +576,13 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
                       <span>Due: <strong>${task.dueDate || 'Not set'}</strong></span>
                       <div>
                         ${
-                          !isDone
-                            ? `<button class="btn btn-teal btn-sm btn-relay-task" data-id="${task.id}">
-                                Relayed to team ✓
-                              </button>`
-                            : `<span style="color: var(--teal); font-weight: 600;">Completed</span>`
+                          isDone
+                            ? `<span style="color: var(--teal); font-weight: 600;">Completed</span>`
+                            : task.team === user.team
+                              ? `<button class="btn btn-teal btn-sm btn-relay-task" data-id="${esc(task.id)}">
+                                  Relayed to team ✓
+                                </button>`
+                              : `<span style="color: var(--text-muted); font-size: 0.75rem;">Class-wide task</span>`
                         }
                       </div>
                     </div>
