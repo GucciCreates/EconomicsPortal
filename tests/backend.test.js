@@ -786,3 +786,73 @@ test('F6: students see the top 5 and their own place, not every classmate\'s sco
   const lead = b.post({ action: 'dashboard', token: gl }).data;
   assert.ok(lead.memberMetrics.Haseeb);
 });
+
+// ── Actions that had no tests before AUDIT_v7 (F8) ──────────────────────
+
+test('F8 addQuiz / deleteQuiz: valid date required, team scope respected, deletes logged', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  assert.equal(b.post({ action: 'addQuiz', token: gl, title: 'Bad date', scheduledAt: 'not a date' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'addQuiz', token: gl, title: '', scheduledAt: '2030-01-05T10:00:00Z' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'addQuiz', token: gl, title: 'X', scheduledAt: '2030-01-05T10:00:00Z', scope: 'Nowhere' }).code, 'VALIDATION');
+  const id = b.post({ action: 'addQuiz', token: gl, title: 'Lareb quiz', scheduledAt: '2030-01-05T10:00:00Z', scope: 'Lareb' }).id;
+  assert.ok(id);
+  const titles = (who) => b.post({ action: 'dashboard', token: b.tokenFor(who) }).data.quizzes.map((q) => q.title);
+  assert.ok(titles('Shaiman').includes('Lareb quiz'), 'Lareb students see it');
+  assert.ok(!titles('Ramesh').includes('Lareb quiz'), 'other teams do not');
+  assert.equal(b.post({ action: 'deleteQuiz', token: gl, id }).ok, true);
+  assert.ok(!titles('Shaiman').includes('Lareb quiz'));
+  assert.equal(b.post({ action: 'deleteQuiz', token: gl, id }).code, 'NOT_FOUND');
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'deleteQuiz' && String(r.details).includes('Lareb quiz')), 'the deleted quiz is kept in the log');
+});
+
+test('F8 pinAnnouncement / deleteAnnouncement: pin and unpin, delete keeps a copy in the log', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const id = b.post({ action: 'addAnnouncement', token: gl, title: 'Exam hall', body: 'Room 4' }).id;
+  const ann = () => b.post({ action: 'dashboard', token: b.tokenFor('Ramesh') }).data.announcements.find((a) => a.id === id);
+  assert.equal(b.post({ action: 'pinAnnouncement', token: gl, id, pinned: true }).ok, true);
+  assert.equal(String(ann().pinned), 'true');
+  assert.equal(b.post({ action: 'pinAnnouncement', token: gl, id, pinned: 'false' }).ok, true);
+  assert.equal(String(ann().pinned), 'false');
+  assert.equal(b.post({ action: 'pinAnnouncement', token: gl, id: 'id-missing', pinned: true }).code, 'NOT_FOUND');
+  assert.equal(b.post({ action: 'deleteAnnouncement', token: gl, id }).ok, true);
+  assert.equal(ann(), undefined);
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'deleteAnnouncement' && String(r.details).includes('Exam hall')));
+});
+
+test('F8 editTask: changes only the given fields, validates, and logs before/after', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const id = b.post({ action: 'addTask', token: gl, title: 'Problem set 4', team: 'Amina', dueDate: '2030-02-01' }).id;
+  assert.equal(b.post({ action: 'editTask', token: gl, id, fields: {} }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'editTask', token: gl, id, fields: { team: 'Nowhere' } }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'editTask', token: gl, id, fields: { title: 'Problem set 4 (revised)', createdBy: 'Hacker' } }).ok, true);
+  const task = b.post({ action: 'dashboard', token: gl }).data.tasks.find((t) => t.id === id);
+  assert.equal(task.title, 'Problem set 4 (revised)');
+  assert.equal(task.team, 'Amina', 'untouched fields stay');
+  assert.notEqual(task.createdBy, 'Hacker', 'fields outside the edit list are ignored');
+  const entry = b.sheetRows('AuditLog').find((r) => r.action === 'editTask');
+  assert.match(String(entry.details), /Problem set 4"/);
+  assert.match(String(entry.details), /revised/);
+});
+
+test('F8 createMentorshipPlan / updateMentorshipStatus: real students only, no self-mentoring, status checked', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  assert.equal(b.post({ action: 'createMentorshipPlan', token: gl, student: 'Ramesh', mentor: 'Ramesh' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'createMentorshipPlan', token: gl, student: 'Dr. Numan', mentor: 'Ramesh' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'createMentorshipPlan', token: gl, student: 'Ramesh', mentor: 'Nobody' }).code, 'VALIDATION');
+  const milestones = Array.from({ length: 14 }, (_, i) => `Step ${i + 1}`);
+  const id = b.post({ action: 'createMentorshipPlan', token: gl, student: 'Mamoon', mentor: 'Minal', milestones }).id;
+  assert.ok(id);
+  const plan = (who) => b.post({ action: 'dashboard', token: b.tokenFor(who) }).data.mentorship.find((p) => p.id === id);
+  assert.ok(plan('Mamoon'), 'the student sees it');
+  assert.ok(plan('Minal'), 'the mentor sees it');
+  assert.equal(plan('Ramesh'), undefined, 'other students do not');
+  const saved = plan('Mamoon').milestones;
+  assert.equal((Array.isArray(saved) ? saved : JSON.parse(saved)).length, 10, 'at most 10 milestones');
+  assert.equal(b.post({ action: 'updateMentorshipStatus', token: gl, id, status: 'done' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'updateMentorshipStatus', token: gl, id, status: 'resolved' }).ok, true);
+  assert.equal(plan('Mamoon').status, 'resolved');
+});
