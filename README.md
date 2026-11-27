@@ -1,114 +1,139 @@
 # 📈 EconomicsPortal
 
-A free, static web portal and dashboard for **Dr. Numan's Economics Class** (17 members across 4 teams), built by **Shehroz's team**.
+A free class portal and gradebook for **Dr. Numan's Economics Class** (17 members across 4 teams), built by **Shehroz's team**.
 
-Runs entirely for free:
-- **Frontend**: Plain HTML, CSS, and modern JavaScript (ES Modules), served via **GitHub Pages**. Zero hosting cost.
-- **Backend**: Serverless JSON API running on **Google Apps Script** backed by a **Google Sheet** on `bahriabatch30@gmail.com`. Zero server costs, never sleeps, and requires no credit card.
+Live site: **https://GucciCreates.github.io/EconomicsPortal/**
 
----
-
-## 👥 Roster & Class Organization
-
-| Role | Name | Team | Default PIN | Permissions |
-| :--- | :--- | :--- | :--- | :--- |
-| **Instructor** | Dr. Numan | — | `0000` | Read-only class marks |
-| **Group Leader** | Shehroz | Shehroz | `1111` | Full oversight: assign tasks, enter marks, resolve escalations |
-| **Group Assistant** | Sajal | Shehroz | `1112` | Recordkeeping: read-only marks & tasks + escalation log |
-| **Team Leader** | Amina | Amina | `2001` | Team oversight: relay tasks, record team marks, view submissions |
-| **Member** | Ramesh | Amina | `2002` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Mamoon | Amina | `2003` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Tazneem | Amina | `2004` | View tasks, submit work, view own marks, raise doubts |
-| **Team Leader** | Ayesha (Quetta) | Ayesha | `3001` | Team oversight, relay tasks, record team marks, view submissions |
-| **Member** | Minal | Ayesha | `3002` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Anika | Ayesha | `3003` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Ahmed bin Nasir | Ayesha | `3004` | View tasks, submit work, view own marks, raise doubts |
-| **Team Leader** | Lareb | Lareb | `4001` | Team oversight, relay tasks, record team marks, view submissions |
-| **Member** | Shaiman | Lareb | `4002` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Aisha Amjad | Lareb | `4003` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Haseeb | Lareb | `4004` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Gorsi | Shehroz | `1113` | View tasks, submit work, view own marks, raise doubts |
-| **Member** | Haris | Shehroz | `1114` | View tasks, submit work, view own marks, raise doubts |
+It runs entirely for free:
+- **Frontend:** plain HTML, CSS and JavaScript modules (no framework), served by **GitHub Pages** from the `/docs` folder. Installable on phones as an app.
+- **Backend:** a **Google Apps Script** web app backed by a **Google Sheet** on `bahriabatch30@gmail.com`. No server, no database hosting, no credit card.
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## 👥 Roster & roles
 
-1. Clone or navigate to the repository:
-   ```bash
-   cd EconomicsPortal
-   ```
+PINs are private. Each person gets theirs from the group leader, and can change it from the account menu (top right) after logging in.
 
-2. Run the local static server:
-   ```bash
-   npm run dev
-   ```
-   *Or:* `python3 -m http.server 3000`
-
-3. Open your browser at `http://localhost:3000`.
-
-> **Note:** The app features an automatic **Demo Mode** out of the box with realistic seed data. You can click any of the quick-login chips on the sign-in screen to explore the Group Leader, Team Leader, and Member interfaces immediately.
+| Role | Name | Team | What they can do |
+| :--- | :--- | :--- | :--- |
+| **Instructor** | Dr. Numan | — | Everything the group leader can see; edit and **delete** marks; activity log |
+| **Group Leader** | Shehroz | Shehroz | Assign tasks, enter/edit marks, announcements, quizzes, mentorship, resolve doubts, reset PINs, activity log |
+| **Assistant** | Sajal | Shehroz | Enter and edit marks, reply to doubts, view everything |
+| **Team Leader** | Amina, Ayesha (Quetta), Lareb | own team | Record marks, forward submissions for grading, team notices, reply to team doubts, submission tracker — **own team only** |
+| **Member** | Ramesh, Mamoon, Tazneem, Minal, Anika, Ahmed bin Nasir, Shaiman, Aisha Amjad, Haseeb, Gorsi, Haris | own team | Submit work, set a goal, ask doubts, see **own** marks and the class leaderboard |
 
 ---
 
-## ⚙️ Connecting Your Google Apps Script Backend
+## 🔐 Security model (v4)
 
-1. Follow the step-by-step instructions in [**`SETUP_GUIDE.md`**](./SETUP_GUIDE.md) to:
-   - Create your `EconomicsPortalDB` Google Sheet under `bahriabatch30@gmail.com`.
-   - Paste [`backend/Code.gs`](./backend/Code.gs) into Google Apps Script.
-   - Run `setup()` once to initialize tabs and users.
-   - Deploy as a Web App (access set to *Anyone*).
-2. Copy your Web App URL.
-3. Open [`js/config.js`](./js/config.js) and update `API_URL`:
-   ```javascript
-   export const API_URL = "https://script.google.com/macros/s/AKfycb.../exec";
-   ```
-4. Run `npm run build` to sync your changes to `/docs`.
+- **Signed sessions.** Logging in with name + PIN returns a session token signed with HMAC-SHA256 (secret kept in the Apps Script project's Script Properties, never in code). Tokens expire after 7 days.
+- **The server decides who you are.** Every request carries the token, and the backend looks up your name, role and team in the Users sheet. Anything the browser claims (`role`, `editedBy`, `team`, …) is ignored.
+- **Scoped access.** Team leaders can only act on their own team; members only on themselves. Members receive only their own marks plus a leaderboard summary of classmates (name, team, average, streak, trend).
+- **PINs are hashed** (salted SHA-256) and never sent to the browser — not even to the group leader. Changing or resetting a PIN signs that person out everywhere.
+- **Brute-force protection.** 5 wrong PINs for a name lock it for 15 minutes.
+- **Validation & integrity.** Inputs are checked on the server (score 0–100, rating 1–5, lengths, teams, `http(s)` links only). Writes run under a lock. Every change is recorded in the **AuditLog** sheet.
+- **No script injection.** Everything users type is escaped before it's shown, and text is stored in the sheet literally, so it can't run as a formula.
 
 ---
+
+## ✨ Features
+
+- **Role dashboards** for instructor/group leader/assistant, team leaders and members.
+- **Gradebook ledger** with filters, report cards (print/PDF), CSV export, charts and a class leaderboard.
+- **Tasks & submissions**, plus a **submission tracker** showing who is on time, late or missing, with a "copy reminder list" button.
+- **Deadline strip** for students: overdue tasks in red, plus tasks and quizzes due in the next 7 days.
+- **"New since your last visit"** badges on tabs and "New" pills on items.
+- **Doubts with replies:** leaders reply in a thread, and students see replies and when a doubt is resolved.
+- **Announcements, quiz scheduler with live countdowns, goals, team noticeboard, peer-mentorship plans.**
+- **Activity log** (instructor & group leader): who changed what, when, with before → after for mark edits.
+- **Change my PIN** for everyone; **Reset PIN** for the group leader.
+- **Installable app (PWA):** add it to your home screen; the app shell opens offline. Student data is never cached.
+- **Weekly backups** of the spreadsheet to Google Drive (keeps the last 8).
+- **Accessible:** labelled forms, WCAG AA contrast in light and dark themes, keyboard-friendly tabs, menus and dialogs.
+
+---
+
+## 🚀 Quick start (local)
+
+```bash
+npm run dev          # serves the repo at http://localhost:3000
+```
+
+Without a live backend, the app runs in **Demo Mode** with sample data in your browser. Demo Mode enforces the same rules as the real backend. The quick-login buttons on the sign-in screen appear **only in Demo Mode**. To try Demo Mode against the live site, click "Continue in Demo Mode" after a connection error.
+
+## ⚙️ Connecting / upgrading the backend
+
+Follow [**SETUP_GUIDE.md**](./SETUP_GUIDE.md). If you're upgrading an existing v3 install, read its **"Upgrading to v4"** section. Everyone's PINs need resetting, and everyone will have to sign in again.
 
 ## 🌐 Deploying to GitHub Pages
 
-1. In your GitHub repository:
-   - Go to **Settings > Pages**.
-   - Under **Build and deployment**:
-     - Source: **Deploy from a branch**
-     - Branch: **`main`**
-     - Folder: **`/docs`** (or `/root`)
-   - Click **Save**.
-2. Your site will be live at:
-   ```
-   https://GucciCreates.github.io/EconomicsPortal/
-   ```
+1. Make changes in `index.html`, `css/`, `js/` (never edit `docs/` by hand).
+2. Run `npm run build`. This syncs everything into `docs/` and removes files that no longer exist.
+3. Commit and push to `main`. GitHub Pages serves `main` → `/docs` (Settings → Pages).
+4. When releasing, bump the `?v=` numbers in `index.html` and `CACHE_VERSION` in `sw.js` together (a test checks they match).
+
+## 🧪 Tests
+
+```bash
+npm test             # backend tests (Code.gs under Node with fake Apps Script services), PWA checks, syntax check
+```
+
+```bash
+npm run test:e2e     # browser tests with Playwright: every role, every tab, XSS checks, phone width
+```
 
 ---
 
-## 📁 Repository Structure
+## 📁 Repository structure
 
 ```
 EconomicsPortal/
 ├── backend/
-│   └── Code.gs              # Complete Google Apps Script backend code
-├── css/
-│   └── style.css            # Responsive, mobile-first CSS with dark/light themes
-├── docs/                    # Production deployment folder for GitHub Pages
-│   ├── css/
-│   ├── js/
-│   └── index.html
+│   └── Code.gs                  # Apps Script backend (auth, API, migrations, backups)
+├── css/style.css                # All styles (dark/light themes, responsive)
+├── docs/                        # Built copy served by GitHub Pages (npm run build)
+├── icons/                       # App icons (SVG + PNG) for the PWA and favicon
 ├── js/
-│   ├── components/
-│   │   ├── groupLeaderView.js
-│   │   ├── memberView.js
-│   │   └── teamLeaderView.js
-│   ├── api.js               # API client with CORS-safe text/plain fetch & demo fallback
-│   ├── app.js               # Main application router and view controller
-│   ├── auth.js              # Local storage session management
-│   ├── config.js            # API_URL configuration
-│   └── mockData.js          # In-browser test database for demo mode
-├── .gitignore
-├── build.js                 # Static sync script for /docs
-├── index.html               # Main application entry point
-├── package.json             # NPM build and dev scripts
-├── README.md                # Documentation & instructions
-└── SETUP_GUIDE.md           # Step-by-step Apps Script setup guide
+│   ├── app.js                   # Boot, header, routing, theme, session-expiry handling
+│   ├── api.js                   # API client: attaches the session token to every call
+│   ├── auth.js                  # Session storage (name, role, team, token)
+│   ├── config.js                # API_URL of the Apps Script web app
+│   ├── demoServer.js            # In-browser backend for Demo Mode (same rules as Code.gs)
+│   ├── lastSeen.js              # "New since your last visit" tracking
+│   ├── mockData.js              # Demo sample data
+│   ├── utils.js                 # escapeHtml / safeUrl / linkHtml helpers
+│   └── components/
+│       ├── accountMenu.js       # Header menu: Change my PIN, Log out
+│       ├── activityLog.js       # Audit log tab
+│       ├── announcementsPanel.js
+│       ├── charts.js            # Chart.js charts
+│       ├── doubtThread.js       # Doubts with replies (all roles)
+│       ├── editModals.js        # Edit mark / edit task dialogs
+│       ├── exportUtils.js       # CSV export
+│       ├── goalPanel.js
+│       ├── groupLeaderView.js   # Instructor / group leader / assistant dashboard
+│       ├── leaderboard.js
+│       ├── loginView.js
+│       ├── memberView.js        # Student dashboard
+│       ├── mentorshipPanel.js
+│       ├── metricsPanel.js
+│       ├── modal.js             # Accessible dialogs (focus trap, Esc)
+│       ├── quizScheduler.js
+│       ├── reportCardModal.js
+│       ├── submissionTracker.js
+│       ├── tabNav.js            # Tabs with "N new" badges and keyboard support
+│       └── teamLeaderView.js    # Team leader dashboard
+├── scripts/check-syntax.js      # node --check on every JS file
+├── tests/
+│   ├── backend.test.js          # Backend tests
+│   ├── gasFakes.js              # In-memory Apps Script fakes
+│   ├── pwa.test.js              # Service worker / manifest checks
+│   └── e2e/                     # Playwright tests (npm run test:e2e)
+├── build.js                     # Syncs the site into /docs
+├── index.html
+├── manifest.webmanifest         # PWA manifest
+├── sw.js                        # Service worker (app shell only)
+├── package.json
+├── README.md
+└── SETUP_GUIDE.md
 ```
