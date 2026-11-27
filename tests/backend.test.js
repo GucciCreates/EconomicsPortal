@@ -362,3 +362,22 @@ test('leaders can reply to doubts and the student sees the reply', () => {
   assert.equal(mine[0].closedBy, 'Dr. Numan');
   assert.equal(mine[0].replies[0].message, 'Because.');
 });
+
+// ── Backups ──────────────────────────────────────────────────────────────
+
+test('installBackupTrigger installs one weekly trigger and backups keep the newest 8', () => {
+  const b = freshBackend();
+  b.api.installBackupTrigger();
+  b.api.installBackupTrigger(); // re-running replaces, not duplicates
+  assert.equal(b.triggers.list.filter((t) => t.getHandlerFunction() === 'runBackup').length, 1);
+  for (let i = 0; i < 10; i++) {
+    b.advance(7 * 24 * 60 * 60 * 1000);
+    b.api.runBackup();
+  }
+  const folder = b.drive.folders.find((f) => f.name === 'EconomicsPortal Backups');
+  const kept = folder.files.filter((f) => !f.trashed);
+  assert.equal(b.drive.folders.length, 1);
+  assert.equal(kept.length, 8);
+  const newest = Math.max(...folder.files.map((f) => f.getDateCreated().getTime()));
+  assert.ok(kept.some((f) => f.getDateCreated().getTime() === newest));
+});

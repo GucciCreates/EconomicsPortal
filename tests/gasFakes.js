@@ -118,6 +118,58 @@ class FakeSpreadsheet {
   }
 }
 
+function iterator(list) {
+  let i = 0;
+  return { hasNext: () => i < list.length, next: () => list[i++] };
+}
+
+function createFakeDrive(clock) {
+  const folders = [];
+  let seq = 0;
+  const makeFolder = (name) => {
+    const files = [];
+    const folder = {
+      name,
+      files,
+      getFiles: () => iterator(files.filter((f) => !f.trashed)),
+    };
+    folders.push(folder);
+    return folder;
+  };
+  return {
+    folders,
+    api: {
+      getFoldersByName: (name) => iterator(folders.filter((f) => f.name === name)),
+      createFolder: (name) => makeFolder(name),
+      getFileById: () => ({
+        makeCopy: (name, folder) => {
+          const created = new Date(clock() + seq++);
+          const file = { name, trashed: false, getDateCreated: () => created, setTrashed: (v) => (file.trashed = v) };
+          folder.files.push(file);
+          return file;
+        },
+      }),
+    },
+  };
+}
+
+function createFakeTriggers() {
+  const list = [];
+  const builder = (handler) => {
+    const b = { timeBased: () => b, everyWeeks: () => b, onWeekDay: () => b, atHour: () => b, create: () => list.push({ getHandlerFunction: () => handler }) };
+    return b;
+  };
+  return {
+    list,
+    api: {
+      WeekDay: { SUNDAY: 'SUNDAY' },
+      getProjectTriggers: () => list.slice(),
+      deleteTrigger: (t) => list.splice(list.indexOf(t), 1),
+      newTrigger: (handler) => builder(handler),
+    },
+  };
+}
+
 function createBackend() {
   const ss = new FakeSpreadsheet();
   const props = {};
@@ -135,6 +187,9 @@ function createBackend() {
       return now;
     }
   }
+
+  const drive = createFakeDrive(() => now);
+  const triggers = createFakeTriggers();
 
   const context = {
     console,
@@ -200,6 +255,8 @@ function createBackend() {
       formatDate: (d) => new RealDate(d).toISOString().slice(0, 10),
     },
     Session: { getScriptTimeZone: () => 'UTC' },
+    DriveApp: drive.api,
+    ScriptApp: triggers.api,
     ContentService: {
       MimeType: { JSON: 'application/json' },
       createTextOutput: (content) => ({
@@ -214,7 +271,7 @@ function createBackend() {
 
   const code = fs.readFileSync(path.join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
   const exportsList =
-    'doGet, doPost, setup, migratePins, migrateSubmissions, setPinForUser, hashPin, normalizeName';
+    'doGet, doPost, setup, migratePins, migrateSubmissions, setPinForUser, hashPin, normalizeName, installBackupTrigger, runBackup';
   const api = vm.runInContext(`${code}\n;({ ${exportsList} })`, context, {
     filename: 'Code.gs',
   });
@@ -230,6 +287,8 @@ function createBackend() {
   return {
     api,
     ss,
+    drive,
+    triggers,
     props,
     logs,
     post,
