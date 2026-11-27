@@ -10,15 +10,29 @@ const { chromium } = require('playwright');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const ORIGIN = 'http://portal.test';
 
-async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { width: 1280, height: 900 }, demo = true } = {}) {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.demo=true] - start in Demo Mode (sessionStorage flag)
+ * @param {object} [opts.backend] - a createBackend() from ../gasFakes: requests
+ *   to the Apps Script URL are answered by backend/Code.gs running in Node.
+ *   `opts.latency` (ms) is added to each such request.
+ */
+async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { width: 1280, height: 900 }, demo = true, backend = null, latency = 0 } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport });
   const errors = [];
+  const apiCalls = [];
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin !== ORIGIN) {
-      // Fonts / Chart.js CDN: let them load if reachable, otherwise ignore.
-      if (/script\.google\.com/.test(url.host)) return route.abort();
+      if (/script\.google\.com/.test(url.host)) {
+        if (!backend) return route.abort();
+        const body = JSON.parse(route.request().postData() || '{}');
+        apiCalls.push(body.action);
+        if (latency) await new Promise((r) => setTimeout(r, latency));
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(backend.post(body)) });
+      }
+      // Fonts: let them load if reachable, otherwise ignore.
       return route.continue().catch(() => route.abort());
     }
     let rel = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
@@ -35,7 +49,7 @@ async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { w
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('dialog', (d) => d.accept());
   await page.goto(`${ORIGIN}/index.html`);
-  return { browser, context, page, errors, ORIGIN };
+  return { browser, context, page, errors, apiCalls, ORIGIN };
 }
 
 module.exports = { openApp, ORIGIN };

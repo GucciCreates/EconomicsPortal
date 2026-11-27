@@ -18,9 +18,23 @@ import {
   forgetDashboards,
 } from './api.js';
 import { formatRelative, formatFull } from './dates.js';
-import { renderMemberDashboard } from './components/memberView.js';
-import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';
-import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
+// Dashboards are loaded only after sign-in, so the sign-in page stays small.
+const VIEWS = {
+  leader: () => import('./components/groupLeaderView.js').then((m) => m.renderGroupLeaderDashboard),
+  team: () => import('./components/teamLeaderView.js').then((m) => m.renderTeamLeaderDashboard),
+  member: () => import('./components/memberView.js').then((m) => m.renderMemberDashboard),
+};
+const loadedViews = {};
+function viewFor(role) {
+  if (role === 'instructor' || role === 'group_leader' || role === 'assistant') return 'leader';
+  if (role === 'team_leader') return 'team';
+  return 'member';
+}
+async function ensureView(role) {
+  const key = viewFor(role);
+  if (!loadedViews[key]) loadedViews[key] = await VIEWS[key]();
+  return loadedViews[key];
+}
 import { renderModernLogin } from './components/loginView.js';
 import { esc } from './utils.js';
 import { renderAccountMenu, openChangeMyPinModal } from './components/accountMenu.js';
@@ -241,16 +255,11 @@ function userIsBusy() {
 
 let lastRenderedJson = '';
 
-function renderDashboard(user, data) {
+async function renderDashboard(user, data) {
+  const render = await ensureView(user.role);
   const scrollY = window.scrollY;
   lastRenderedJson = JSON.stringify(data);
-  if (user.role === 'instructor' || user.role === 'group_leader' || user.role === 'assistant') {
-    renderGroupLeaderDashboard(mainEl, user, data, loadDashboard);
-  } else if (user.role === 'team_leader') {
-    renderTeamLeaderDashboard(mainEl, user, data, loadDashboard);
-  } else {
-    renderMemberDashboard(mainEl, user, data, loadDashboard);
-  }
+  render(mainEl, user, data, loadDashboard);
   if (pinUpgradeOffer) showPinUpgradeOffer(user);
   window.scrollTo(0, scrollY);
   updateSyncStatus();
@@ -302,14 +311,17 @@ async function loadDashboard() {
   // 1. Fresh data from the sign-in or write that just happened: no request.
   const fresh = takeFreshDashboard();
   if (fresh) {
-    renderDashboard(user, fresh);
+    await renderDashboard(user, fresh);
     return;
   }
 
   // 2. Show what this tab last saw straight away, then refresh behind it.
   const cached = getCachedDashboard();
-  if (cached) renderDashboard(user, cached.data);
-  else renderSkeleton(user);
+  if (cached) await renderDashboard(user, cached.data);
+  else {
+    renderSkeleton(user);
+    ensureView(user.role).catch(() => {}); // fetch the code while the data loads
+  }
 
   try {
     const res = await apiGetDashboard();
@@ -327,7 +339,7 @@ async function loadDashboard() {
       window.showEconomicsToast && window.showEconomicsToast('New data is available. It will show after you finish.', 'info');
       return;
     }
-    renderDashboard(user, res.data || {});
+    await renderDashboard(user, res.data || {});
   } catch (err) {
     const msg = navigator.onLine === false
       ? "You're offline. Reconnect to the internet to load your latest data."
