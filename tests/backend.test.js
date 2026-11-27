@@ -558,7 +558,7 @@ test('setReminders stores my own email; dashboard shows only mine', () => {
   assert.equal(b.post({ action: 'setReminders', token: t, reminders: true, email: 'not-an-email' }).code, 'VALIDATION');
   const r = b.post({ action: 'setReminders', token: t, reminders: true, email: 'ramesh@example.com' });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.data.me, { email: 'ramesh@example.com', reminders: true });
+  assert.deepEqual(r.data.me, { email: 'ramesh@example.com', reminders: true, googleEmail: '' });
   const gl = b.post({ action: 'dashboard', token: b.tokenFor('Shehroz') });
   assert.ok(!JSON.stringify(gl).includes('ramesh@example.com'), "nobody else sees Ramesh's email");
 });
@@ -606,4 +606,110 @@ test('health answers without a token', () => {
   const r = b.post({ action: 'health' });
   assert.equal(r.ok, true);
   assert.ok(r.time);
+});
+
+// ── Sign in with Google ──────────────────────────────────────────────────
+
+const CLIENT_ID = '123-test.apps.googleusercontent.com';
+function googleBackend() {
+  const b = freshBackend();
+  b.props.GOOGLE_CLIENT_ID = CLIENT_ID;
+  b.googleToken = (email, extra = {}) => {
+    const credential = `h.${Buffer.from(email + JSON.stringify(extra)).toString('base64url')}.s`;
+    b.google.tokens[credential] = {
+      iss: 'https://accounts.google.com',
+      aud: CLIENT_ID,
+      email,
+      email_verified: 'true',
+      exp: String(Math.floor(Date.now() / 1000) + 3600),
+      ...extra,
+    };
+    return credential;
+  };
+  return b;
+}
+
+test('names publishes the Google client ID only once it is set', () => {
+  const b = freshBackend();
+  assert.equal(b.post({ action: 'names' }).googleClientId, '');
+  b.props.GOOGLE_CLIENT_ID = CLIENT_ID;
+  assert.equal(b.post({ action: 'names' }).googleClientId, CLIENT_ID);
+});
+
+test('Google sign-in is refused until GOOGLE_CLIENT_ID is set', () => {
+  const b = freshBackend();
+  const res = b.post({ action: 'googleLogin', credential: 'a.b.c' });
+  assert.equal(res.ok, false);
+  assert.equal(res.code, 'NOT_CONFIGURED');
+});
+
+test('linking a Google account, then signing in with it in one request', () => {
+  const b = googleBackend();
+  const token = b.tokenFor('Ramesh');
+  const notLinked = b.post({ action: 'googleLogin', credential: b.googleToken('ramesh@gmail.com') });
+  assert.equal(notLinked.code, 'GOOGLE_NOT_LINKED');
+
+  const link = b.post({ action: 'linkGoogle', token, credential: b.googleToken('Ramesh@Gmail.com') });
+  assert.equal(link.ok, true, link.error);
+  assert.equal(link.googleEmail, 'ramesh@gmail.com');
+  assert.equal(link.data.me.googleEmail, 'ramesh@gmail.com');
+
+  const res = b.post({ action: 'googleLogin', credential: b.googleToken('ramesh@gmail.com') });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(res.user.name, 'Ramesh');
+  assert.equal(res.user.role, 'member');
+  assert.ok(res.data, 'dashboard comes back with the sign-in');
+  assert.equal(b.post({ action: 'dashboard', token: res.token }).ok, true);
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'linkGoogle' && !String(r.details).includes('@')));
+});
+
+test('an address the owner typed into googleEmail works too, case-insensitively', () => {
+  const b = googleBackend();
+  const sheet = b.ss.getSheetByName('Users');
+  const headers = sheet.data[0];
+  const row = sheet.data.findIndex((r) => r[0] === 'Shehroz');
+  sheet.data[row][headers.indexOf('googleEmail')] = ' Shehroz.Leader@Gmail.com ';
+  b.api.clearCache();
+  const res = b.post({ action: 'googleLogin', credential: b.googleToken('shehroz.leader@gmail.com') });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(res.user.name, 'Shehroz');
+});
+
+test('Google tokens for another app, unverified, expired, forged or from another issuer are refused', () => {
+  const b = googleBackend();
+  const token = b.tokenFor('Amina');
+  b.post({ action: 'linkGoogle', token, credential: b.googleToken('amina@gmail.com') });
+  const bad = [
+    b.googleToken('amina@gmail.com', { aud: 'someone-else.apps.googleusercontent.com' }),
+    b.googleToken('amina@gmail.com', { email_verified: 'false' }),
+    b.googleToken('amina@gmail.com', { exp: String(Math.floor(Date.now() / 1000) - 5) }),
+    b.googleToken('amina@gmail.com', { iss: 'evil.example.com' }),
+    'h.not-issued-by-google.s',
+    'not a token',
+  ];
+  bad.forEach((credential) => {
+    const res = b.post({ action: 'googleLogin', credential });
+    assert.equal(res.ok, false, credential);
+    assert.equal(res.code, 'GOOGLE_FAILED', credential);
+  });
+});
+
+test('one Google account cannot be linked to two people; unlinking frees it', () => {
+  const b = googleBackend();
+  const amina = b.tokenFor('Amina');
+  const ramesh = b.tokenFor('Ramesh');
+  assert.equal(b.post({ action: 'linkGoogle', token: amina, credential: b.googleToken('shared@gmail.com') }).ok, true);
+  const clash = b.post({ action: 'linkGoogle', token: ramesh, credential: b.googleToken('shared@gmail.com') });
+  assert.equal(clash.code, 'CONFLICT');
+  assert.equal(b.post({ action: 'unlinkGoogle', token: amina }).ok, true);
+  assert.equal(b.post({ action: 'googleLogin', credential: b.googleToken('shared@gmail.com') }).code, 'GOOGLE_NOT_LINKED');
+  assert.equal(b.post({ action: 'linkGoogle', token: ramesh, credential: b.googleToken('shared@gmail.com') }).ok, true);
+});
+
+test('the users list for leaders never includes Google addresses', () => {
+  const b = googleBackend();
+  b.post({ action: 'linkGoogle', token: b.tokenFor('Minal'), credential: b.googleToken('minal@gmail.com') });
+  const res = b.post({ action: 'users', token: b.tokenFor('Shehroz') });
+  assert.equal(res.ok, true);
+  assert.ok(!JSON.stringify(res).includes('minal@gmail.com'));
 });

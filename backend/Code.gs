@@ -37,7 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────────────────
-const SCHEMA_VERSION = "6";
+const SCHEMA_VERSION = "7";
 const TEAMS = ["Shehroz", "Amina", "Ayesha", "Lareb"];
 const ROLES = ["instructor", "group_leader", "assistant", "team_leader", "member"];
 const SESSION_DAYS = 7;
@@ -98,7 +98,7 @@ const SHEET_NAMES = {
 };
 
 const HEADERS = {
-  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders"],
+  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders", "googleEmail"],
   Marks:             ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
   Tasks:             ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
   Submissions:       ["id", "taskId", "member", "team", "content", "fileUrl", "gradingRequested", "requestedBy", "reviewNotes", "timestamp"],
@@ -151,6 +151,8 @@ const ACTIONS = {
   updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader"] },
   changeMyPin:            { fn: actionChangeMyPin, write: true },
   setReminders:           { fn: actionSetReminders, write: true },
+  linkGoogle:             { fn: actionLinkGoogle, write: true },
+  unlinkGoogle:           { fn: actionUnlinkGoogle, write: true },
 
   requestGrading:         { fn: actionRequestGrading, write: true, roles: ["team_leader", "group_leader"] },
   addTeamMessage:         { fn: actionAddTeamMessage, write: true, roles: ["team_leader", "group_leader"] },
@@ -202,6 +204,7 @@ function handleRequest(params) {
 
   if (action === "login") return actionLogin(ss, params);
   if (action === "names") return actionNames(ss);
+  if (action === "googleLogin") return actionGoogleLogin(ss, params);
 
   const entry = Object.prototype.hasOwnProperty.call(ACTIONS, action) ? ACTIONS[action] : null;
   if (!entry) throw apiError("Unknown action.", "BAD_REQUEST");
@@ -298,7 +301,89 @@ function actionLogin(ss, params) {
 /** Public list of first names for the login form's suggestions. No roles or teams. */
 function actionNames(ss) {
   const names = readRows(ss, SHEET_NAMES.USERS).map(u => firstName(u.name)).filter(Boolean);
-  return { ok: true, names: names.filter((n, i) => names.indexOf(n) === i).sort() };
+  // The Google client ID is public by design (it is in every Google button).
+  return { ok: true, names: names.filter((n, i) => names.indexOf(n) === i).sort(), googleClientId: googleClientId() };
+}
+
+// ── Sign in with Google ────────────────────────────────────────────────────
+// The browser gets a signed ID token from Google; we ask Google's tokeninfo
+// endpoint whether it is genuine, meant for this portal and for a verified
+// address, then look that address up in the Users tab's `googleEmail` column.
+// Free: no API key, no billing. Set the Script Property GOOGLE_CLIENT_ID.
+
+function googleClientId() {
+  return String(PropertiesService.getScriptProperties().getProperty("GOOGLE_CLIENT_ID") || "").trim();
+}
+
+/** Returns the verified Google address (lower case) for an ID token, or throws. */
+function verifyGoogleCredential(credential) {
+  const clientId = googleClientId();
+  if (!clientId) throw apiError("Google sign-in isn't set up yet. Use your name and PIN.", "NOT_CONFIGURED");
+  const failed = () => apiError("Google sign-in didn't work. Try again, or use your name and PIN.", "GOOGLE_FAILED");
+  const idToken = String(credential || "");
+  if (idToken.length > 4096 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(idToken)) throw failed();
+  let info;
+  try {
+    const res = UrlFetchApp.fetch("https://oauth2.googleapis.com/tokeninfo?id_token=" + encodeURIComponent(idToken), { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) throw failed();
+    info = JSON.parse(res.getContentText());
+  } catch (e) {
+    throw failed();
+  }
+  const issuerOk = info.iss === "accounts.google.com" || info.iss === "https://accounts.google.com";
+  const verified = info.email_verified === true || info.email_verified === "true";
+  if (!issuerOk || info.aud !== clientId || !verified || !info.email || !(Number(info.exp) * 1000 > Date.now())) throw failed();
+  return String(info.email).trim().toLowerCase();
+}
+
+function findUserByGoogleEmail(ss, email) {
+  const key = String(email || "").trim().toLowerCase();
+  if (!key) return null;
+  const rows = readRows(ss, SHEET_NAMES.USERS).filter(u => String(u.googleEmail || "").trim().toLowerCase() === key);
+  // Two people with the same address is a sheet mistake: refuse rather than guess.
+  return rows.length === 1 ? { row: rows[0]._row, user: rows[0] } : null;
+}
+
+function actionGoogleLogin(ss, params) {
+  const email = verifyGoogleCredential(params.credential);
+  const found = findUserByGoogleEmail(ss, email);
+  if (!found) {
+    throw apiError(
+      "This Google account (" + email + ") isn't linked to anyone in the class. Sign in with your name and PIN, " +
+        "then choose \"Sign in with Google\" under your name to link it.",
+      "GOOGLE_NOT_LINKED"
+    );
+  }
+  rememberDevice(found.user.name, params.device);
+  const user = found.user;
+  const session = Object.assign(publicUser(user), { exp: Date.now() + SESSION_DAYS * 86400000 });
+  return {
+    ok: true,
+    token: issueToken(user),
+    user: publicUser(user),
+    pinUpgrade: false,
+    pinMinLength: minPinLength(user.role),
+    method: "google",
+    data: buildDashboard(ss, session),
+  };
+}
+
+function actionLinkGoogle(ss, session, p) {
+  const email = verifyGoogleCredential(p.credential);
+  const other = readRows(ss, SHEET_NAMES.USERS).find(u =>
+    String(u.googleEmail || "").trim().toLowerCase() === email && normalizeName(u.name) !== normalizeName(session.name));
+  if (other) throw apiError("That Google account is already linked to someone else in the class.", "CONFLICT");
+  const found = findUser(ss, session.name);
+  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { googleEmail: email });
+  audit(ss, session, "linkGoogle", session.name, { after: { googleEmail: "linked" } });
+  return { ok: true, googleEmail: email };
+}
+
+function actionUnlinkGoogle(ss, session) {
+  const found = findUser(ss, session.name);
+  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { googleEmail: "" });
+  audit(ss, session, "unlinkGoogle", session.name, {});
+  return { ok: true };
 }
 
 /** "Ayesha (Quetta)" → "Ayesha", "Dr. Numan" → "Numan", "Ahmed bin Nasir" → "Ahmed". */
@@ -942,7 +1027,11 @@ function buildDashboard(ss, session) {
 function myPrefs(ss, session) {
   const found = findUser(ss, session.name);
   const u = found ? found.user : {};
-  return { email: String(u.email || ""), reminders: u.reminders === true || String(u.reminders).toLowerCase() === "true" };
+  return {
+    email: String(u.email || ""),
+    reminders: u.reminders === true || String(u.reminders).toLowerCase() === "true",
+    googleEmail: String(u.googleEmail || ""),
+  };
 }
 
 /** What a member may see about classmates: enough for the leaderboard, nothing more. */

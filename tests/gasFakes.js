@@ -176,6 +176,8 @@ function createBackend() {
   const cache = {};
   const logs = [];
   const mail = { sent: [], quota: 100 };
+  // Google ID tokens the fake tokeninfo endpoint accepts: { credential: claims }.
+  const google = { tokens: {}, calls: 0 };
   let now = Date.now();
 
   const RealDate = Date;
@@ -278,6 +280,17 @@ function createBackend() {
       getRemainingDailyQuota: () => mail.quota - mail.sent.length,
       sendEmail: (to, subject, body) => mail.sent.push({ to, subject, body }),
     },
+    UrlFetchApp: {
+      fetch: (url) => {
+        google.calls++;
+        const m = /^https:\/\/oauth2\.googleapis\.com\/tokeninfo\?id_token=(.*)$/.exec(String(url));
+        const claims = m && google.tokens[decodeURIComponent(m[1])];
+        return {
+          getResponseCode: () => (claims ? 200 : 400),
+          getContentText: () => JSON.stringify(claims || { error: 'invalid_token' }),
+        };
+      },
+    },
     DriveApp: drive.api,
     ScriptApp: triggers.api,
     ContentService: {
@@ -315,6 +328,7 @@ function createBackend() {
     props,
     cache,
     mail,
+    google,
     logs,
     post,
     get,
