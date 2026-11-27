@@ -1,9 +1,10 @@
 /**
- * EconomicsPortal — Header account menu: "Change my PIN", "Email reminders"
- * and "Log out".
+ * EconomicsPortal — Header account menu: "Sign in with Google" (once the
+ * owner has turned it on), "Change my PIN", "Email reminders" and "Log out".
  */
 
-import { apiChangeMyPin, apiSetReminders, getCachedDashboard } from '../api.js';
+import { apiChangeMyPin, apiLinkGoogle, apiSetReminders, apiUnlinkGoogle, getCachedDashboard } from '../api.js';
+import { cachedGoogleClientId, renderGoogleButton } from '../googleSignIn.js';
 import { getCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
 import { esc } from '../utils.js';
@@ -24,6 +25,7 @@ export function renderAccountMenu(host, user, onLogout) {
         <span aria-hidden="true">▾</span>
       </button>
       <div class="account-menu-list" id="account-menu-list" role="menu" hidden>
+        ${googleAvailable() ? '<button type="button" role="menuitem" class="account-menu-item" id="btn-google-link">Sign in with Google</button>' : ''}
         <button type="button" role="menuitem" class="account-menu-item" id="btn-change-my-pin">Change my PIN</button>
         <button type="button" role="menuitem" class="account-menu-item" id="btn-email-reminders">Email reminders</button>
         <button type="button" role="menuitem" class="account-menu-item" id="btn-logout">Log out</button>
@@ -70,6 +72,13 @@ export function renderAccountMenu(host, user, onLogout) {
     setOpen(false);
     onLogout();
   });
+  const googleItem = host.querySelector('#btn-google-link');
+  if (googleItem) {
+    googleItem.addEventListener('click', () => {
+      setOpen(false);
+      openGoogleLinkModal();
+    });
+  }
   host.querySelector('#btn-change-my-pin').addEventListener('click', () => {
     setOpen(false);
     openChangeMyPinModal();
@@ -77,6 +86,79 @@ export function renderAccountMenu(host, user, onLogout) {
   host.querySelector('#btn-email-reminders').addEventListener('click', () => {
     setOpen(false);
     openRemindersModal();
+  });
+}
+
+function googleAvailable() {
+  return !isDemoMode() && Boolean(cachedGoogleClientId());
+}
+
+/** Link (or unlink) a Google account so next time is one tap. */
+export function openGoogleLinkModal() {
+  const cached = getCachedDashboard();
+  const me = (cached && cached.data && cached.data.me) || {};
+  const linked = String(me.googleEmail || '');
+  const { dialog, close } = openModal({
+    title: 'Sign in with Google',
+    bodyHtml: linked
+      ? `
+      <p class="modal-intro">You can sign in with the Google account <strong>${esc(linked)}</strong>. Your name and PIN still work too.</p>
+      <div id="google-link-feedback" aria-live="polite"></div>
+      <div class="modal-btn-row">
+        <button type="button" class="btn btn-secondary" data-modal-close>Close</button>
+        <button type="button" class="btn btn-danger" id="btn-unlink-google">Stop using Google</button>
+      </div>`
+      : `
+      <p class="modal-intro">
+        Choose your Google account below. After that, the Google button on the sign-in page signs you in with one tap,
+        with no PIN to type. Your name and PIN keep working as a backup.
+      </p>
+      <div id="google-link-feedback" aria-live="polite"></div>
+      <div class="google-btn-host google-link-status" id="google-link-host"></div>
+      <div class="modal-btn-row">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancel</button>
+      </div>`,
+  });
+  const feedback = dialog.querySelector('#google-link-feedback');
+  const showError = (msg) => (feedback.innerHTML = `<div class="alert alert-error" role="alert">${esc(msg)}</div>`);
+
+  if (linked) {
+    const btn = dialog.querySelector('#btn-unlink-google');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const res = await apiUnlinkGoogle();
+        if (res.ok) {
+          close();
+          window.showEconomicsToast('Google sign-in turned off for your account.', 'success');
+        } else if (res.code !== 'AUTH') showError(res.error || 'Could not save.');
+      } catch (err) {
+        showError("Can't reach the class server. Try again in a moment.");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    return;
+  }
+
+  renderGoogleButton(
+    dialog.querySelector('#google-link-host'),
+    cachedGoogleClientId(),
+    async (credential) => {
+      feedback.innerHTML = '<div class="alert alert-info" role="status">Linking your Google account…</div>';
+      try {
+        const res = await apiLinkGoogle(credential);
+        if (res.ok) {
+          close();
+          window.showEconomicsToast(`Done. Next time, sign in with Google as ${res.googleEmail}.`, 'success');
+        } else if (res.code !== 'AUTH') showError(res.error || 'Could not link that account.');
+      } catch (err) {
+        showError("Can't reach the class server. Try again in a moment.");
+      }
+    },
+    { text: 'continue_with' },
+  ).then((ok) => {
+    if (!ok) showError("Google's sign-in button couldn't load. Check your connection or turn off any blocker for accounts.google.com.");
   });
 }
 

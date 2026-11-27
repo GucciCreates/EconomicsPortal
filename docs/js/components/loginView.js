@@ -6,11 +6,15 @@
  *   "Did you mean …?".
  * - PINs are 4 to 8 digits.
  * - Signing in is one request: the response carries the dashboard.
+ * - "Sign in with Google" appears above the PIN form once the owner sets
+ *   GOOGLE_CLIENT_ID on the server (never in Demo Mode). It is also one
+ *   request: the response carries the dashboard.
  * - If the class server can't be reached, the screen says so and offers
  *   Retry. It never switches to Demo Mode on its own.
  */
 
-import { apiLogin, apiNames, acceptLoginDashboard } from '../api.js';
+import { apiLogin, apiGoogleLogin, apiNames, acceptLoginDashboard } from '../api.js';
+import { cachedGoogleClientId, rememberGoogleClientId, renderGoogleButton } from '../googleSignIn.js';
 import { setCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
 import { esc, escapeHtml } from '../utils.js';
@@ -43,7 +47,7 @@ export function renderModernLogin(container, onSuccess, options = {}) {
 
       <div class="auth-card">
         <h2 class="auth-card-title">Sign in</h2>
-        <p class="auth-card-sub">Use your full name and the 4-digit PIN your group leader gave you.</p>
+        <p class="auth-card-sub" id="auth-card-sub">Use your full name and the PIN your group leader gave you.</p>
 
         <div id="login-error-box">${
           options.notice
@@ -61,6 +65,11 @@ export function renderModernLogin(container, onSuccess, options = {}) {
             <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh <small>student</small></button>
           </div>
         </div>` : ''}
+
+        <div class="google-signin" id="google-signin" hidden>
+          <div class="google-btn-host" id="google-btn-host"></div>
+          <p class="auth-divider"><span>or use your name and PIN</span></p>
+        </div>
 
         <form id="form-login" class="auth-form">
           <div class="form-group">
@@ -126,15 +135,72 @@ export function renderModernLogin(container, onSuccess, options = {}) {
   const togglePinBtn = container.querySelector('#btn-toggle-pin-visibility');
   const rememberChk = container.querySelector('#chk-remember');
 
-  // First-name suggestions. Best effort: the form works without them.
+  // ── Sign in with Google (only when the server has a client ID) ──────────
+  const googleBox = container.querySelector('#google-signin');
+  const googleHost = container.querySelector('#google-btn-host');
+  let googleShownFor = '';
+  async function showGoogle(clientId) {
+    if (isDemoMode() || !clientId || clientId === googleShownFor) return;
+    googleShownFor = clientId;
+    googleBox.hidden = false;
+    const ok = await renderGoogleButton(googleHost, clientId, signInWithGoogle);
+    if (!ok) {
+      // Google's script is blocked or offline: the PIN form still works.
+      googleBox.hidden = true;
+      googleShownFor = '';
+      return;
+    }
+    container.querySelector('#auth-card-sub').textContent = 'Use your Google account, or your full name and PIN.';
+  }
+  function hideGoogle() {
+    googleBox.hidden = true;
+    googleHost.replaceChildren();
+    googleShownFor = '';
+    container.querySelector('#auth-card-sub').textContent = 'Use your full name and the PIN your group leader gave you.';
+  }
+  if (!isDemoMode()) showGoogle(cachedGoogleClientId());
+
+  async function signInWithGoogle(credential) {
+    errorBox.innerHTML = `<div class="alert alert-info" role="status"><span class="auth-spinner" aria-hidden="true"></span> Signing in with Google…</div>`;
+    try {
+      const res = await apiGoogleLogin(credential);
+      if (res.ok && res.user) return finishSignIn(res);
+      if (res.code === 'NOT_CONFIGURED') {
+        rememberGoogleClientId('');
+        hideGoogle();
+      }
+      errorBox.innerHTML = `<div class="alert ${res.code === 'GOOGLE_NOT_LINKED' ? 'alert-info' : 'alert-error'}" role="alert">${esc(
+        res.error || "Google sign-in didn't work. Use your name and PIN.",
+      )}</div>`;
+    } catch (err) {
+      errorBox.innerHTML = `<div class="alert alert-error auth-error-alert" role="alert"><strong>Can't reach the class server right now.</strong>
+        <p class="alert-text">Wait a moment, then press the Google button again.</p></div>`;
+    }
+  }
+
+  // First-name suggestions (and the Google client ID). Best effort: the form works without them.
   apiNames()
     .then((res) => {
       if (!res || !res.ok || !Array.isArray(res.names)) return;
       container.querySelector('#login-name-options').innerHTML = res.names
         .map((n) => `<option value="${escapeHtml(n)}"></option>`)
         .join('');
+      if (isDemoMode()) return;
+      const clientId = String(res.googleClientId || '');
+      if (clientId !== cachedGoogleClientId()) rememberGoogleClientId(clientId);
+      if (clientId) showGoogle(clientId);
+      else hideGoogle();
     })
     .catch(() => {});
+
+  function finishSignIn(res) {
+    setCurrentUser(res.user);
+    acceptLoginDashboard(res);
+    try {
+      sessionStorage.removeItem(`economics_portal_tab:${res.user.name}`); // start each login on the first tab
+    } catch (e) {}
+    onSuccess(res);
+  }
 
   container.querySelectorAll('.quick-login-chip').forEach((button) => {
     button.addEventListener('click', () => {
@@ -181,12 +247,7 @@ export function renderModernLogin(container, onSuccess, options = {}) {
     try {
       const res = await apiLogin(name, pin);
       if (res.ok && res.user) {
-        setCurrentUser(res.user);
-        acceptLoginDashboard(res);
-        try {
-          sessionStorage.removeItem(`economics_portal_tab:${res.user.name}`); // start each login on the first tab
-        } catch (e) {}
-        onSuccess(res);
+        finishSignIn(res);
       } else if (res.code === 'DID_YOU_MEAN' && res.suggestion) {
         errorBox.innerHTML = `
           <div class="alert alert-info" role="status">

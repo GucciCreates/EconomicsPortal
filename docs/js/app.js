@@ -37,7 +37,8 @@ async function ensureView(role) {
 }
 import { renderModernLogin } from './components/loginView.js';
 import { esc } from './utils.js';
-import { renderAccountMenu, openChangeMyPinModal } from './components/accountMenu.js';
+import { renderAccountMenu, openChangeMyPinModal, openGoogleLinkModal } from './components/accountMenu.js';
+import { cachedGoogleClientId } from './googleSignIn.js';
 import { enhanceModal } from './components/modal.js';
 
 // DOM Root Elements
@@ -193,12 +194,17 @@ setInterval(updateSyncStatus, 30 * 1000);
 // LOGIN VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 let pinUpgradeOffer = null; // set right after a sign-in with a short PIN
+let googleOffer = false; // set right after a PIN sign-in when Google sign-in is on but not linked
 
 function renderLogin(notice = '') {
   renderModernLogin(
     mainEl,
     (res) => {
       pinUpgradeOffer = res && res.pinUpgrade ? { minLength: res.pinMinLength || 4 } : null;
+      googleOffer = Boolean(
+        res && res.method !== 'google' && !isDemoMode() && cachedGoogleClientId() &&
+          !(res.data && res.data.me && res.data.me.googleEmail),
+      );
       refreshApp();
     },
     { notice },
@@ -261,6 +267,7 @@ async function renderDashboard(user, data) {
   lastRenderedJson = JSON.stringify(data);
   render(mainEl, user, data, loadDashboard);
   if (pinUpgradeOffer) showPinUpgradeOffer(user);
+  else if (googleOffer) showGoogleOffer(user);
   window.scrollTo(0, scrollY);
   updateSyncStatus();
 }
@@ -298,6 +305,35 @@ function showPinUpgradeOffer(user) {
     if (!btn) return;
     box.remove();
     if (btn.dataset.pinOffer === 'change') openChangeMyPinModal();
+  });
+}
+
+/** One-time suggestion to link Google after a PIN sign-in. */
+function showGoogleOffer(user) {
+  googleOffer = false;
+  const key = 'economics_portal_google_offer_v1:' + String(user.name).toLowerCase();
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch (e) {
+    /* show it anyway */
+  }
+  const box = document.createElement('div');
+  box.className = 'alert alert-info pin-offer';
+  box.setAttribute('role', 'status');
+  box.innerHTML = `
+    <strong>Skip the PIN next time.</strong>
+    Link your Google account and sign in with one tap.
+    <div class="btn-row">
+      <button type="button" class="btn btn-primary btn-sm" data-google-offer="link">Use Google to sign in</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-google-offer="later">Not now</button>
+    </div>`;
+  mainEl.prepend(box);
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-google-offer]');
+    if (!btn) return;
+    box.remove();
+    if (btn.dataset.googleOffer === 'link') openGoogleLinkModal();
   });
 }
 

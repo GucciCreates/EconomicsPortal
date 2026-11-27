@@ -153,3 +153,71 @@ test('every tab of every role fits a 390px phone screen', { timeout: 240000 }, a
     await browser.close();
   }
 });
+
+test('Google sign-in: link once after a PIN sign-in, then one tap and one request', { timeout: 120000 }, async () => {
+  const backend = liveBackend();
+  const CLIENT = '123-e2e.apps.googleusercontent.com';
+  backend.props.GOOGLE_CLIENT_ID = CLIENT;
+  const credential = 'h.ramesh-e2e.s';
+  backend.google.tokens[credential] = {
+    iss: 'accounts.google.com',
+    aud: CLIENT,
+    email: 'ramesh@gmail.com',
+    email_verified: true,
+    exp: String(Math.floor(Date.now() / 1000) + 3600),
+  };
+  const { browser, page, errors, apiCalls } = await openApp({ demo: false, backend, fakeGoogle: true, viewport: { width: 390, height: 844 } });
+  try {
+    await page.waitForSelector('#google-signin:not([hidden]) .fake-gsi-button');
+    await page.evaluate((c) => (window.__fakeCredential = c), credential);
+
+    // Not linked yet: a clear message, and the PIN form still works.
+    await page.click('.fake-gsi-button');
+    await page.waitForSelector('#login-error-box .alert');
+    assert.match(await page.textContent('#login-error-box'), /isn't linked to anyone/);
+
+    await page.fill('#login-name', 'Ramesh');
+    await page.fill('#login-pin', '1357');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('.tab-nav');
+    // A 4-digit PIN shows the PIN note first; link from the account menu instead.
+    await page.click('#btn-account-menu');
+    await page.click('#btn-google-link');
+    await page.waitForSelector('#google-link-host .fake-gsi-button');
+    await page.click('#google-link-host .fake-gsi-button');
+    await page.waitForSelector('.toast:has-text("Next time, sign in with Google")');
+
+    await page.click('#btn-account-menu');
+    await page.click('#btn-logout');
+    await page.waitForSelector('#google-signin:not([hidden]) .fake-gsi-button');
+    await page.evaluate((c) => (window.__fakeCredential = c), credential);
+    apiCalls.length = 0;
+    await page.click('.fake-gsi-button');
+    await page.waitForSelector('.tab-nav');
+    assert.deepEqual(apiCalls.filter((a) => a !== 'names'), ['googleLogin'], 'one request signs in and loads the dashboard');
+    assert.match(await page.textContent('#btn-account-menu'), /Ramesh/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= 390), true, 'no sideways scroll at 390 px');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('the Google button stays hidden in Demo Mode and when the server has no client ID', { timeout: 60000 }, async () => {
+  const backend = liveBackend();
+  const live = await openApp({ demo: false, backend, fakeGoogle: true });
+  try {
+    await live.page.waitForFunction(() => document.querySelectorAll('#login-name-options option').length > 10);
+    assert.equal(await live.page.isVisible('#google-signin'), false);
+  } finally {
+    await live.browser.close();
+  }
+  const demo = await openApp({ demo: true, fakeGoogle: true });
+  try {
+    await demo.page.waitForSelector('.quick-login-chip');
+    await demo.page.waitForTimeout(300);
+    assert.equal(await demo.page.isVisible('#google-signin'), false);
+  } finally {
+    await demo.browser.close();
+  }
+});

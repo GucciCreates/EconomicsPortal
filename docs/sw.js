@@ -10,7 +10,7 @@
  * Bump CACHE_VERSION on each release (keep it in step with index.html ?v=).
  */
 
-const CACHE_VERSION = 'v6.0.0';
+const CACHE_VERSION = 'v6.1.0';
 const CACHE_NAME = `economics-portal-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -26,6 +26,7 @@ const APP_SHELL = [
   './js/api.js',
   './js/app.js',
   './js/auth.js',
+  './js/googleSignIn.js',
   './js/components/accountMenu.js',
   './js/components/activityLog.js',
   './js/components/announcementsPanel.js',

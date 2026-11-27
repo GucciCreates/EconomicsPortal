@@ -10,6 +10,20 @@ const { chromium } = require('playwright');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const ORIGIN = 'http://portal.test';
 
+const FAKE_GSI = `
+window.google = { accounts: { id: {
+  initialize(o) { window.__gsiOptions = o; },
+  renderButton(el) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'fake-gsi-button';
+    b.textContent = 'Sign in with Google';
+    b.onclick = () => window.__gsiOptions.callback({ credential: window.__fakeCredential || 'x.y.z' });
+    el.appendChild(b);
+  },
+  disableAutoSelect() {},
+} } };`;
+
 /**
  * @param {object} [opts]
  * @param {boolean} [opts.demo=true] - start in Demo Mode (sessionStorage flag)
@@ -17,7 +31,7 @@ const ORIGIN = 'http://portal.test';
  *   to the Apps Script URL are answered by backend/Code.gs running in Node.
  *   `opts.latency` (ms) is added to each such request.
  */
-async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { width: 1280, height: 900 }, demo = true, backend = null, latency = 0 } = {}) {
+async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { width: 1280, height: 900 }, demo = true, backend = null, latency = 0, fakeGoogle = false } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport });
   const errors = [];
@@ -25,6 +39,10 @@ async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { w
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin !== ORIGIN) {
+      if (fakeGoogle && url.href === 'https://accounts.google.com/gsi/client') {
+        // Stand-in for Google's button: clicking it hands back window.__fakeCredential.
+        return route.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_GSI });
+      }
       if (/script\.google\.com/.test(url.host)) {
         if (!backend) return route.abort();
         const body = JSON.parse(route.request().postData() || '{}');
