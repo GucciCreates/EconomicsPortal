@@ -1,17 +1,25 @@
 /**
- * EconomicsPortal — Backend (Google Apps Script) v4
+ * EconomicsPortal — Backend (Google Apps Script) v6
  * Account to use: bahriabatch30@gmail.com
  * Repo:           https://github.com/GucciCreates/EconomicsPortal
  *
- * v4 security model
- * ─────────────────
+ * Security model
+ * ──────────────
  * - `login` checks name + PIN and returns a signed session token
- *   (HMAC-SHA256, secret kept in Script Properties, 7-day expiry).
+ *   (HMAC-SHA256, secret kept in Script Properties) plus the dashboard, so
+ *   signing in is one request. Tokens last 7 days and are renewed
+ *   automatically while in use (sliding renewal).
  * - Every other action must carry that token. The caller's name, role and
  *   team are always read from the Users sheet, never from the request.
  * - PINs are stored as salted SHA-256 hashes and never returned.
  * - Changing a PIN invalidates every token issued before the change.
- * - Failed logins are rate-limited per name (5 tries, then a 15-minute lock).
+ * - PINs are 4–8 digits; instructor, group leader and assistant need 6+
+ *   when they choose a new one.
+ * - Failed logins are slowed per name with escalating locks (1, 5, 15, 60
+ *   minutes). A device that has signed in before keeps its own counter, so
+ *   someone guessing from another device cannot lock the owner out.
+ * - Sheet reads are cached (CacheService) behind per-table data versions;
+ *   every write bumps the version of the tables it touched.
  * - Every write is validated, done under a script lock, and recorded in the
  *   AuditLog sheet.
  *
@@ -22,17 +30,29 @@
  *   resetAllPins()        — new random PIN for everyone (do this when upgrading)
  *   setPinForUser(name, pin) — set someone's PIN from the editor
  *   installBackupTrigger() — weekly spreadsheet backup to Drive (keeps 8)
+ *   installEmailTriggers() — daily deadline reminders + Monday summary
+ *   clearCache()          — forget cached sheet data (after editing the sheet by hand)
  */
 
 // ─────────────────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────────────────
-const SCHEMA_VERSION = "4";
+const SCHEMA_VERSION = "6";
 const TEAMS = ["Shehroz", "Amina", "Ayesha", "Lareb"];
 const ROLES = ["instructor", "group_leader", "assistant", "team_leader", "member"];
 const SESSION_DAYS = 7;
-const LOGIN_MAX_FAILS = 5;
-const LOGIN_LOCK_SECONDS = 15 * 60;
+const SESSION_RENEW_DAYS = 2;            // renew tokens in their last 2 days
+const PIN_MIN = 4;
+const PIN_MAX = 8;
+const LEADER_PIN_MIN = 6;
+const NEW_PIN_LENGTH = 6;                // resets and new users get 6 digits
+const LOGIN_MAX_FAILS = 5;               // failures before each lock
+const LOCK_STEPS_SECONDS = [60, 5 * 60, 15 * 60, 60 * 60];
+const LOCK_STATE_SECONDS = 6 * 60 * 60;  // CacheService maximum
+const KNOWN_DEVICES_PER_USER = 5;
+const CACHE_SECONDS = 30 * 60;           // cached sheet data lives 30 minutes
+const CACHE_CHUNK = 90 * 1000;           // stay under CacheService's 100 KB per value
+const EMAIL_MIN_QUOTA = 5;               // keep a few sends spare for lock alerts
 const MAX_TITLE = 200;
 const MAX_BODY = 5000;
 const MAX_SHORT = 100;
@@ -78,7 +98,7 @@ const SHEET_NAMES = {
 };
 
 const HEADERS = {
-  Users:             ["name", "role", "team", "pinHash", "salt"],
+  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders"],
   Marks:             ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
   Tasks:             ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
   Submissions:       ["id", "taskId", "member", "team", "content", "fileUrl", "gradingRequested", "requestedBy", "reviewNotes", "timestamp"],
@@ -93,6 +113,7 @@ const HEADERS = {
 };
 
 const LEADERS = ["group_leader", "instructor"];
+const LONG_PIN_ROLES = ["instructor", "group_leader", "assistant"];
 const MARK_EDITORS = ["group_leader", "instructor", "assistant"];
 const MARK_FIELDS = ["cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes"];
 const TASK_FIELDS = ["title", "description", "team", "dueDate", "fileUrl"];
@@ -129,6 +150,7 @@ const ACTIONS = {
 
   updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader"] },
   changeMyPin:            { fn: actionChangeMyPin, write: true },
+  setReminders:           { fn: actionSetReminders, write: true },
 
   requestGrading:         { fn: actionRequestGrading, write: true, roles: ["team_leader", "group_leader"] },
   addTeamMessage:         { fn: actionAddTeamMessage, write: true, roles: ["team_leader", "group_leader"] },
@@ -156,6 +178,11 @@ function doPost(e) {
 }
 
 function handleSafely(params) {
+  // Per-request state (Apps Script starts each request fresh, but be explicit).
+  _inWrite = false;
+  _versions = null;
+  _memo = {};
+  _touched = {};
   try {
     return handleRequest(params);
   } catch (err) {
@@ -166,12 +193,15 @@ function handleSafely(params) {
 
 function handleRequest(params) {
   const action = String(params.action || "");
-  if (action === "ping") return { ok: true, version: SCHEMA_VERSION };
+  if (action === "ping" || action === "health") {
+    return { ok: true, version: SCHEMA_VERSION, time: new Date().toISOString() };
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSchema(ss);
 
   if (action === "login") return actionLogin(ss, params);
+  if (action === "names") return actionNames(ss);
 
   const entry = Object.prototype.hasOwnProperty.call(ACTIONS, action) ? ACTIONS[action] : null;
   if (!entry) throw apiError("Unknown action.", "BAD_REQUEST");
@@ -181,15 +211,34 @@ function handleRequest(params) {
     throw apiError("You are not allowed to do this.", "FORBIDDEN");
   }
 
-  if (!entry.write) return entry.fn(ss, session, params);
-
-  const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
-  try {
-    return entry.fn(ss, session, params);
-  } finally {
-    lock.releaseLock();
+  let result;
+  if (!entry.write) {
+    result = entry.fn(ss, session, params);
+  } else {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(15000);
+    try {
+      _inWrite = true;
+      result = entry.fn(ss, session, params);
+    } finally {
+      _inWrite = false;
+      bumpDataVersions();
+      lock.releaseLock();
+    }
+    // One request per action: send back the updated dashboard so the page
+    // doesn't have to ask for it again.
+    if (result && result.ok && params.withDashboard !== false) {
+      result.data = buildDashboard(ss, session);
+    }
   }
+
+  // Sliding renewal: a token in its last days gets replaced by a fresh one.
+  if (result && result.ok && !result.token &&
+      session.exp - Date.now() < SESSION_RENEW_DAYS * 24 * 60 * 60 * 1000) {
+    const me = findUser(ss, session.name);
+    if (me) result.token = issueToken(me.user);
+  }
+  return result;
 }
 
 function apiError(message, code) {
@@ -210,33 +259,160 @@ function actionLogin(ss, params) {
   const name = String(params.name || "").trim();
   const pin = String(params.pin || "").trim();
   const key = normalizeName(name);
-  if (!key || !/^\d{4}$/.test(pin)) {
-    throw apiError("Enter your full name and your 4-digit PIN.", "VALIDATION");
+  if (!key || !isPinFormat(pin)) {
+    throw apiError("Enter your name and your PIN (4 to 8 digits).", "VALIDATION");
   }
 
-  const cache = CacheService.getScriptCache();
-  if (cache.get("lock:" + key)) {
-    throw apiError("Too many failed attempts for this name. Try again in 15 minutes.", "LOCKED");
+  let found = findUser(ss, name);
+  if (!found) {
+    // "Ayesha" → "Did you mean Ayesha (Quetta)?" No PIN check, no failure counted.
+    const matches = readRows(ss, SHEET_NAMES.USERS).filter(u => firstName(u.name) && normalizeName(firstName(u.name)) === key);
+    if (matches.length === 1) {
+      return { ok: false, code: "DID_YOU_MEAN", suggestion: String(matches[0].name), error: "Did you mean " + matches[0].name + "?" };
+    }
   }
 
-  const found = findUser(ss, name);
+  const bucket = lockBucket(key, found ? found.user.name : name, params.device);
+  checkLock(bucket);
+
   if (!found || !found.user.pinHash || !verifyPin(found.user, pin)) {
-    recordLoginFailure(cache, key);
-    throw apiError("Invalid name or PIN.", "LOGIN_FAILED");
+    recordLoginFailure(ss, bucket, found ? found.user : null);
+    throw apiError("That name and PIN don't match.", "LOGIN_FAILED");
   }
 
-  cache.remove("fail:" + key);
-  return { ok: true, token: issueToken(found.user), user: publicUser(found.user) };
+  clearLoginFailures(bucket);
+  rememberDevice(found.user.name, params.device);
+  const user = found.user;
+  const session = Object.assign(publicUser(user), { exp: Date.now() + SESSION_DAYS * 86400000 });
+  return {
+    ok: true,
+    token: issueToken(user),
+    user: publicUser(user),
+    // The PIN is only known here, so this is where we can tell it is short.
+    pinUpgrade: pin.length < LEADER_PIN_MIN,
+    pinMinLength: minPinLength(user.role),
+    data: buildDashboard(ss, session),
+  };
 }
 
-function recordLoginFailure(cache, key) {
-  const fails = Number(cache.get("fail:" + key) || 0) + 1;
-  if (fails >= LOGIN_MAX_FAILS) {
-    cache.put("lock:" + key, "1", LOGIN_LOCK_SECONDS);
-    cache.remove("fail:" + key);
-    throw apiError("Too many failed attempts for this name. Try again in 15 minutes.", "LOCKED");
+/** Public list of first names for the login form's suggestions. No roles or teams. */
+function actionNames(ss) {
+  const names = readRows(ss, SHEET_NAMES.USERS).map(u => firstName(u.name)).filter(Boolean);
+  return { ok: true, names: names.filter((n, i) => names.indexOf(n) === i).sort() };
+}
+
+/** "Ayesha (Quetta)" → "Ayesha", "Dr. Numan" → "Numan", "Ahmed bin Nasir" → "Ahmed". */
+function firstName(full) {
+  const words = String(full || "").replace(/\(.*?\)/g, " ").trim().split(/\s+/).filter(Boolean);
+  const word = words.find(w => !/\.$/.test(w)) || words[0] || "";
+  return word;
+}
+
+// ── Login rate limiting ────────────────────────────────────────────────────
+// State per bucket (in CacheService): { n: fails since last lock, level, until }.
+// A bucket is "name + device" for a device that has signed in as that person
+// before, otherwise "name + unknown". Guessing from a new device can only lock
+// the unknown bucket; the real person's own phone keeps working.
+
+function lockBucket(key, displayName, device) {
+  const d = deviceHash(device);
+  const known = d && knownDevices(displayName).indexOf(d) !== -1;
+  return { key: "login:" + key + ":" + (known ? d : "unknown"), name: String(displayName), nameKey: key };
+}
+
+function checkLock(bucket) {
+  const state = readLockState(bucket);
+  if (state.until && state.until > Date.now()) {
+    const mins = Math.max(1, Math.ceil((state.until - Date.now()) / 60000));
+    throw apiError("Too many wrong PINs. Try again in " + mins + (mins === 1 ? " minute." : " minutes."), "LOCKED");
   }
-  cache.put("fail:" + key, String(fails), LOGIN_LOCK_SECONDS);
+}
+
+function readLockState(bucket) {
+  try {
+    return JSON.parse(CacheService.getScriptCache().get(bucket.key) || "{}") || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function recordLoginFailure(ss, bucket, user) {
+  const cache = CacheService.getScriptCache();
+  const state = readLockState(bucket);
+  state.n = Number(state.n || 0) + 1;
+  if (state.n >= LOGIN_MAX_FAILS) {
+    state.level = Math.min(LOCK_STEPS_SECONDS.length, Number(state.level || 0) + 1);
+    const seconds = LOCK_STEPS_SECONDS[state.level - 1];
+    state.until = Date.now() + seconds * 1000;
+    state.n = 0;
+    cache.put(bucket.key, JSON.stringify(state), LOCK_STATE_SECONDS);
+    auditSystem(ss, "loginLocked", bucket.name, { minutes: seconds / 60, level: state.level, device: /:unknown$/.test(bucket.key) ? "unknown" : "known" });
+    if (user && LONG_PIN_ROLES.indexOf(String(user.role)) !== -1) notifyOwnerOfLock(String(user.name), seconds / 60);
+    const mins = seconds / 60;
+    throw apiError("Too many wrong PINs. Try again in " + mins + (mins === 1 ? " minute." : " minutes."), "LOCKED");
+  }
+  cache.put(bucket.key, JSON.stringify(state), LOCK_STATE_SECONDS);
+}
+
+function clearLoginFailures(bucket) {
+  CacheService.getScriptCache().remove(bucket.key);
+}
+
+function deviceHash(device) {
+  const d = String(device || "");
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(d)) return "";
+  return sign("device:" + d).slice(0, 16);
+}
+
+function knownDevices(name) {
+  try {
+    return JSON.parse(PropertiesService.getScriptProperties().getProperty("DEV_" + normalizeName(name).replace(/ /g, "_")) || "[]");
+  } catch (e) {
+    return [];
+  }
+}
+
+function rememberDevice(name, device) {
+  const d = deviceHash(device);
+  if (!d) return;
+  const list = knownDevices(name).filter(x => x !== d);
+  list.unshift(d);
+  PropertiesService.getScriptProperties().setProperty(
+    "DEV_" + normalizeName(name).replace(/ /g, "_"),
+    JSON.stringify(list.slice(0, KNOWN_DEVICES_PER_USER))
+  );
+}
+
+/** At most one email per name per day. */
+function notifyOwnerOfLock(name, minutes) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    const key = "LOCKMAIL_" + normalizeName(name).replace(/ /g, "_");
+    if (props.getProperty(key) === today) return;
+    const to = ownerEmail();
+    if (!to || MailApp.getRemainingDailyQuota() < 1) return;
+    MailApp.sendEmail(
+      to,
+      "EconomicsPortal: " + name + "'s account was locked",
+      "Someone entered a wrong PIN for " + name + " " + LOGIN_MAX_FAILS + " times, so sign-in for that name is paused for " +
+        minutes + " minute(s).\n\nIf this wasn't " + name + ", consider resetting their PIN from Member Access & PINs.\n" +
+        "Devices that have signed in as " + name + " before are not affected.\n\nThe AuditLog tab has the details."
+    );
+    props.setProperty(key, today);
+  } catch (e) {
+    // Email is best-effort; a failure here must never break login.
+  }
+}
+
+function ownerEmail() {
+  const p = PropertiesService.getScriptProperties().getProperty("OWNER_EMAIL");
+  if (p) return p;
+  try {
+    return Session.getEffectiveUser().getEmail();
+  } catch (e) {
+    return "";
+  }
 }
 
 let _secretCache = null;
@@ -291,7 +467,7 @@ function requireSession(ss, token) {
   if (!safeEqual(pinFingerprint(found.user.pinHash), String(payload.f || ""))) throw expired();
   if (ROLES.indexOf(found.user.role) === -1) throw expired();
 
-  return { name: String(found.user.name), role: String(found.user.role), team: String(found.user.team) };
+  return { name: String(found.user.name), role: String(found.user.role), team: String(found.user.team), exp: payload.exp };
 }
 
 function hashPin(pin, salt) {
@@ -336,9 +512,26 @@ function publicUser(u) {
   return { name: String(u.name), role: String(u.role), team: String(u.team) };
 }
 
-function randomPin() {
-  const hex = Utilities.getUuid().replace(/-/g, "").slice(0, 8);
-  return String(parseInt(hex, 16) % 10000).padStart(4, "0");
+function randomPin(length) {
+  const len = length || NEW_PIN_LENGTH;
+  const hex = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
+  return String(parseInt(hex, 16) % Math.pow(10, len)).padStart(len, "0");
+}
+
+function isPinFormat(pin) {
+  return new RegExp("^\\d{" + PIN_MIN + "," + PIN_MAX + "}$").test(String(pin));
+}
+
+function minPinLength(role) {
+  return LONG_PIN_ROLES.indexOf(String(role)) !== -1 ? LEADER_PIN_MIN : PIN_MIN;
+}
+
+/** Throws unless `pin` is a valid new PIN for someone with `role`. */
+function checkNewPin(pin, role, label) {
+  const min = minPinLength(role);
+  if (!isPinFormat(pin) || String(pin).length < min) {
+    throw apiError((label || "PIN") + " must be " + min + " to " + PIN_MAX + " digits.", "VALIDATION");
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -347,7 +540,9 @@ function randomPin() {
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   PropertiesService.getScriptProperties().deleteProperty("SCHEMA_VERSION");
+  CacheService.getScriptCache().remove("SCHEMA_OK");
   ensureSchema(ss);
+  clearCache();
 
   const usersSheet = ss.getSheetByName(SHEET_NAMES.USERS);
   if (usersSheet.getLastRow() <= 1) {
@@ -364,15 +559,20 @@ function setup() {
 }
 
 function ensureSchema(ss) {
+  // Checked on every request, so look in the fast cache first.
+  const cache = CacheService.getScriptCache();
+  if (cache.get("SCHEMA_OK") === SCHEMA_VERSION) return;
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty("SCHEMA_VERSION") === SCHEMA_VERSION) return;
-
-  migratePinsIn(ss);
-  Object.keys(SHEET_NAMES).forEach(key => {
-    const sheet = getOrInitSheet(ss, SHEET_NAMES[key]);
-    ensureHeaders(sheet, HEADERS[SHEET_NAMES[key]]);
-  });
-  props.setProperty("SCHEMA_VERSION", SCHEMA_VERSION);
+  if (props.getProperty("SCHEMA_VERSION") !== SCHEMA_VERSION) {
+    migratePinsIn(ss);
+    Object.keys(SHEET_NAMES).forEach(key => {
+      const sheet = getOrInitSheet(ss, SHEET_NAMES[key]);
+      ensureHeaders(sheet, HEADERS[SHEET_NAMES[key]]);
+    });
+    props.setProperty("SCHEMA_VERSION", SCHEMA_VERSION);
+    bumpDataVersions(Object.keys(SHEET_NAMES).map(k => SHEET_NAMES[k]));
+  }
+  cache.put("SCHEMA_OK", SCHEMA_VERSION, LOCK_STATE_SECONDS);
 }
 
 function ensureHeaders(sheet, headers) {
@@ -434,6 +634,7 @@ function migratePinsIn(ss) {
  */
 function migrateSubmissions() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  bumpDataVersions([SHEET_NAMES.SUBMISSIONS]);
   const t = readTable(ss, SHEET_NAMES.SUBMISSIONS);
   const gCol = t.headers.indexOf("gradingRequested");
   const tsCol = t.headers.indexOf("timestamp");
@@ -463,17 +664,28 @@ function resetAllPins() {
     writePin(ss, u.name, pin);
     lines.push(u.name + " → " + pin);
   });
+  bumpDataVersions([SHEET_NAMES.USERS]);
   Logger.log("New PINs (hand them out privately — they are not stored anywhere in plain text):\n" + lines.join("\n"));
   return lines.length;
 }
 
-/** Set a PIN from the editor, e.g. setPinForUser("Shehroz", "4821"). */
+/** Set a PIN from the editor, e.g. setPinForUser("Shehroz", "482193"). 4–8 digits. */
 function setPinForUser(name, pin) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSchema(ss);
-  if (!/^\d{4}$/.test(String(pin))) throw new Error("PIN must be exactly 4 digits.");
+  if (!isPinFormat(pin)) throw new Error("PIN must be " + PIN_MIN + " to " + PIN_MAX + " digits.");
   writePin(ss, name, String(pin));
+  bumpDataVersions([SHEET_NAMES.USERS]);
   Logger.log("PIN updated for " + name + ".");
+}
+
+/**
+ * Forget all cached sheet data. Run this after editing the spreadsheet by
+ * hand; otherwise hand edits show up within 30 minutes.
+ */
+function clearCache() {
+  bumpDataVersions(Object.keys(SHEET_NAMES).map(k => SHEET_NAMES[k]));
+  Logger.log("Cache cleared. The next request reads fresh data from the sheet.");
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -503,10 +715,107 @@ function runBackup() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// EMAIL (MailApp, free: about 100 emails a day on a personal Google account)
+// ─────────────────────────────────────────────────────────────────────────
+/**
+ * Installs the daily deadline reminders (about 7 AM) and the Monday summary
+ * for Dr. Numan (about 8 AM), in the script's time zone. Safe to re-run.
+ * Set the Script Property INSTRUCTOR_EMAIL first for the weekly summary.
+ */
+function installEmailTriggers() {
+  ScriptApp.getProjectTriggers()
+    .filter(t => ["sendDeadlineReminders", "sendWeeklySummary"].indexOf(t.getHandlerFunction()) !== -1)
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger("sendDeadlineReminders").timeBased().everyDays(1).atHour(7).create();
+  ScriptApp.newTrigger("sendWeeklySummary").timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(8).create();
+  Logger.log("Email triggers installed: deadline reminders daily ~7 AM, weekly summary Mondays ~8 AM (" + Session.getScriptTimeZone() + ").");
+}
+
+/** Emails each opted-in student the tasks due in the next 24 hours that they haven't submitted. */
+function sendDeadlineReminders() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const now = Date.now();
+  const tasks = readTable(ss, SHEET_NAMES.TASKS).rows.filter(t => String(t.status) !== "done" && dateOnly(t.dueDate));
+  const subs = readTable(ss, SHEET_NAMES.SUBMISSIONS).rows;
+  let sent = 0;
+  readTable(ss, SHEET_NAMES.USERS).rows.forEach(u => {
+    const on = u.reminders === true || String(u.reminders).toLowerCase() === "true";
+    if (!on || !u.email || TEAMS.indexOf(String(u.team)) === -1) return;
+    if (MailApp.getRemainingDailyQuota() <= EMAIL_MIN_QUOTA) return;
+    const due = tasks.filter(t => {
+      if (String(t.team) !== "ALL" && String(t.team) !== String(u.team)) return false;
+      const end = dueEnd(t.dueDate);
+      if (end < now || end - now > 24 * 60 * 60 * 1000) return false;
+      return !subs.some(s => String(s.taskId) === String(t.id) && normalizeName(s.member) === normalizeName(u.name));
+    });
+    if (!due.length) return;
+    MailApp.sendEmail(
+      String(u.email),
+      "Due soon: " + due.map(t => t.title).join(", ").slice(0, 120),
+      "Hi " + firstName(u.name) + ",\n\nThese tasks are due by the end of " + dateOnly(due[0].dueDate) + " and you haven't submitted them yet:\n\n" +
+        due.map(t => "• " + t.title + " (due " + dateOnly(t.dueDate) + ")").join("\n") +
+        "\n\nSubmit them in EconomicsPortal: https://GucciCreates.github.io/EconomicsPortal/\n\n" +
+        "You get this email because you turned on deadline reminders. Turn them off under your name → Email reminders."
+    );
+    sent++;
+  });
+  Logger.log("Deadline reminders sent: " + sent);
+  return sent;
+}
+
+/** Monday email to Dr. Numan: class average, students needing support, missing work from the last 7 days. */
+function sendWeeklySummary() {
+  const to = PropertiesService.getScriptProperties().getProperty("INSTRUCTOR_EMAIL");
+  if (!to) {
+    Logger.log("Set the Script Property INSTRUCTOR_EMAIL to send the weekly summary.");
+    return false;
+  }
+  if (MailApp.getRemainingDailyQuota() <= EMAIL_MIN_QUOTA) return false;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const marks = readTable(ss, SHEET_NAMES.MARKS).rows;
+  const escalations = readTable(ss, SHEET_NAMES.ESCALATIONS).rows;
+  const tasks = readTable(ss, SHEET_NAMES.TASKS).rows;
+  const subs = readTable(ss, SHEET_NAMES.SUBMISSIONS).rows;
+  const roster = rosterFor(ss, null);
+  const metrics = computeMemberMetrics(marks, escalations);
+  const valid = marks.filter(m => m.quizScore !== "" && !isNaN(Number(m.quizScore))).map(m => Number(m.quizScore));
+  const avg = valid.length ? round1(valid.reduce((a, b) => a + b, 0) / valid.length) : null;
+  const support = Object.keys(metrics).filter(k => metrics[k].atRisk).map(k => k + " (Team " + metrics[k].team + ")");
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const missing = [];
+  tasks.forEach(t => {
+    if (!dateOnly(t.dueDate)) return;
+    const end = dueEnd(t.dueDate);
+    if (end > Date.now() || end < weekAgo) return;
+    roster.filter(r => String(t.team) === "ALL" || String(t.team) === r.team).forEach(r => {
+      if (!subs.some(s => String(s.taskId) === String(t.id) && normalizeName(s.member) === normalizeName(r.name))) {
+        missing.push(r.name + " — " + t.title);
+      }
+    });
+  });
+  MailApp.sendEmail(
+    to,
+    "EconomicsPortal weekly summary",
+    "Class average: " + (avg === null ? "no marks yet" : avg) + " (" + valid.length + " marks recorded)\n\n" +
+      "Students needing support (" + support.length + "):\n" + (support.length ? support.map(x => "• " + x).join("\n") : "• None") + "\n\n" +
+      "Missing submissions for tasks due in the last 7 days (" + missing.length + "):\n" + (missing.length ? missing.map(x => "• " + x).join("\n") : "• None") +
+      "\n\nOpen the portal: https://GucciCreates.github.io/EconomicsPortal/"
+  );
+  return true;
+}
+
+/** A task is due at the end of its due date. */
+function dueEnd(v) {
+  const d = dateOnly(v);
+  const t = new Date(d + "T23:59:59").getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // READ ACTIONS
 // ─────────────────────────────────────────────────────────────────────────
 function actionUsers(ss, session) {
-  return { ok: true, users: readTable(ss, SHEET_NAMES.USERS).rows.map(sanitizeUser) };
+  return { ok: true, users: readRows(ss, SHEET_NAMES.USERS).map(sanitizeUser) };
 }
 
 function sanitizeUser(u) {
@@ -537,18 +846,18 @@ function buildDashboard(ss, session) {
   const me = normalizeName(session.name);
   const isMe = v => normalizeName(v) === me;
 
-  const tasks = readTable(ss, SHEET_NAMES.TASKS).rows.map(stripRow).map(t => Object.assign(t, { dueDate: dateOnly(t.dueDate) }));
-  const marks = readTable(ss, SHEET_NAMES.MARKS).rows.map(stripRow);
-  const subs = readTable(ss, SHEET_NAMES.SUBMISSIONS).rows.map(stripRow);
-  const replies = readTable(ss, SHEET_NAMES.ESCALATION_REPLIES).rows.map(stripRow);
-  const escalations = readTable(ss, SHEET_NAMES.ESCALATIONS).rows.map(stripRow).map(es =>
+  const tasks = readRows(ss, SHEET_NAMES.TASKS).map(stripRow).map(t => Object.assign(t, { dueDate: dateOnly(t.dueDate) }));
+  const marks = readRows(ss, SHEET_NAMES.MARKS).map(stripRow);
+  const subs = readRows(ss, SHEET_NAMES.SUBMISSIONS).map(stripRow);
+  const replies = readRows(ss, SHEET_NAMES.ESCALATION_REPLIES).map(stripRow);
+  const escalations = readRows(ss, SHEET_NAMES.ESCALATIONS).map(stripRow).map(es =>
     Object.assign(es, { replies: replies.filter(r => String(r.escalationId) === String(es.id)) })
   );
-  const announcements = readTable(ss, SHEET_NAMES.ANNOUNCEMENTS).rows.map(stripRow);
-  const quizzes = readTable(ss, SHEET_NAMES.QUIZ_SCHEDULE).rows.map(stripRow);
-  const goals = readTable(ss, SHEET_NAMES.GOALS).rows.map(stripRow);
-  const teamMessages = readTable(ss, SHEET_NAMES.TEAM_MESSAGES).rows.map(stripRow);
-  const mentorship = readTable(ss, SHEET_NAMES.MENTORSHIP).rows.map(stripRow).map(p => {
+  const announcements = readRows(ss, SHEET_NAMES.ANNOUNCEMENTS).map(stripRow);
+  const quizzes = readRows(ss, SHEET_NAMES.QUIZ_SCHEDULE).map(stripRow);
+  const goals = readRows(ss, SHEET_NAMES.GOALS).map(stripRow);
+  const teamMessages = readRows(ss, SHEET_NAMES.TEAM_MESSAGES).map(stripRow);
+  const mentorship = readRows(ss, SHEET_NAMES.MENTORSHIP).map(stripRow).map(p => {
     let milestones = [];
     try { milestones = JSON.parse(p.milestones || "[]"); } catch (e) { milestones = []; }
     return Object.assign(p, { milestones: milestones });
@@ -574,7 +883,8 @@ function buildDashboard(ss, session) {
       roster: rosterFor(ss, null),
       canEdit: true,
     };
-    if (role === "group_leader") out.users = readTable(ss, SHEET_NAMES.USERS).rows.map(sanitizeUser);
+    if (role === "group_leader") out.users = readRows(ss, SHEET_NAMES.USERS).map(sanitizeUser);
+    out.me = myPrefs(ss, session);
     return out;
   }
 
@@ -598,6 +908,7 @@ function buildDashboard(ss, session) {
       memberMetrics: teamMetrics,
       atRiskMembers: Object.values(teamMetrics).filter(m => m.atRisk),
       roster: rosterFor(ss, team),
+      me: myPrefs(ss, session),
     };
   }
 
@@ -623,7 +934,15 @@ function buildDashboard(ss, session) {
     teamMessages: teamMessages.filter(tm => tm.team === team),
     mentorship: mentorship.filter(mp => isMe(mp.student) || isMe(mp.mentor)),
     myGoal: goals.find(g => isMe(g.name)) || null,
+    me: myPrefs(ss, session),
   };
+}
+
+/** The signed-in person's own settings (never anyone else's email). */
+function myPrefs(ss, session) {
+  const found = findUser(ss, session.name);
+  const u = found ? found.user : {};
+  return { email: String(u.email || ""), reminders: u.reminders === true || String(u.reminders).toLowerCase() === "true" };
 }
 
 /** What a member may see about classmates: enough for the leaderboard, nothing more. */
@@ -633,7 +952,7 @@ function publicMetrics(m) {
 
 /** Students on a team (or all teams), for submission tracking. */
 function rosterFor(ss, team) {
-  return readTable(ss, SHEET_NAMES.USERS).rows
+  return readRows(ss, SHEET_NAMES.USERS)
     .filter(u => TEAMS.indexOf(String(u.team)) !== -1)
     .filter(u => String(u.role) === "member" || String(u.role) === "team_leader")
     .filter(u => !team || String(u.team) === team)
@@ -875,9 +1194,9 @@ function actionSetGoal(ss, session, p) {
 
 function actionUpdatePin(ss, session, p) {
   const newPin = String(p.newPin || "").trim();
-  if (!/^\d{4}$/.test(newPin)) throw apiError("PIN must be exactly 4 numeric digits.", "VALIDATION");
   const target = findUser(ss, p.targetMember);
   if (!target) throw apiError("Member not found in roster.", "NOT_FOUND");
+  checkNewPin(newPin, target.user.role, "PIN");
   writePin(ss, target.user.name, newPin);
   audit(ss, session, "resetPin", String(target.user.name), {});
   return { ok: true };
@@ -887,20 +1206,29 @@ function actionChangeMyPin(ss, session, p) {
   const currentPin = String(p.currentPin || "").trim();
   const newPin = String(p.newPin || "").trim();
   const me = findUser(ss, session.name);
-  const cache = CacheService.getScriptCache();
-  const key = normalizeName(session.name);
-  if (cache.get("lock:" + key)) throw apiError("Too many failed attempts. Try again in 15 minutes.", "LOCKED");
-  if (!/^\d{4}$/.test(currentPin) || !verifyPin(me.user, currentPin)) {
-    recordLoginFailure(cache, key);
+  const bucket = lockBucket(normalizeName(session.name), session.name, p.device);
+  checkLock(bucket);
+  if (!isPinFormat(currentPin) || !verifyPin(me.user, currentPin)) {
+    recordLoginFailure(ss, bucket, me.user);
     throw apiError("Your current PIN is not correct.", "VALIDATION");
   }
-  if (!/^\d{4}$/.test(newPin)) throw apiError("New PIN must be exactly 4 numeric digits.", "VALIDATION");
+  checkNewPin(newPin, session.role, "New PIN");
   if (newPin === currentPin) throw apiError("Choose a PIN that is different from your current one.", "VALIDATION");
   writePin(ss, session.name, newPin);
   audit(ss, session, "changeMyPin", session.name, {});
   // Hand back a fresh token so this device stays signed in; every other
   // session was issued against the old PIN and is now invalid.
   return { ok: true, token: issueToken(findUser(ss, session.name).user) };
+}
+
+function actionSetReminders(ss, session, p) {
+  const on = p.reminders === true || p.reminders === "true";
+  const email = text(p.email, 254, "Email", on);
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw apiError("Enter a valid email address.", "VALIDATION");
+  const found = findUser(ss, session.name);
+  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { email: email, reminders: on });
+  audit(ss, session, "setReminders", session.name, { after: { reminders: on, email: email ? "set" : "" } });
+  return { ok: true };
 }
 
 function writePin(ss, name, pin) {
@@ -1163,6 +1491,86 @@ function audit(ss, session, action, targetId, details) {
   });
 }
 
+/** Audit entries for events with no signed-in actor (e.g. a login lock). */
+function auditSystem(ss, action, targetId, details) {
+  audit(ss, { name: "system", role: "system" }, action, targetId, details);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// CACHED READS
+// Each table has a data version in Script Properties ("DV_<sheet>"). Cached
+// rows are stored under that version, so bumping it after a write makes the
+// next read go to the sheet. Writes themselves always read the sheet.
+// ─────────────────────────────────────────────────────────────────────────
+let _inWrite = false;
+let _versions = null;          // per-request copy of the DV_* properties
+let _memo = {};                // per-request rows, keyed by sheet name
+let _touched = {};             // sheets written during this request
+
+function dataVersions() {
+  if (!_versions) {
+    const all = PropertiesService.getScriptProperties().getProperties();
+    _versions = {};
+    Object.keys(all).forEach(k => { if (k.indexOf("DV_") === 0) _versions[k.slice(3)] = all[k]; });
+  }
+  return _versions;
+}
+
+function bumpDataVersions(names) {
+  const list = names || Object.keys(_touched);
+  _touched = {};
+  if (!list.length) return;
+  const stamp = Utilities.getUuid().replace(/-/g, "").slice(0, 12);
+  const update = {};
+  list.forEach(n => { update["DV_" + n] = stamp; delete _memo[n]; });
+  PropertiesService.getScriptProperties().setProperties(update);
+  _versions = null;
+}
+
+function markTouched(name) {
+  _touched[name] = true;
+  delete _memo[name];
+}
+
+/** Rows of a sheet (objects with `_row`), from the per-request memo, the cache, or the sheet. */
+function readRows(ss, name) {
+  if (_inWrite) return readTable(ss, name).rows;
+  if (_memo[name]) return _memo[name];
+  const version = dataVersions()[name] || "0";
+  const base = "T:" + name + ":" + version;
+  const cache = CacheService.getScriptCache();
+  const head = cache.get(base);
+  if (head) {
+    const n = Number(head);
+    const keys = [];
+    for (let i = 0; i < n; i++) keys.push(base + ":" + i);
+    const parts = cache.getAll(keys);
+    if (keys.every(k => typeof parts[k] === "string")) {
+      try {
+        _memo[name] = JSON.parse(keys.map(k => parts[k]).join(""), reviveDates);
+        return _memo[name];
+      } catch (e) { /* fall through to the sheet */ }
+    }
+  }
+  const rows = readTable(ss, name).rows;
+  _memo[name] = rows;
+  try {
+    const json = JSON.stringify(rows, function (k, v) { return isDate(this[k]) ? "\u0000D" + this[k].toISOString() : v; });
+    const chunks = {};
+    let i = 0;
+    for (let at = 0; at < json.length; at += CACHE_CHUNK) chunks[base + ":" + i++] = json.slice(at, at + CACHE_CHUNK);
+    if (i <= 50) {
+      cache.putAll(chunks, CACHE_SECONDS);
+      cache.put(base, String(i), CACHE_SECONDS);
+    }
+  } catch (e) { /* caching is an optimisation only */ }
+  return rows;
+}
+
+function reviveDates(k, v) {
+  return typeof v === "string" && v.charAt(0) === "\u0000" && v.charAt(1) === "D" ? new Date(v.slice(2)) : v;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // SHEET HELPERS (all lookups go by header name, not column position)
 // ─────────────────────────────────────────────────────────────────────────
@@ -1219,11 +1627,13 @@ function cell(v) {
 }
 
 function appendObject(sheet, obj) {
+  markTouched(sheet.getName());
   const headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0].map(String);
   sheet.appendRow(headers.map(h => (h && obj[h] !== undefined ? cell(obj[h]) : "")));
 }
 
 function writeFields(table, rowNumber, fields) {
+  markTouched(table.sheet.getName());
   Object.keys(fields).forEach(k => {
     const c = table.headers.indexOf(k);
     if (c !== -1) table.sheet.getRange(rowNumber, c + 1).setValue(cell(fields[k]));
@@ -1250,6 +1660,7 @@ function deleteRowById(ss, sheetName, id) {
   const t = readTable(ss, sheetName);
   const row = t.rows.find(r => String(r.id) === String(id));
   if (id === undefined || id === null || id === "" || !row) throw apiError("That record no longer exists.", "NOT_FOUND");
+  markTouched(t.sheet.getName());
   t.sheet.deleteRow(row._row);
   return stripRow(row);
 }
@@ -1257,7 +1668,7 @@ function deleteRowById(ss, sheetName, id) {
 function findUser(ss, name) {
   const key = normalizeName(name);
   if (!key) return null;
-  const row = readTable(ss, SHEET_NAMES.USERS).rows.find(u => normalizeName(u.name) === key);
+  const row = readRows(ss, SHEET_NAMES.USERS).find(u => normalizeName(u.name) === key);
   return row ? { row: row._row, user: row } : null;
 }
 

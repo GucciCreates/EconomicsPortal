@@ -103,19 +103,61 @@ test('valid login returns a token and the user from the sheet', () => {
 test('wrong PIN fails and loose PIN matching is gone', () => {
   const b = freshBackend();
   assert.equal(b.login('Shehroz', '9999').code, 'LOGIN_FAILED');
-  assert.equal(b.login('Dr. Numan', '100').code, 'VALIDATION'); // not 4 digits
-  assert.equal(b.login('Ayesha', '3101').code, 'LOGIN_FAILED'); // no "ayesha" shortcut
+  assert.equal(b.login('Dr. Numan', '100').code, 'VALIDATION'); // under 4 digits
+  assert.equal(b.login('Dr. Numan', '123456789').code, 'VALIDATION'); // over 8 digits
+  const guess = b.login('Ayesha', '3101'); // first name only: suggestion, not a sign-in
+  assert.equal(guess.ok, false);
+  assert.equal(guess.code, 'DID_YOU_MEAN');
+  assert.equal(guess.suggestion, 'Ayesha (Quetta)');
+  assert.equal(guess.token, undefined);
   assert.equal(b.login('  ayesha (QUETTA) ', '3101').ok, true); // normalized exact name
 });
 
-test('login locks a name after 5 failures for 15 minutes', () => {
+test('login locks escalate 1, 5, 15, 60 minutes and are logged', () => {
   const b = freshBackend();
-  for (let i = 0; i < 4; i++) assert.equal(b.login('Ramesh', '0000').code, 'LOGIN_FAILED');
-  assert.equal(b.login('Ramesh', '0000').code, 'LOCKED');
+  const fail5 = () => {
+    for (let i = 0; i < 4; i++) assert.equal(b.login('Ramesh', '0000').code, 'LOGIN_FAILED');
+    const res = b.login('Ramesh', '0000');
+    assert.equal(res.code, 'LOCKED');
+    return res.error;
+  };
+  assert.match(fail5(), /1 minute/);
   assert.equal(b.login('Ramesh').code, 'LOCKED', 'correct PIN is refused while locked');
   assert.equal(b.login('Mamoon').ok, true, 'other names are not affected');
+  b.advance(61 * 1000);
+  assert.match(fail5(), /5 minutes/);
+  b.advance(5 * 60 * 1000 + 1000);
+  assert.match(fail5(), /15 minutes/);
   b.advance(15 * 60 * 1000 + 1000);
+  assert.match(fail5(), /60 minutes/);
+  b.advance(60 * 60 * 1000 + 1000);
   assert.equal(b.login('Ramesh').ok, true);
+  const locks = b.sheetRows('AuditLog').filter((r) => r.action === 'loginLocked');
+  assert.equal(locks.length, 4);
+  assert.equal(locks[0].targetId, 'Ramesh');
+});
+
+test('a device that signed in before cannot be locked out by guesses from elsewhere', () => {
+  const b = freshBackend();
+  const myPhone = 'device-abcdefghijklmnop1234';
+  assert.equal(b.post({ action: 'login', name: 'Shehroz', pin: PINS.Shehroz, device: myPhone }).ok, true);
+  for (let i = 0; i < 5; i++) b.post({ action: 'login', name: 'Shehroz', pin: '0000', device: 'attacker-zzzzzzzzzzzzzzzz' });
+  assert.equal(b.post({ action: 'login', name: 'Shehroz', pin: PINS.Shehroz, device: 'attacker-zzzzzzzzzzzzzzzz' }).code, 'LOCKED');
+  assert.equal(b.post({ action: 'login', name: 'Shehroz', pin: PINS.Shehroz }).code, 'LOCKED', 'no device = unknown device');
+  assert.equal(b.post({ action: 'login', name: 'Shehroz', pin: PINS.Shehroz, device: myPhone }).ok, true);
+});
+
+test('locking a leader account emails the owner at most once a day', () => {
+  const b = freshBackend();
+  for (let round = 0; round < 2; round++) {
+    for (let i = 0; i < 5; i++) b.login('Shehroz', '0000');
+    b.advance(61 * 1000);
+  }
+  assert.equal(b.mail.sent.length, 1);
+  assert.equal(b.mail.sent[0].to, 'owner@example.com');
+  assert.match(b.mail.sent[0].subject, /Shehroz/);
+  for (let i = 0; i < 5; i++) b.login('Ramesh', '0000');
+  assert.equal(b.mail.sent.length, 1, 'students being locked does not email');
 });
 
 test('missing, forged, tampered and expired tokens are rejected with code AUTH', () => {
@@ -389,6 +431,179 @@ test('resetAllPins gives everyone a new PIN, logs it once, and signs everyone ou
   assert.equal(b.post({ action: 'dashboard', token: oldToken }).code, 'AUTH');
   const line = b.logs.at(-1).split('\n').find((l) => l.startsWith('Dr. Numan → '));
   const pin = line.split('→ ')[1].trim();
-  assert.match(pin, /^\d{4}$/);
+  assert.match(pin, /^\d{6}$/);
   assert.equal(b.login('Dr. Numan', pin).ok, true);
+});
+
+// ── v6: sign-in, PINs, sessions ──────────────────────────────────────────
+
+test('login returns the dashboard, so signing in is one request', () => {
+  const b = freshBackend();
+  const res = b.login('Ramesh');
+  assert.equal(res.ok, true);
+  assert.ok(res.data && Array.isArray(res.data.myMarks), 'dashboard included');
+  assert.equal(res.pinUpgrade, true, '4-digit PIN gets the upgrade prompt');
+  assert.equal(res.pinMinLength, 4);
+  assert.equal(b.login('Shehroz').pinMinLength, 6);
+  b.api.setPinForUser('Ramesh', '24681357');
+  assert.equal(b.login('Ramesh', '24681357').pinUpgrade, false);
+});
+
+test('names lists first names only, with no token needed', () => {
+  const b = freshBackend();
+  const res = b.post({ action: 'names' });
+  assert.equal(res.ok, true);
+  assert.ok(res.names.includes('Ayesha'));
+  assert.ok(res.names.includes('Numan'));
+  assert.ok(res.names.includes('Ahmed'));
+  assert.ok(!res.names.some((n) => /\(|\s/.test(n)));
+  assert.ok(!JSON.stringify(res).includes('team_leader'));
+});
+
+test('PIN rules: 4–8 digits; leaders need 6+ for a new PIN; resets accept the target role', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  let r = b.post({ action: 'changeMyPin', token: gl, currentPin: PINS.Shehroz, newPin: '5555' });
+  assert.equal(r.code, 'VALIDATION');
+  assert.match(r.error, /6 to 8 digits/);
+  r = b.post({ action: 'changeMyPin', token: gl, currentPin: PINS.Shehroz, newPin: '555123' });
+  assert.equal(r.ok, true);
+  const mem = b.tokenFor('Ramesh');
+  assert.equal(b.post({ action: 'changeMyPin', token: mem, currentPin: PINS.Ramesh, newPin: '4321' }).ok, true, 'members may keep 4 digits');
+  const gl2 = r.token;
+  assert.equal(b.post({ action: 'updatePin', token: gl2, targetMember: 'Sajal', newPin: '1234' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'updatePin', token: gl2, targetMember: 'Sajal', newPin: '123456' }).ok, true);
+  assert.equal(b.post({ action: 'updatePin', token: gl2, targetMember: 'Mamoon', newPin: '123456789' }).code, 'VALIDATION');
+});
+
+test('tokens in their last 2 days are renewed; idle tokens still expire after 7 days', () => {
+  const b = freshBackend();
+  const token = b.tokenFor('Ramesh');
+  assert.equal(b.post({ action: 'dashboard', token }).token, undefined, 'fresh token not renewed');
+  b.advance(5.5 * 24 * 60 * 60 * 1000);
+  const res = b.post({ action: 'dashboard', token });
+  assert.equal(res.ok, true);
+  assert.ok(res.token && res.token !== token, 'renewed');
+  b.advance(2 * 24 * 60 * 60 * 1000);
+  assert.equal(b.post({ action: 'dashboard', token }).code, 'AUTH', 'old token expired');
+  assert.equal(b.post({ action: 'dashboard', token: res.token }).ok, true, 'renewed token still valid');
+  b.advance(7 * 24 * 60 * 60 * 1000 + 1000);
+  assert.equal(b.post({ action: 'dashboard', token: res.token }).code, 'AUTH', 'idle for 7 days');
+});
+
+// ── v6: caching & one-request writes ─────────────────────────────────────
+
+function countReads(b) {
+  const proto = Object.getPrototypeOf(b.ss.getSheetByName('Users'));
+  if (!proto.__counted) {
+    const orig = proto.getDataRange;
+    proto.getDataRange = function () {
+      proto.__reads = (proto.__reads || 0) + 1;
+      return orig.call(this);
+    };
+    proto.__counted = true;
+  }
+  return {
+    reset: () => (proto.__reads = 0),
+    get: () => proto.__reads || 0,
+  };
+}
+
+test('dashboard reads are cached and every write invalidates what it touched', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const reads = countReads(b);
+  b.post({ action: 'dashboard', token: gl });
+  reads.reset();
+  const again = b.post({ action: 'dashboard', token: gl });
+  assert.equal(reads.get(), 0, 'second dashboard comes entirely from cache');
+  const before = again.data.announcements.length;
+  const write = b.post({ action: 'addAnnouncement', token: gl, title: 'Fresh', body: 'News' });
+  assert.equal(write.ok, true);
+  assert.equal(write.data.announcements.length, before + 1, 'write returns the updated dashboard');
+  const after = b.post({ action: 'dashboard', token: gl });
+  assert.ok(after.data.announcements.some((a) => a.title === 'Fresh'), 'no stale cache after a write');
+});
+
+test('cached rows keep dates as dates (due dates stay yyyy-MM-dd)', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  b.post({ action: 'addTask', token: gl, title: 'Essay', team: 'ALL', dueDate: '2026-12-05' });
+  // Simulate Sheets turning the text into a real Date cell.
+  const sheet = b.ss.getSheetByName('Tasks');
+  const col = sheet.data[0].indexOf('dueDate');
+  sheet.data[1][col] = new Date('2026-12-05T00:00:00Z');
+  b.api.clearCache();
+  const first = b.post({ action: 'dashboard', token: gl }).data.tasks[0].dueDate;
+  const cached = b.post({ action: 'dashboard', token: gl }).data.tasks[0].dueDate;
+  assert.equal(first, '2026-12-05');
+  assert.equal(cached, '2026-12-05');
+});
+
+test('large tables are split across cache entries under 100 KB each', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  for (let i = 0; i < 60; i++) b.post({ action: 'addAnnouncement', token: gl, title: 'Long ' + i, body: 'x'.repeat(4000), withDashboard: false });
+  b.post({ action: 'dashboard', token: gl });
+  const chunks = Object.keys(b.cache).filter((k) => k.startsWith('T:Announcements:') && /:\d+$/.test(k));
+  assert.ok(chunks.length >= 3, 'split into several chunks');
+  assert.equal(b.post({ action: 'dashboard', token: gl }).data.announcements.length, 60);
+});
+
+// ── v6: email ────────────────────────────────────────────────────────────
+
+test('setReminders stores my own email; dashboard shows only mine', () => {
+  const b = freshBackend();
+  const t = b.tokenFor('Ramesh');
+  assert.equal(b.post({ action: 'setReminders', token: t, reminders: true, email: 'not-an-email' }).code, 'VALIDATION');
+  const r = b.post({ action: 'setReminders', token: t, reminders: true, email: 'ramesh@example.com' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data.me, { email: 'ramesh@example.com', reminders: true });
+  const gl = b.post({ action: 'dashboard', token: b.tokenFor('Shehroz') });
+  assert.ok(!JSON.stringify(gl).includes('ramesh@example.com'), "nobody else sees Ramesh's email");
+});
+
+test('deadline reminders go only to opted-in students with unsubmitted work due within 24 hours', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const d = new Date();
+  const tomorrow = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // due end of today
+  const task = b.post({ action: 'addTask', token: gl, title: 'Problem set 4', team: 'Amina', dueDate: tomorrow }).id;
+  b.post({ action: 'setReminders', token: b.tokenFor('Ramesh'), reminders: true, email: 'ramesh@example.com' });
+  b.post({ action: 'setReminders', token: b.tokenFor('Mamoon'), reminders: true, email: 'mamoon@example.com' });
+  b.post({ action: 'setReminders', token: b.tokenFor('Minal'), reminders: true, email: 'minal@example.com' }); // other team
+  b.post({ action: 'addSubmission', token: b.tokenFor('Mamoon'), taskId: task, content: 'done' });
+  const sent = b.api.sendDeadlineReminders();
+  assert.equal(sent, 1);
+  assert.equal(b.mail.sent.at(-1).to, 'ramesh@example.com');
+  assert.match(b.mail.sent.at(-1).body, /Problem set 4/);
+});
+
+test('weekly summary needs INSTRUCTOR_EMAIL and lists support and missing work', () => {
+  const b = freshBackend();
+  assert.equal(b.api.sendWeeklySummary(), false);
+  b.props.INSTRUCTOR_EMAIL = 'numan@example.com';
+  const gl = b.tokenFor('Shehroz');
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  b.post({ action: 'addTask', token: gl, title: 'Essay 2', team: 'Lareb', dueDate: yesterday });
+  assert.equal(b.api.sendWeeklySummary(), true);
+  const mail = b.mail.sent.at(-1);
+  assert.equal(mail.to, 'numan@example.com');
+  assert.match(mail.body, /Class average/);
+  assert.match(mail.body, /Shaiman — Essay 2/);
+});
+
+test('installEmailTriggers installs exactly one of each', () => {
+  const b = freshBackend();
+  b.api.installEmailTriggers();
+  b.api.installEmailTriggers();
+  const handlers = b.triggers.list.map((t) => t.getHandlerFunction()).sort();
+  assert.deepEqual(handlers, ['sendDeadlineReminders', 'sendWeeklySummary']);
+});
+
+test('health answers without a token', () => {
+  const b = freshBackend();
+  const r = b.post({ action: 'health' });
+  assert.equal(r.ok, true);
+  assert.ok(r.time);
 });

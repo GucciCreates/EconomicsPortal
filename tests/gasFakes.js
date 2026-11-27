@@ -156,13 +156,13 @@ function createFakeDrive(clock) {
 function createFakeTriggers() {
   const list = [];
   const builder = (handler) => {
-    const b = { timeBased: () => b, everyWeeks: () => b, onWeekDay: () => b, atHour: () => b, create: () => list.push({ getHandlerFunction: () => handler }) };
+    const b = { timeBased: () => b, everyWeeks: () => b, everyDays: () => b, onWeekDay: () => b, atHour: () => b, create: () => list.push({ getHandlerFunction: () => handler }) };
     return b;
   };
   return {
     list,
     api: {
-      WeekDay: { SUNDAY: 'SUNDAY' },
+      WeekDay: { SUNDAY: 'SUNDAY', MONDAY: 'MONDAY' },
       getProjectTriggers: () => list.slice(),
       deleteTrigger: (t) => list.splice(list.indexOf(t), 1),
       newTrigger: (handler) => builder(handler),
@@ -175,6 +175,7 @@ function createBackend() {
   const props = {};
   const cache = {};
   const logs = [];
+  const mail = { sent: [], quota: 100 };
   let now = Date.now();
 
   const RealDate = Date;
@@ -215,6 +216,10 @@ function createBackend() {
         deleteProperty: (k) => {
           delete props[k];
         },
+        getProperties: () => ({ ...props }),
+        setProperties: (obj) => {
+          Object.entries(obj).forEach(([k, v]) => (props[k] = String(v)));
+        },
       }),
     },
     CacheService: {
@@ -229,6 +234,20 @@ function createBackend() {
         },
         remove: (k) => {
           delete cache[k];
+        },
+        getAll: (keys) => {
+          const out = {};
+          keys.forEach((k) => {
+            const e = cache[k];
+            if (e && e.expires >= now) out[k] = e.value;
+          });
+          return out;
+        },
+        putAll: (obj, ttl) => {
+          Object.entries(obj).forEach(([k, v]) => {
+            if (String(v).length > 100 * 1024) throw new Error('Cache value too large: ' + k);
+            cache[k] = { value: String(v), expires: now + (ttl || 600) * 1000 };
+          });
         },
       }),
     },
@@ -254,7 +273,11 @@ function createBackend() {
       newBlob: (bytes) => ({ getDataAsString: () => fromBytes(bytes).toString('utf8') }),
       formatDate: (d) => new RealDate(d).toISOString().slice(0, 10),
     },
-    Session: { getScriptTimeZone: () => 'UTC' },
+    Session: { getScriptTimeZone: () => 'UTC', getEffectiveUser: () => ({ getEmail: () => 'owner@example.com' }) },
+    MailApp: {
+      getRemainingDailyQuota: () => mail.quota - mail.sent.length,
+      sendEmail: (to, subject, body) => mail.sent.push({ to, subject, body }),
+    },
     DriveApp: drive.api,
     ScriptApp: triggers.api,
     ContentService: {
@@ -271,7 +294,7 @@ function createBackend() {
 
   const code = fs.readFileSync(path.join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
   const exportsList =
-    'doGet, doPost, setup, migratePins, migrateSubmissions, setPinForUser, hashPin, normalizeName, installBackupTrigger, runBackup, resetAllPins';
+    'doGet, doPost, setup, migratePins, migrateSubmissions, setPinForUser, hashPin, normalizeName, installBackupTrigger, runBackup, resetAllPins, installEmailTriggers, sendDeadlineReminders, sendWeeklySummary, clearCache';
   const api = vm.runInContext(`${code}\n;({ ${exportsList} })`, context, {
     filename: 'Code.gs',
   });
@@ -290,6 +313,8 @@ function createBackend() {
     drive,
     triggers,
     props,
+    cache,
+    mail,
     logs,
     post,
     get,
