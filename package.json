@@ -6,7 +6,8 @@
     "build": "node build.js",
     "dev": "python3 -m http.server 3000",
     "test": "node --test \"tests/**/*.test.js\" && node scripts/check-syntax.js",
-    "test:e2e": "node --test tests/e2e/roles.e2e.js tests/e2e/v6.e2e.js tests/e2e/v7.e2e.js"
+    "test:e2e": "node --test tests/e2e/roles.e2e.js tests/e2e/v6.e2e.js tests/e2e/v7.e2e.js tests/e2e/budget.e2e.js",
+    "budget:update": "UPDATE_BUDGET=1 node --test tests/e2e/budget.e2e.js"
   },
   "keywords": [
     "economics",
