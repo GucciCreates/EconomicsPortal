@@ -1,177 +1,108 @@
 /**
- * EconomicsPortal — Team Leader Dashboard Component (v3 Enhanced)
+ * EconomicsPortal — team leader dashboard.
+ *
+ * Six tabs, each in its own module under ./tabs/:
+ *   Team · Submissions · Tasks · Noticeboard · Doubts · Class
  */
 
-import {
-  apiUpdateTaskStatus,
-  apiRequestGrading,
-  apiAddTeamMessage,
-  apiDeleteTeamMessage,
-} from '../api.js';
-import { getScoreBand, renderMemberMetricsHTML } from './metricsPanel.js';
-import { esc, linkHtml, slug } from '../utils.js';
-import { renderSparkline } from './charts.js';
+import { esc } from '../utils.js';
+import { getScoreBand } from './metricsPanel.js';
 import { createTabNav } from './tabNav.js';
-import { renderAnnouncementsPanel } from './announcementsPanel.js';
-import { renderQuizScheduler, cleanupQuizCountdowns } from './quizScheduler.js';
-import { renderLeaderboard } from './leaderboard.js';
-import { openReportCardModal } from './reportCardModal.js';
-import { renderSubmissionTracker } from './submissionTracker.js';
-import { renderDoubtThreads, countDoubtUpdates } from './doubtThread.js';
+import { cleanupQuizCountdowns } from './quizScheduler.js';
+import { countDoubtUpdates } from './doubtThread.js';
 import { loadLastSeen, markSeen, isNewer } from '../lastSeen.js';
+import { TEAM_ROSTER } from './ui.js';
+import { renderTeamTab } from './tabs/tlTeam.js';
+import { renderSubmissionsTab } from './tabs/tlSubmissions.js';
+import { renderTeamTasksTab } from './tabs/tlTasks.js';
+import { renderNoticeboardTab } from './tabs/tlNoticeboard.js';
+import { renderTeamDoubtsTab } from './tabs/tlDoubts.js';
+import { renderClassTab } from './tabs/tlClass.js';
 
-export const TEAM_ROSTER = {
-  Shehroz: ['Gorsi', 'Haris'],
-  Amina: ['Amina', 'Ramesh', 'Mamoon', 'Tazneem'],
-  Ayesha: ['Ayesha (Quetta)', 'Minal', 'Anika', 'Ahmed bin Nasir'],
-  Lareb: ['Lareb', 'Shaiman', 'Aisha Amjad', 'Haseeb'],
+// Kept for older imports; the server's roster is preferred.
+export { TEAM_ROSTER };
+
+const TABS = {
+  members: renderTeamTab,
+  submissions: renderSubmissionsTab,
+  tasks: renderTeamTasksTab,
+  noticeboard: renderNoticeboardTab,
+  doubts: renderTeamDoubtsTab,
+  class: renderClassTab,
 };
 
 export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
 
-  const tasks = data.tasks || [];
-  const marks = data.marks || [];
-  const submissions = data.submissions || [];
+  const roster = (data.roster || []).filter((r) => r.team === user.team).map((r) => r.name);
+  const teamMembers = (roster.length ? roster : TEAM_ROSTER[user.team] || []).filter((m) => m !== user.name);
+  const submissions = (data.submissions || []).filter((s) => s.team === user.team);
+  const escalations = data.escalations || [];
   const announcements = data.announcements || [];
   const quizzes = data.quizzes || [];
-  const teamMessages = data.teamMessages || [];
-  const teamAverage = data.teamAverage;
-  const teamAverages = data.teamAverages || {};
-  const memberMetrics = data.memberMetrics || {};
-  const atRiskMembers = data.atRiskMembers || [];
-  const escalations = data.escalations || [];
-
-  const avgBand = teamAverage !== null ? getScoreBand(teamAverage) : null;
-  const teamMembers = (TEAM_ROSTER[user.team] || []).filter(
-    (m) => m !== user.name,
-  );
-
-  // Compute team submission completion
-  const teamSubmissions = submissions.filter((s) => s.team === user.team);
-  const totalTasks = tasks.length || 1;
-  const completedRate = Math.min(
-    100,
-    Math.round(
-      (teamSubmissions.length / (teamMembers.length * totalTasks)) * 100,
-    ),
-  );
+  const atRisk = data.atRiskMembers || [];
+  const teamAverage = data.teamAverage ?? null;
+  const band = teamAverage !== null ? getScoreBand(teamAverage) : null;
+  const waiting = submissions.filter((s) => !s.gradingRequested).length;
+  const ctx = { user, data, onRefresh, teamMembers, submissions };
 
   container.innerHTML = `
     <div class="page-head">
       <div>
         <p class="page-kicker">Team leader, Team ${esc(user.team)}</p>
         <h1 class="page-title">${esc(user.name)}</h1>
-        <p class="page-sub">${esc(teamMembers.length)} students in your team. You can record marks and forward work for grading.</p>
+        <p class="page-sub">${esc(teamMembers.length)} students in your team.${
+          atRisk.length ? ` <strong class="text-red">${esc(atRisk.map((m) => m.member || m.name).join(', '))} ${atRisk.length === 1 ? 'needs' : 'need'} support.</strong>` : ''
+        }</p>
       </div>
       <div class="page-actions">
         <div class="page-stat">
           <div class="page-stat-label">Team average</div>
           <div class="page-stat-val num">${esc(teamAverage !== null ? teamAverage : '—')}</div>
-          ${avgBand ? `<span class="badge ${esc(avgBand.cls)}">${esc(avgBand.label)}</span>` : ''}
+          ${band ? `<span class="badge ${esc(band.cls)}">${esc(band.label)}</span>` : ''}
         </div>
         <button class="btn btn-secondary btn-sm" id="btn-refresh-tl">Refresh</button>
       </div>
     </div>
 
-    <!-- Team Health KPI Banner -->
     <div class="kpi-grid">
-      <div class="kpi-card">
-        <span class="kpi-label">Students</span>
-        <span class="kpi-val num">${esc(teamMembers.length)}</span>
-        <span class="kpi-sub">Students under guidance</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Submissions</span>
-        <span class="kpi-val num">${esc(teamSubmissions.length)}</span>
-        <span class="kpi-sub">${esc(completedRate)}% completion rate</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Needing support</span>
-        <span class="kpi-val num" style="color: ${esc(atRiskMembers.length > 0 ? 'var(--red)' : 'var(--teal)')};">${esc(atRiskMembers.length)}</span>
-        <span class="kpi-sub">${esc(atRiskMembers.length > 0 ? 'Requires team support' : 'All passing')}</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">Waiting for grading</span>
-        <span class="kpi-val num" style="color: var(--purple);">${esc(teamSubmissions.filter((s) => !s.gradingRequested).length)}</span>
-        <span class="kpi-sub">Submissions ready to forward</span>
-      </div>
+      <div class="kpi-card"><span class="kpi-label">Students</span><span class="kpi-val num">${esc(teamMembers.length)}</span><span class="kpi-sub">in Team ${esc(user.team)}</span></div>
+      <div class="kpi-card"><span class="kpi-label">Submissions</span><span class="kpi-val num">${esc(submissions.length)}</span><span class="kpi-sub">from your team</span></div>
+      <div class="kpi-card"><span class="kpi-label">To forward</span><span class="kpi-val num ${waiting ? 'text-accent' : ''}">${esc(waiting)}</span><span class="kpi-sub">not yet sent for grading</span></div>
+      <div class="kpi-card"><span class="kpi-label">Needing support</span><span class="kpi-val num ${atRisk.length ? 'text-red' : ''}">${esc(atRisk.length)}</span><span class="kpi-sub">${esc(atRisk.length ? 'check in with them' : 'everyone on track')}</span></div>
     </div>
 
-    <!-- At-Risk Alert Banner (if any) -->
-    ${
-      atRiskMembers.length > 0
-        ? `
-      <div class="at-risk-panel" style="margin-bottom: 1.25rem;">
-        <div class="at-risk-title">Team members needing support (${esc(atRiskMembers.length)})</div>
-        <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
-          These members need guidance on upcoming problem sets and mock reviews:
-        </p>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          ${atRiskMembers
-            .map((m) => {
-              const name = m.member || m.name;
-              return `<span class="badge badge-support" style="padding: 0.35rem 0.65rem;">${esc(name)} (Follow up)</span>`;
-            })
-            .join(' ')}
-        </div>
-      </div>
-    `
-        : ''
-    }
-
-    <!-- Tab bar and content are separate so the tab bar sits below the KPI tiles. -->
     <div id="tl-tab-nav"></div>
     <div id="tl-tab-content"></div>
-    <div id="tl-modal-shell"></div>
   `;
 
-  const contentShell = container.querySelector('#tl-tab-content');
-  const modalShell = container.querySelector('#tl-modal-shell');
-
+  const content = container.querySelector('#tl-tab-content');
   const tabs = [
     { id: 'members', label: 'Team' },
-    { id: 'submissions', label: 'Submissions', count: teamSubmissions.length },
-    { id: 'noticeboard', label: 'Noticeboard', count: teamMessages.length },
-    { id: 'tasks', label: 'Tasks', count: tasks.length },
-    { id: 'tracker', label: 'Tracker' },
+    { id: 'submissions', label: 'Submissions', count: waiting || undefined },
+    { id: 'tasks', label: 'Tasks', count: (data.tasks || []).length },
+    { id: 'noticeboard', label: 'Noticeboard' },
     { id: 'doubts', label: 'Doubts', count: escalations.filter((d) => d.status === 'open').length },
-    { id: 'quizzes', label: 'Quizzes', count: quizzes.length },
-    { id: 'leaderboard', label: 'Leaderboard' },
-    { id: 'announcements', label: 'Announcements', count: announcements.length },
+    { id: 'class', label: 'Class', count: announcements.length + quizzes.length },
   ];
 
-  const seen = loadLastSeen(user, ['announcements', 'doubts']);
+  ctx.seen = loadLastSeen(user, ['announcements', 'doubts']);
   const badges = {
-    announcements: announcements.filter((a) => a.postedBy !== user.name && isNewer(a.timestamp, seen.announcements)).length,
-    doubts: countDoubtUpdates(escalations, seen.doubts, user),
+    class: announcements.filter((a) => isNewer(a.timestamp, ctx.seen.announcements)).length,
+    doubts: countDoubtUpdates(escalations, ctx.seen.doubts, user),
   };
 
-  function switchTab(tabId) {
-    if (tabId in badges) {
-      markSeen(user, tabId);
-      tabNav.setBadge(tabId, 0);
-    }
-    if (tabId === 'members') renderMembersTab(contentShell);
-    else if (tabId === 'doubts')
-      renderDoubtThreads(contentShell, {
-        escalations,
-        user,
-        canReply: true,
-        canResolve: false,
-        since: seen.doubts,
-        title: `Team ${user.team} Doubts`,
-        emptyText: 'Nobody on your team has raised a doubt yet.',
-        onRefresh,
-      });
-    else if (tabId === 'submissions') renderSubmissionsTab(contentShell);
-    else if (tabId === 'noticeboard') renderNoticeboardTab(contentShell);
-    else if (tabId === 'tasks') renderTasksTab(contentShell);
-    else if (tabId === 'tracker')
-      renderSubmissionTracker(contentShell, { tasks, submissions, roster: data.roster || [] });
-    else if (tabId === 'quizzes') renderQuizzesTab(contentShell);
-    else if (tabId === 'leaderboard') renderLeaderboardTab(contentShell);
-    else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
+  function switchTab(id) {
+    if (id === 'class') markSeen(user, 'announcements');
+    if (id === 'doubts') markSeen(user, 'doubts');
+    if (id in badges) tabNav.setBadge(id, 0);
+    cleanupQuizCountdowns();
+    const panel = document.createElement('div');
+    panel.className = 'tab-panel';
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', `tab-${id}`);
+    content.replaceChildren(panel);
+    (TABS[id] || TABS.members)(panel, ctx);
   }
 
   const tabNav = createTabNav(container.querySelector('#tl-tab-nav'), tabs, switchTab, {
@@ -180,488 +111,5 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
   Object.entries(badges).forEach(([id, n]) => tabNav.setBadge(id, n));
   switchTab(tabNav.initialTab);
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // TAB 1: MEMBERS & REPORT CARDS
-  // ─────────────────────────────────────────────────────────────────────────
-  function renderMembersTab(wrap) {
-    wrap.innerHTML = `
-      <div class="card" style="margin-bottom: 1.25rem;">
-        <div class="card-header">
-          <h3 class="card-title">Team ${esc(user.team)} Member Roster</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Click "Report Card" to view or print official summaries</span>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
-          ${teamMembers
-            .map((memberName) => {
-              const memData = memberMetrics[memberName] || {};
-              const memMarks = marks.filter(
-                (m) => m.member.toLowerCase() === memberName.toLowerCase(),
-              );
-              return `
-              <div style="border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1rem; background-color: var(--bg-surface);">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-                  <div>
-                    <h4 style="font-size: 1.05rem; font-weight: 700;">${esc(memberName)}</h4>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Team ${esc(user.team)}</span>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                    ${memMarks.length > 1 ? `<canvas id="sparkline-${slug(memberName)}" width="120" height="32"></canvas>` : ''}
-                    <button class="btn btn-secondary btn-sm btn-view-report" data-name="${esc(memberName)}">
-                      Report card
-                    </button>
-                    <button class="btn btn-secondary btn-sm btn-nudge-member" data-name="${esc(memberName)}" title="Copy check-in reminder">
-                      Nudge
-                    </button>
-                  </div>
-                </div>
-                ${renderMemberMetricsHTML(memData, { compact: true })}
-              </div>
-            `;
-            })
-            .join('')}
-        </div>
-      </div>
-    `;
-
-    setTimeout(() => {
-      teamMembers.forEach((memberName) => {
-        const memMarks = marks.filter(
-          (m) => m.member.toLowerCase() === memberName.toLowerCase(),
-        );
-        if (memMarks.length > 1) {
-          const scores = memMarks
-            .map((m) => Number(m.quizScore))
-            .filter((s) => !isNaN(s));
-          const canvasId = `sparkline-${slug(memberName)}`;
-          renderSparkline(canvasId, scores);
-        }
-      });
-    }, 50);
-
-    // Open Report Card Modal
-    wrap.querySelectorAll('.btn-view-report').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const memName = btn.getAttribute('data-name');
-        const memMarks = marks.filter(
-          (m) => m.member.toLowerCase() === memName.toLowerCase(),
-        );
-        const memData = memberMetrics[memName] || {};
-        openReportCardModal(
-          { name: memName, team: user.team, role: 'member' },
-          memMarks,
-          memData,
-          user,
-        );
-      });
-    });
-
-    // Nudge Member
-    wrap.querySelectorAll('.btn-nudge-member').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const memName = btn.getAttribute('data-name');
-        const nudgeText = `Hi ${memName}! Just checking in from Team ${user.team} for Dr. Numan's Economics class. Please ensure your problem set is submitted so I can forward it for grading!`;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard
-            .writeText(nudgeText)
-            .then(() => {
-              btn.textContent = 'Copied! ✓';
-              setTimeout(() => (btn.textContent = 'Nudge'), 2000);
-            })
-            .catch(() => {
-              prompt('Copy reminder message for ' + memName + ':', nudgeText);
-            });
-        } else {
-          prompt('Copy reminder message for ' + memName + ':', nudgeText);
-        }
-      });
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // TAB 2: REVIEW SUBMISSIONS & REQUEST GRADING (Core Requested Power)
-  // ─────────────────────────────────────────────────────────────────────────
-  function renderSubmissionsTab(wrap) {
-    wrap.innerHTML = `
-      <div class="card">
-        <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
-          <div>
-            <h3 class="card-title">Team ${esc(user.team)} Submissions & Test Review</h3>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">
-              Inspect submitted work and request official evaluation from Group Leader Shehroz or Sajal.
-            </span>
-          </div>
-        </div>
-
-        <div class="alert" style="background-color: var(--teal-soft); color: var(--teal); font-size: 0.85rem; margin-bottom: 1rem;">
-          <strong>Before you forward:</strong> Inspect the attachment to verify completeness, then click <strong>"Request Grading"</strong> to queue it for Sajal & Shehroz.
-        </div>
-
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Task ID</th>
-                <th>Submission Content</th>
-                <th>Drive Attachment</th>
-                <th>Submitted Date</th>
-                <th>Grading Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                teamSubmissions.length === 0
-                  ? `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No submissions turned in yet by Team ${esc(user.team)}.</td></tr>`
-                  : teamSubmissions
-                      .map((s) => {
-                        const isRequested = Boolean(s.gradingRequested);
-                        return `
-                      <tr>
-                        <td><strong>${esc(s.member)}</strong></td>
-                        <td style="font-family: monospace; font-size: 0.8rem;">${esc(s.taskId)}</td>
-                        <td style="font-size: 0.85rem;">${esc(s.content || 'Completed assignment')}</td>
-                        <td>
-                          ${linkHtml(
-                            s.fileUrl,
-                            'View Drive File ↗',
-                            'style="font-weight: 600;"',
-                            `<span style="color: var(--text-muted); font-size: 0.8rem;">Text only</span>`,
-                          )}
-                        </td>
-                        <td style="font-size: 0.8rem; color: var(--text-muted);">${esc(new Date(s.timestamp).toLocaleDateString())}</td>
-                        <td>
-                          ${
-                            isRequested
-                              ? `<span class="badge badge-done" title="${esc(s.reviewNotes || 'Forwarded by leader')}">⏳ Forwarded to Sajal</span>`
-                              : `<span class="badge badge-open">Pending Leader Review</span>`
-                          }
-                        </td>
-                        <td>
-                          ${
-                            !isRequested
-                              ? `
-                            <button class="btn btn-primary btn-sm btn-request-grading" data-id="${esc(s.id)}" data-member="${esc(s.member)}">
-                              Forward for Grading ↗
-                            </button>
-                          `
-                              : `
-                            <span style="font-size: 0.75rem; color: var(--text-muted);">✓ Requested</span>
-                          `
-                          }
-                        </td>
-                      </tr>
-                    `;
-                      })
-                      .join('')
-              }
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-
-    // Request Grading Action
-    wrap.querySelectorAll('.btn-request-grading').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const subId = btn.getAttribute('data-id');
-        const member = btn.getAttribute('data-member');
-
-        modalShell.innerHTML = `
-          <div class="modal-overlay" id="req-grading-overlay">
-            <div class="modal-content" style="max-width: 440px;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
-                <div>
-                  <h3 style="font-size: 1.15rem; font-weight: 700;">Request Official Grading</h3>
-                  <p style="font-size: 0.85rem; color: var(--text-muted);">
-                    Forwarding submission by <strong>${esc(member)}</strong> to Group Leader & Sajal
-                  </p>
-                </div>
-                <button class="btn btn-secondary btn-sm" id="btn-close-req-modal">✕</button>
-              </div>
-
-              <form id="form-confirm-grading">
-                <div class="form-group">
-                  <label class="form-label" for="req-grading-notes">Team Leader Review Notes (Optional)</label>
-                  <textarea id="req-grading-notes" class="form-control" rows="3" placeholder="e.g. Checked problem set, questions 1-4 completed with good diagrams. Ready for score entry."></textarea>
-                </div>
-                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                  <button type="button" class="btn btn-secondary" id="btn-cancel-req-modal" style="flex: 1;">Cancel</button>
-                  <button type="submit" class="btn btn-primary" id="btn-submit-req-grading" style="flex: 2;">Confirm & Forward</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        `;
-
-        const overlay = modalShell.querySelector('#req-grading-overlay');
-        const form = modalShell.querySelector('#form-confirm-grading');
-        const notesInput = modalShell.querySelector('#req-grading-notes');
-        const submitBtn = modalShell.querySelector('#btn-submit-req-grading');
-
-        const closeModal = () => (modalShell.innerHTML = '');
-
-        modalShell
-          .querySelector('#btn-close-req-modal')
-          .addEventListener('click', closeModal);
-        modalShell
-          .querySelector('#btn-cancel-req-modal')
-          .addEventListener('click', closeModal);
-        overlay.addEventListener('click', (e) => {
-          if (e.target === overlay) closeModal();
-        });
-
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          submitBtn.disabled = true;
-          submitBtn.textContent = 'Forwarding...';
-
-          try {
-            const res = await apiRequestGrading({
-              submissionId: subId,
-              leaderName: user.name,
-              reviewNotes: notesInput.value.trim(),
-            });
-
-            if (res.ok) {
-              closeModal();
-              window.showEconomicsToast(
-                'Grading request forwarded successfully.',
-                'success',
-              );
-              onRefresh();
-            } else {
-              window.showEconomicsToast(
-                res.error || 'Failed to forward grading request.',
-                'error',
-              );
-              submitBtn.disabled = false;
-              submitBtn.textContent = 'Confirm & Forward';
-            }
-          } catch (err) {
-            window.showEconomicsToast(err.message, 'error');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Confirm & Forward';
-          }
-        });
-      });
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // TAB 3: TEAM NOTICEBOARD (Leader Communication Power)
-  // ─────────────────────────────────────────────────────────────────────────
-  function renderNoticeboardTab(wrap) {
-    wrap.innerHTML = `
-      <div class="card" style="margin-bottom: 1.25rem;">
-        <div class="card-header"><h3 class="card-title">Post Team Announcement</h3></div>
-        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-          Messages posted here are displayed directly to members of <strong>Team ${esc(user.team)}</strong> on their dashboard.
-        </p>
-
-        <div id="tm-feedback"></div>
-
-        <form id="form-add-team-msg">
-          <div class="form-group">
-            <label class="form-label" for="tm-body">Message for Team ${esc(user.team)}</label>
-            <textarea id="tm-body" class="form-control" rows="3" placeholder="e.g. Reminder: Group review call on Thursday at 5 PM. Bring questions on IS-LM model!" required></textarea>
-          </div>
-          <button type="submit" class="btn btn-primary" id="btn-post-team-msg">Send to Team ${esc(user.team)}</button>
-        </form>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3 class="card-title">Active Team Noticeboard (${esc(teamMessages.length)})</h3></div>
-        <div>
-          ${
-            teamMessages.length === 0
-              ? `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No team notices posted yet.</p>`
-              : teamMessages
-                  .map(
-                    (msg) => `
-                <div class="announcement-item" style="margin-bottom: 0.75rem; border-left: 4px solid var(--teal);">
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-                    <strong style="font-size: 0.95rem;">Notice from ${esc(msg.author)}</strong>
-                    <button class="btn btn-danger btn-sm btn-delete-tm" data-id="${esc(msg.id)}" title="Remove notice" aria-label="Remove notice">Remove</button>
-                  </div>
-                  <p class="ann-body">${esc(msg.message)}</p>
-                  <div class="ann-meta">${esc(new Date(msg.timestamp).toLocaleString())}</div>
-                </div>
-              `,
-                  )
-                  .join('')
-          }
-        </div>
-      </div>
-    `;
-
-    const form = wrap.querySelector('#form-add-team-msg');
-    const feedback = wrap.querySelector('#tm-feedback');
-    const submitBtn = wrap.querySelector('#btn-post-team-msg');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const message = wrap.querySelector('#tm-body').value.trim();
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Posting...';
-
-      try {
-        const res = await apiAddTeamMessage({
-          team: user.team,
-          author: user.name,
-          message,
-        });
-
-        if (res.ok) {
-          feedback.innerHTML = `<div class="alert alert-success">Notice posted to Team ${esc(user.team)}!</div>`;
-          window.showEconomicsToast(
-            'Team notice posted successfully.',
-            'success',
-          );
-          form.reset();
-          setTimeout(() => {
-            feedback.innerHTML = '';
-            onRefresh();
-          }, 1500);
-        } else {
-          feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Failed to post message.')}</div>`;
-          window.showEconomicsToast(
-            res.error || 'Failed to post message.',
-            'error',
-          );
-        }
-      } catch (err) {
-        feedback.innerHTML = `<div class="alert alert-error">Error: ${esc(err.message)}</div>`;
-        window.showEconomicsToast('Error: ' + err.message, 'error');
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = `Send to Team ${user.team}`;
-      }
-    });
-
-    wrap.querySelectorAll('.btn-delete-tm').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        if (!window.confirmEconomicsAction('Delete this team notice?')) return;
-        const msgId = btn.getAttribute('data-id');
-        btn.disabled = true;
-        try {
-          const res = await apiDeleteTeamMessage({
-            id: msgId,
-            role: user.role,
-          });
-          if (res.ok) {
-            window.showEconomicsToast('Team notice removed.', 'success');
-            onRefresh();
-          } else {
-            window.showEconomicsToast(
-              res.error || 'Failed to remove notice.',
-              'error',
-            );
-          }
-        } catch (err) {
-          window.showEconomicsToast(err.message, 'error');
-        }
-      });
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // TAB 4: TEAM TASKS
-  // ─────────────────────────────────────────────────────────────────────────
-  function renderTasksTab(wrap) {
-    wrap.innerHTML = `
-      <div class="card">
-        <div class="card-header"><h3 class="card-title">Team Tasks (${esc(tasks.length)})</h3></div>
-        <div id="tl-tasks-list">
-          ${
-            tasks.length === 0
-              ? `<p style="color: var(--text-muted); text-align: center; padding: 1.5rem;">No tasks assigned.</p>`
-              : tasks
-                  .map((task) => {
-                    const isDone = task.status === 'done';
-                    return `
-                  <div class="task-item ${esc(isDone ? 'done' : '')}">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-                      <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(task.title)}</h4>
-                      <span class="badge ${esc(isDone ? 'badge-done' : 'badge-open')}">${esc(task.status)}</span>
-                    </div>
-                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.45rem;">
-                      ${esc(task.description || 'No description provided.')}
-                    </p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
-                      <span>Due: <strong>${esc(task.dueDate || 'Not set')}</strong></span>
-                      <div>
-                        ${
-                          isDone
-                            ? `<span style="color: var(--teal); font-weight: 600;">Completed</span>`
-                            : task.team === user.team
-                              ? `<button class="btn btn-teal btn-sm btn-relay-task" data-id="${esc(task.id)}">
-                                  Relayed to team ✓
-                                </button>`
-                              : `<span style="color: var(--text-muted); font-size: 0.75rem;">Class-wide task</span>`
-                        }
-                      </div>
-                    </div>
-                  </div>
-                `;
-                  })
-                  .join('')
-          }
-        </div>
-      </div>
-    `;
-
-    wrap.querySelectorAll('.btn-relay-task').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const taskId = btn.getAttribute('data-id');
-        btn.disabled = true;
-        try {
-          const res = await apiUpdateTaskStatus(taskId, 'done', user.role);
-          if (res.ok) {
-            window.showEconomicsToast('Task marked as complete.', 'success');
-            onRefresh();
-          } else {
-            window.showEconomicsToast(res.error || 'Update failed.', 'error');
-          }
-        } catch (err) {
-          window.showEconomicsToast(err.message, 'error');
-        }
-      });
-    });
-  }
-
-  function renderQuizzesTab(wrap) {
-    wrap.innerHTML = `<div id="tl-quiz-shell"></div>`;
-    renderQuizScheduler(
-      wrap.querySelector('#tl-quiz-shell'),
-      user,
-      quizzes,
-      onRefresh,
-    );
-  }
-
-  function renderLeaderboardTab(wrap) {
-    wrap.innerHTML = `<div id="tl-lb-shell"></div>`;
-    renderLeaderboard(
-      wrap.querySelector('#tl-lb-shell'),
-      memberMetrics,
-      teamAverages,
-      user,
-    );
-  }
-
-  function renderAnnouncementsTab(wrap) {
-    wrap.innerHTML = `<div id="tl-ann-shell"></div>`;
-    renderAnnouncementsPanel(
-      wrap.querySelector('#tl-ann-shell'),
-      user,
-      announcements,
-      onRefresh,
-      { since: seen.announcements },
-    );
-  }
-
-  container.querySelector('#btn-refresh-tl').addEventListener('click', () => {
-    onRefresh();
-  });
+  container.querySelector('#btn-refresh-tl').addEventListener('click', () => onRefresh());
 }
