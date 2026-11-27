@@ -173,7 +173,8 @@ test('Google sign-in: link once after a PIN sign-in, then one tap and one reques
 
     // Not linked yet: a clear message, and the PIN form still works.
     await page.click('.fake-gsi-button');
-    await page.waitForSelector('#login-error-box .alert');
+    // Wait for the answer (role=alert), not the "Signing in…" status line.
+    await page.waitForSelector('#login-error-box [role="alert"]');
     assert.match(await page.textContent('#login-error-box'), /isn't linked to anyone/);
 
     await page.fill('#login-name', 'Ramesh');
