@@ -224,7 +224,11 @@ async function loadDashboard() {
   } catch (err) {
     mainEl.innerHTML = `
       <div class="alert alert-error" style="max-width: 600px; margin: 2rem auto;">
-        Error connecting to API: ${esc(err.message)}
+        ${
+          navigator.onLine === false
+            ? "You're offline. Reconnect to the internet to load your latest data."
+            : `Error connecting to API: ${esc(err.message)}`
+        }
         <div style="margin-top: 0.75rem;">
           <button class="btn btn-secondary btn-sm" id="btn-retry-load">Retry</button>
         </div>
@@ -286,6 +290,13 @@ window.showEconomicsToast = function showEconomicsToast(
 window.confirmEconomicsAction = function confirmEconomicsAction(message) {
   return window.confirm(message);
 };
+
+// Installable app / offline shell. Service workers need HTTPS (or localhost).
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('Service worker not registered:', err));
+  });
+}
 
 // Run on page load
 initTheme();
