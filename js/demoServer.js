@@ -37,6 +37,14 @@ const MAX_SHORT = 100;
 // Login rate limiting is kept in memory for the demo (resets on reload).
 const loginFailures = {};
 
+// The v3 demo database used a different key and stored PINs alongside other
+// data; drop it so it doesn't linger in browsers.
+try {
+  localStorage.removeItem('economics_portal_demo_db_v3');
+} catch (e) {
+  /* ignore */
+}
+
 export function normalizeUserName(value = '') {
   return String(value == null ? '' : value)
     .normalize('NFKD')

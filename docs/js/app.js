@@ -2,8 +2,8 @@
  * EconomicsPortal — Main Application Controller (v2)
  */
 
-import { API_URL, isDemoMode } from './config.js';
-import { getCurrentUser, setCurrentUser, clearCurrentUser } from './auth.js';
+import { isDemoMode } from './config.js';
+import { getCurrentUser, clearCurrentUser } from './auth.js';
 import { apiGetDashboard, resetDemoData } from './api.js';
 import { renderMemberDashboard } from './components/memberView.js';
 import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';

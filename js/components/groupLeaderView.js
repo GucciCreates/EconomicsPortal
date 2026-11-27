@@ -9,12 +9,11 @@ import {
   apiEditMark,
   apiDeleteMark,
   apiUpdateTaskStatus,
-  apiUpdateEscalationStatus,
   apiUpdatePin,
   apiGetUsers,
 } from '../api.js';
 import { getScoreBand } from './metricsPanel.js';
-import { esc, linkHtml, slug } from '../utils.js';
+import { esc, linkHtml } from '../utils.js';
 import { TEAM_ROSTER } from './teamLeaderView.js';
 import {
   renderTeamAveragesChart,
