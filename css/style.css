@@ -1448,6 +1448,15 @@ input[type='checkbox'] {
   fill: none;
   stroke-linecap: round;
 }
+/* Where demand started, shown faintly once it moves away. */
+.auth-figure .curve-d-ghost {
+  stroke: var(--red);
+  stroke-width: 2;
+  stroke-dasharray: 3 6;
+  stroke-linecap: round;
+  fill: none;
+  opacity: 0;
+}
 .auth-figure .guide {
   stroke: var(--text-muted);
   stroke-width: 1.5;

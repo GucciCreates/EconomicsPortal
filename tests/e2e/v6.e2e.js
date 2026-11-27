@@ -222,3 +222,41 @@ test('the Google button stays hidden in Demo Mode and when the server has no cli
     await demo.browser.close();
   }
 });
+
+test('the sign-in chart animates a demand shift, and stays still for reduced motion', { timeout: 60000 }, async () => {
+  const { browser, context, page, errors } = await openApp({ demo: true });
+  try {
+    await page.waitForSelector('.auth-figure .eq-dot');
+    const read = () =>
+      page.evaluate(() => {
+        const dot = document.querySelector('.auth-figure .eq-dot');
+        const s = document.querySelector('.auth-figure .curve-s');
+        const x = Number(dot.getAttribute('cx'));
+        const y = Number(dot.getAttribute('cy'));
+        // Distance from the dot to the supply curve: the dot must stay on it.
+        let best = Infinity;
+        const len = s.getTotalLength();
+        for (let i = 0; i <= 400; i++) {
+          const p = s.getPointAtLength((len * i) / 400);
+          best = Math.min(best, Math.hypot(p.x - x, p.y - y));
+        }
+        return { x, y, off: best, shift: document.querySelector('.auth-figure .curve-d').getAttribute('transform') || '' };
+      });
+    await page.waitForTimeout(4600); // draw-in + hold + most of the first shift
+    const moved = await read();
+    assert.ok(moved.x > 220, `equilibrium moved right with demand (x=${moved.x})`);
+    assert.ok(moved.off < 1.5, `dot stays on the supply curve (off by ${moved.off.toFixed(2)})`);
+    assert.match(moved.shift, /translate\(\d/);
+    assert.deepEqual(errors, []);
+
+    const still = await context.newPage();
+    await still.emulateMedia({ reducedMotion: 'reduce' });
+    await still.goto('http://portal.test/index.html');
+    await still.waitForSelector('.auth-figure .eq-dot');
+    await still.waitForTimeout(4600);
+    assert.equal(await still.getAttribute('.auth-figure .eq-dot', 'cx'), '216.03');
+    assert.equal(await still.getAttribute('.auth-figure .curve-d', 'transform'), null);
+  } finally {
+    await browser.close();
+  }
+});

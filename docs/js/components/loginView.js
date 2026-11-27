@@ -18,6 +18,7 @@ import { cachedGoogleClientId, rememberGoogleClientId, renderGoogleButton } from
 import { setCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
 import { esc, escapeHtml } from '../utils.js';
+import { animateAuthFigure } from './authFigure.js';
 
 export function renderModernLogin(container, onSuccess, options = {}) {
   const rememberedName =
@@ -31,14 +32,15 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         <figure class="auth-figure" aria-hidden="true">
           <svg viewBox="0 0 440 280" role="presentation">
             <path class="axis" d="M40 16 V244 H428" />
-            <path class="guide" d="M40 136 H214 V244" />
+            <path class="guide guide-eq" d="M40 130.45 H216.03 V244" />
+            <path class="curve-d-ghost" d="M64 40 C140 80, 270 170, 392 228" />
             <path class="curve-s draw" d="M64 228 C130 190, 230 110, 392 36" />
             <path class="curve-d draw" d="M64 40 C140 80, 270 170, 392 228" />
-            <circle class="eq-dot" cx="214" cy="136" r="9" />
+            <circle class="eq-dot" cx="216.03" cy="130.45" r="9" />
             <text class="label-s" x="398" y="34">S</text>
             <text class="label-d" x="398" y="234">D</text>
-            <path class="guide" d="M214 58 V124" />
-            <text class="label-eq" x="214" y="48" text-anchor="middle">Effort meets the deadline</text>
+            <path class="guide guide-label" d="M216.03 58 V118.45" />
+            <text class="label-eq" x="216.03" y="48" text-anchor="middle">Effort meets the deadline</text>
             <text x="44" y="268">Week</text>
             <text x="8" y="22">Marks</text>
           </svg>
@@ -124,6 +126,8 @@ export function renderModernLogin(container, onSuccess, options = {}) {
       </div>
     </div>
   `;
+
+  animateAuthFigure(container.querySelector('.auth-figure svg'));
 
   // Element handles
   const formLogin = container.querySelector('#form-login');
