@@ -87,10 +87,10 @@ export function openModal({ title, bodyHtml, maxWidth = '440px' }) {
   overlay.className = 'modal-overlay';
   const titleId = `modal-title-${++modalSeq}`;
   overlay.innerHTML = `
-    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="${titleId}" style="max-width: ${esc(maxWidth)};">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
-        <h3 id="${titleId}" style="font-size: 1.15rem; font-weight: 700;">${esc(title)}</h3>
-        <button type="button" class="btn btn-secondary btn-sm" data-modal-close aria-label="Close">✕</button>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="${titleId}">
+      <div class="modal-head">
+        <h3 id="${titleId}" class="modal-title">${esc(title)}</h3>
+        <button type="button" class="btn btn-secondary btn-sm btn-icon" data-modal-close aria-label="Close">✕</button>
       </div>
       <div class="modal-body">${bodyHtml}</div>
     </div>
@@ -99,6 +99,7 @@ export function openModal({ title, bodyHtml, maxWidth = '440px' }) {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay || e.target.closest('[data-modal-close]')) close();
   });
+  overlay.querySelector('.modal-content').style.maxWidth = maxWidth;
   document.body.appendChild(overlay);
   enhanceModal(overlay, close);
   return { overlay, dialog: overlay.querySelector('.modal-content'), close };

@@ -1,232 +1,144 @@
 /**
- * EconomicsPortal — Academic Student Progress Report Card Modal (v3)
- * Provides 1-click PDF export & printable report card with academic gradebook layout.
+ * EconomicsPortal — printable report card for one student.
+ * Everything on it comes from recorded marks; nothing is made up.
  */
 
 import { getScoreBand } from "./metricsPanel.js";
 import { esc } from "../utils.js";
+import { isDemoMode } from "../config.js";
+import { enhanceModal } from "./modal.js";
+
+const MODAL_ID = "report-card-modal-overlay";
+
+/** Average of values like "95%" or "90"; null if none can be read. */
+function averagePercent(values) {
+  const nums = values.map((v) => parseFloat(String(v || "").replace("%", ""))).filter((n) => !isNaN(n));
+  return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : null;
+}
 
 /**
- * Open the printable report card modal for a student.
- * @param {object} studentInfo - { name, team, role }
- * @param {Array} studentMarks - all marks for this student
- * @param {object} studentMetrics - computed metrics { avgScore, streak, delta, atRisk, ... }
- * @param {object} currentUser - user viewing the report
+ * @param {{ name: string, team: string }} studentInfo
+ * @param {Array} studentMarks
+ * @param {object} studentMetrics
  */
-export function openReportCardModal(studentInfo, studentMarks = [], studentMetrics = {}, currentUser = {}) {
-  const modalId = "report-card-modal-overlay";
-  const existing = document.getElementById(modalId);
+export function openReportCardModal(studentInfo, studentMarks = [], studentMetrics = {}) {
+  const existing = document.getElementById(MODAL_ID);
   if (existing) existing.remove();
 
-  const info = typeof studentInfo === "string" 
-    ? { name: studentInfo, team: studentMetrics.team || "-" } 
-    : (studentInfo || { name: "Student", team: "-" });
+  const info = studentInfo || { name: "Student", team: "-" };
+  const metrics = studentMetrics || {};
+  const marks = [...studentMarks].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+  const scores = marks.filter((m) => m.quizScore !== "" && m.quizScore != null && !isNaN(Number(m.quizScore))).map((m) => Number(m.quizScore));
+  const avg = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+  const band = getScoreBand(avg === null ? "" : avg);
+  const attendance = averagePercent(marks.map((m) => m.attendance));
+  const delta = metrics.improvementDelta ?? null;
+  const notes = marks.filter((m) => String(m.notes || "").trim());
 
-  const sortedMarks = [...studentMarks].sort((a, b) => {
-    const da = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-    const db = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-    return da - db;
-  });
-
-  const validScores = sortedMarks
-    .filter((m) => m.quizScore !== "" && m.quizScore !== null && m.quizScore !== undefined && !isNaN(Number(m.quizScore)))
-    .map((m) => Number(m.quizScore));
-
-  const avg = validScores.length
-    ? Math.round((validScores.reduce((a, b) => a + b, 0) / validScores.length) * 10) / 10
-    : 0;
-  const band = getScoreBand(avg);
-
-  const attRate = studentMetrics.punctualityRate !== null && studentMetrics.punctualityRate !== undefined
-    ? studentMetrics.punctualityRate + "%"
-    : "100%";
-  const peerRating = studentMetrics.avgPeerRating ? studentMetrics.avgPeerRating + " / 5.0" : "—";
-  const streak = studentMetrics.streak || 0;
-  const delta = studentMetrics.delta || studentMetrics.improvementDelta || 0;
-
-  // Auto-generate academic remarks based on performance
-  let remarks = "";
-  if (studentMetrics.atRisk) {
-    remarks = "Student has faced difficulties meeting recent unit benchmarks. Mandatory attendance in mock prep sessions and active participation in the peer recovery plan are strongly advised to secure term passing criteria.";
-  } else if (avg >= 85) {
-    remarks = "Demonstrates exceptional mastery of macroeconomic principles and analytical rigor. Consistently produces top-tier analytical problem sets and maintains admirable cohort engagement.";
-  } else if (avg >= 70) {
-    remarks = "Consistent performance with sound conceptual comprehension. Continued focus on mathematical model derivations and timely submissions will ensure top score tier advancement.";
-  } else {
-    remarks = "Satisfactory progress noted with room for quantitative optimization. Encouraged to consult team leader during office hours for problem set reviews.";
-  }
-
-  const modalEl = document.createElement("div");
-  modalEl.id = modalId;
-  modalEl.className = "modal-overlay report-modal-overlay";
-
-  modalEl.innerHTML = `
-    <div class="modal-content report-card-modal-content">
-      <!-- Toolbar (Hidden when printing) -->
+  const overlay = document.createElement("div");
+  overlay.id = MODAL_ID;
+  overlay.className = "modal-overlay report-modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-content report-card-modal-content" role="dialog" aria-modal="true" aria-labelledby="report-title">
       <div class="report-toolbar no-print">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <button class="btn btn-primary btn-sm" id="btn-print-report">
-            Print or save as PDF
-          </button>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Format: Standard A4</span>
-        </div>
-        <button class="btn btn-secondary btn-sm" id="btn-close-report">Close</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-print-report">Print or save as PDF</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-close-report">Close</button>
       </div>
 
-      <!-- Printable Report Sheet -->
-      <div class="report-sheet" id="printable-report">
-        <!-- Institution Header -->
+      <div class="report-sheet ${isDemoMode() ? "is-sample" : ""}" id="printable-report">
         <div class="report-header">
-          <div class="report-inst-logo">📈</div>
           <div class="report-inst-info">
-            <h2 class="report-inst-title">ECONOMICS ACADEMIC PORTAL</h2>
-            <p class="report-inst-sub">Department of Economics • Term Evaluation & Gradebook Ledger</p>
-            <p class="report-inst-teacher">Class Instructor: <strong>Dr. Numan</strong> • Group Coordinator: <strong>Shehroz</strong></p>
+            <p class="report-inst-sub">EconomicsPortal · Dr. Numan's Economics class</p>
+            <h2 class="report-inst-title" id="report-title">Report card: ${esc(info.name)}</h2>
+            <p class="report-inst-teacher">Team ${esc(info.team)}</p>
           </div>
           <div class="report-date-box">
-            <div class="report-date-label">Audit Date</div>
-            <div class="report-date-val">${new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</div>
+            <div class="report-date-label">Printed</div>
+            <div class="report-date-val">${esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }))}</div>
           </div>
         </div>
-
         <div class="report-divider"></div>
 
-        <!-- Student Profile Box -->
-        <div class="report-profile-grid">
-          <div class="report-field">
-            <span class="report-label">Student Name</span>
-            <span class="report-val name">${esc(info.name)}</span>
-          </div>
-          <div class="report-field">
-            <span class="report-label">Cohort Team</span>
-            <span class="report-val">Team ${esc(info.team)}</span>
-          </div>
-          <div class="report-field">
-            <span class="report-label">Class Standing</span>
-            <span class="report-val"><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></span>
-          </div>
-          <div class="report-field">
-            <span class="report-label">Status</span>
-            <span class="report-val">${studentMetrics.atRisk ? `<span class="badge badge-atrisk">Academic Support Plan</span>` : `<span class="badge badge-done">In Good Standing</span>`}</span>
-          </div>
-        </div>
-
-        <!-- Key Metrics Highlights -->
         <div class="report-kpis">
           <div class="report-kpi">
-            <span class="rk-label">Cumulative Average</span>
-            <span class="rk-val num" style="color: ${esc(band.barColor)};">${esc(avg.toFixed(1))}</span>
-            <span class="rk-sub">Scale: 0–100</span>
+            <span class="rk-label">Average score</span>
+            <span class="rk-val num" style="color: ${esc(band.barColor)};">${esc(avg === null ? "—" : avg.toFixed(1))}</span>
+            <span class="rk-sub">${avg === null ? "No scores yet" : `<span class="badge ${esc(band.cls)}">${esc(band.label)}</span>`}</span>
           </div>
           <div class="report-kpi">
-            <span class="rk-label">Attendance Rate</span>
-            <span class="rk-val num">${esc(attRate)}</span>
-            <span class="rk-sub">Mock & lecture presence</span>
+            <span class="rk-label">Tests recorded</span>
+            <span class="rk-val num">${esc(scores.length)}</span>
           </div>
           <div class="report-kpi">
-            <span class="rk-label">Assessment Streak</span>
-            <span class="rk-val num">${esc(streak > 0 ? streak : "—")}</span>
-            <span class="rk-sub">Consecutive passes</span>
+            <span class="rk-label">Attendance</span>
+            <span class="rk-val num">${esc(attendance === null ? "—" : attendance + "%")}</span>
+            <span class="rk-sub">Average of recorded values</span>
           </div>
           <div class="report-kpi">
-            <span class="rk-label">Peer Evaluation</span>
-            <span class="rk-val num">${esc(peerRating)}</span>
-            <span class="rk-sub">Cohort rating</span>
+            <span class="rk-label">Peer rating</span>
+            <span class="rk-val num">${esc(metrics.avgPeerRating ? metrics.avgPeerRating + " / 5" : "—")}</span>
           </div>
           <div class="report-kpi">
-            <span class="rk-label">Score Trend</span>
-            <span class="rk-val num" style="color: ${delta > 0 ? "var(--teal)" : delta < 0 ? "var(--red)" : "inherit"};">
-              ${delta > 0 ? "▲ +" + delta : delta < 0 ? "▼ " + delta : "—"}
-            </span>
-            <span class="rk-sub">Mock-to-mock delta</span>
+            <span class="rk-label">Since last test</span>
+            <span class="rk-val num">${delta === null ? "—" : delta > 0 ? `▲ +${esc(delta)}` : delta < 0 ? `▼ ${esc(delta)}` : "0"}</span>
           </div>
         </div>
 
-        <!-- Cycle Scores Ledger Table -->
+        ${metrics.atRisk ? `<p class="report-flag">On a support plan: the last two tests were below 50 or work was missing.</p>` : ""}
+
         <div class="report-section">
-          <h4 class="report-section-title">Assessment & Test History</h4>
-          <table class="report-table">
-            <thead>
-              <tr>
-                <th>Tested Topic / Unit</th>
-                <th>Mock #</th>
-                <th>Score</th>
-                <th>Submission</th>
-                <th>Attendance</th>
-                <th>Preview Done</th>
-                <th>Punctual</th>
-                <th>Tier</th>
-              </tr>
-            </thead>
+          <h4 class="report-section-title">Tests</h4>
+          ${
+            marks.length === 0
+              ? `<p>No marks recorded yet.</p>`
+              : `<table class="report-table">
+            <thead><tr><th>Topic or unit</th><th>Mock</th><th>Score</th><th>Submitted</th><th>Attendance</th><th>Preview</th><th>On time</th><th>Band</th></tr></thead>
             <tbody>
-              ${
-                sortedMarks.length === 0
-                  ? `<tr><td colspan="8" style="text-align: center; color: #666; padding: 1rem;">No assessment marks logged yet.</td></tr>`
-                  : sortedMarks
-                      .map((m) => {
-                        const mBand = getScoreBand(m.quizScore);
-                        return `
-                      <tr>
-                        <td><strong>${esc(m.cycle)}</strong></td>
-                        <td>${esc(m.mockNumber || "—")}</td>
-                        <td><strong class="num">${esc(m.quizScore)}</strong> / 100</td>
-                        <td>${esc(m.submission || "Yes")}</td>
-                        <td>${esc(m.attendance || "100%")}</td>
-                        <td>${esc(m.previewDone || "Yes")}</td>
-                        <td>${esc(m.punctual || "Yes")}</td>
-                        <td><span class="badge ${esc(mBand.cls)}">${esc(mBand.label)}</span></td>
-                      </tr>
-                    `;
-                      })
-                      .join("")
-              }
+              ${marks
+                .map((m) => {
+                  const b = getScoreBand(m.quizScore);
+                  return `<tr>
+                <td><strong>${esc(m.cycle)}</strong></td>
+                <td>${esc(m.mockNumber || "—")}</td>
+                <td><strong class="num">${esc(m.quizScore)}</strong></td>
+                <td>${esc(m.submission || "—")}</td>
+                <td>${esc(m.attendance || "—")}</td>
+                <td>${esc(m.previewDone || "—")}</td>
+                <td>${esc(m.punctual || "—")}</td>
+                <td><span class="badge ${esc(b.cls)}">${esc(b.label)}</span></td>
+              </tr>`;
+                })
+                .join("")}
             </tbody>
-          </table>
+          </table>`
+          }
         </div>
 
-        <!-- Official Instructor Remarks -->
         <div class="report-section">
-          <h4 class="report-section-title">Faculty Assessment & Growth Roadmap</h4>
-          <div class="report-remarks-box">
-            <p>${esc(remarks)}</p>
-          </div>
+          <h4 class="report-section-title">Notes from markers</h4>
+          ${
+            notes.length
+              ? `<ul class="report-notes">${notes
+                  .map((m) => `<li><strong>${esc(m.cycle)}:</strong> ${esc(m.notes)}${m.editedBy ? ` <span class="report-by">(${esc(m.editedBy)})</span>` : ""}</li>`)
+                  .join("")}</ul>`
+              : `<p>No notes were written with these marks.</p>`
+          }
         </div>
 
-        <!-- Signatures & Verification -->
         <div class="report-signatures">
-          <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-name">Dr. Numan</div>
-            <div class="sig-title">Class Instructor • Economics</div>
-          </div>
-          <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-name">Shehroz</div>
-            <div class="sig-title">Group Leader • Academic Operations</div>
-          </div>
-          <div class="sig-col">
-            <div class="sig-line"></div>
-            <div class="sig-name">Sajal</div>
-            <div class="sig-title">Teaching Assistant • Test Auditor</div>
-          </div>
+          <div class="sig-col"><div class="sig-line"></div><div class="sig-name">Dr. Numan</div><div class="sig-title">Instructor</div></div>
+          <div class="sig-col"><div class="sig-line"></div><div class="sig-name">Shehroz</div><div class="sig-title">Group leader</div></div>
         </div>
       </div>
     </div>
   `;
 
-  document.body.appendChild(modalEl);
-
-  const closeBtn = modalEl.querySelector("#btn-close-report");
-  const printBtn = modalEl.querySelector("#btn-print-report");
-
-  const closeModal = () => modalEl.remove();
-
-  closeBtn.addEventListener("click", closeModal);
-  modalEl.addEventListener("click", (e) => {
-    if (e.target === modalEl) closeModal();
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector("#btn-close-report").addEventListener("click", close);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
   });
-
-  printBtn.addEventListener("click", () => {
-    window.print();
-  });
+  overlay.querySelector("#btn-print-report").addEventListener("click", () => window.print());
+  enhanceModal(overlay, close);
 }
