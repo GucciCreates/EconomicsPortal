@@ -31,19 +31,38 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         <p class="auth-subtitle">The class portal for Dr. Numan's Economics class: four teams, seventeen students, every quiz and submission on the record.</p>
         <figure class="auth-figure" aria-hidden="true">
           <svg viewBox="0 0 440 280" role="presentation">
+            <path class="area area-cs" d="" />
+            <path class="area area-ps" d="" />
             <path class="axis" d="M40 16 V244 H428" />
             <path class="guide guide-eq" d="M40 130.45 H216.03 V244" />
+            <clipPath id="auth-plot-area"><rect x="42" y="0" width="398" height="242" /></clipPath>
             <path class="curve-d-ghost" d="M64 40 C140 80, 270 170, 392 228" />
             <path class="curve-s draw" d="M64 228 C130 190, 230 110, 392 36" />
-            <path class="curve-d draw" d="M64 40 C140 80, 270 170, 392 228" />
+            <g clip-path="url(#auth-plot-area)"><path class="curve-d draw" d="M64 40 C140 80, 270 170, 392 228" /></g>
+            <text class="area-label area-label-cs" x="115" y="96" text-anchor="middle"><tspan x="115" dy="0">Consumer</tspan><tspan x="115" dy="12">surplus</tspan></text>
+            <text class="area-label area-label-ps" x="115" y="158" text-anchor="middle"><tspan x="115" dy="0">Producer</tspan><tspan x="115" dy="12">surplus</tspan></text>
+            <g class="axis-mark mark-p" transform="translate(0 130.45)">
+              <path d="M34 0 H46" />
+              <text x="30" y="4" text-anchor="end">P*</text>
+            </g>
+            <g class="axis-mark mark-q" transform="translate(216.03 0)">
+              <path d="M0 238 V250" />
+              <text x="0" y="262" text-anchor="middle">Q*</text>
+            </g>
+            <circle class="eq-halo" cx="216.03" cy="130.45" r="9" />
             <circle class="eq-dot" cx="216.03" cy="130.45" r="9" />
             <text class="label-s" x="398" y="34">S</text>
             <text class="label-d" x="398" y="234">D</text>
             <path class="guide guide-label" d="M216.03 58 V118.45" />
+            <rect class="label-eq-bg" x="130" y="33" width="172" height="21" rx="3" />
             <text class="label-eq" x="216.03" y="48" text-anchor="middle">Effort meets the deadline</text>
             <text x="44" y="268">Week</text>
             <text x="8" y="22">Marks</text>
           </svg>
+          <figcaption class="auth-figure-caption">
+            <span class="hint-hover">Move across the chart to shift demand.</span>
+            <span class="hint-touch">Drag across the chart to shift demand.</span>
+          </figcaption>
         </figure>
       </section>
 

@@ -255,7 +255,7 @@ test('the sign-in chart animates a demand shift, and stays still for reduced mot
     await still.waitForSelector('.auth-figure .eq-dot');
     await still.waitForTimeout(4600);
     assert.equal(await still.getAttribute('.auth-figure .eq-dot', 'cx'), '216.03');
-    assert.equal(await still.getAttribute('.auth-figure .curve-d', 'transform'), null);
+    assert.equal(await still.getAttribute('.auth-figure .curve-d', 'transform'), 'translate(0.00 0)');
   } finally {
     await browser.close();
   }
