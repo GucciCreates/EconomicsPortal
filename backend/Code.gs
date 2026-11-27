@@ -39,6 +39,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 const SCHEMA_VERSION = "7";
 const TEAMS = ["Shehroz", "Amina", "Ayesha", "Lareb"];
+const LEADERBOARD_TOP = 5; // students see this many classmates on the leaderboard, plus themselves
 const ROLES = ["instructor", "group_leader", "assistant", "team_leader", "member"];
 const SESSION_DAYS = 7;
 const SESSION_RENEW_DAYS = 2;            // renew tokens in their last 2 days
@@ -1033,9 +1034,15 @@ function buildDashboard(ss, session) {
   // Member: only their own detail, plus a public leaderboard summary.
   const myMarks = marks.filter(m => isMe(m.member));
   const myMetricsKey = Object.keys(metrics).find(k => isMe(k));
+  // Students see the top LEADERBOARD_TOP and their own place, never the
+  // whole class's scores (so nobody can see who is at the bottom).
+  const ranked = Object.keys(metrics)
+    .filter(k => Number(metrics[k].avgScore) > 0)
+    .sort((a, b) => Number(metrics[b].avgScore) - Number(metrics[a].avgScore) || String(a).localeCompare(String(b)));
   const leaderboard = {};
-  Object.keys(metrics).forEach(k => {
-    leaderboard[k] = isMe(k) ? metrics[k] : publicMetrics(metrics[k]);
+  ranked.forEach((k, i) => {
+    if (i >= LEADERBOARD_TOP && !isMe(k)) return;
+    leaderboard[k] = Object.assign({}, isMe(k) ? metrics[k] : publicMetrics(metrics[k]), { rank: i + 1 });
   });
   return {
     tasks: tasks.filter(t => t.team === team || t.team === "ALL"),
@@ -1046,6 +1053,7 @@ function buildDashboard(ss, session) {
     mySubmissions: subs.filter(s => isMe(s.member)),
     myMetrics: myMetricsKey ? metrics[myMetricsKey] : null,
     memberMetrics: leaderboard,
+    leaderboardSize: ranked.length,
     myEscalations: escalations.filter(es => isMe(es.raisedBy)),
     announcements: announcements,
     quizzes: quizzes.filter(q => q.scope === "ALL" || q.scope === team),

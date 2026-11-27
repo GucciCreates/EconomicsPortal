@@ -3225,3 +3225,10 @@ input[type='checkbox'] {
     display: none;
   }
 }
+
+.lb-gap td {
+  text-align: center;
+  color: var(--text-muted);
+  padding-block: 0.15rem;
+  letter-spacing: 0.3em;
+}

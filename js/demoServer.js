@@ -32,6 +32,7 @@ export { normalizeUserName };
 
 const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v7';
 const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
+const LEADERBOARD_TOP = 5;
 const ROLES = ['instructor', 'group_leader', 'assistant', 'team_leader', 'member'];
 const LEADERS = ['group_leader', 'instructor'];
 const MARK_EDITORS = ['group_leader', 'instructor', 'assistant'];
@@ -466,9 +467,14 @@ function buildDashboard(store, session) {
 
   const myMarks = marks.filter((m) => isMe(m.member));
   const myKey = Object.keys(metrics).find((k) => isMe(k));
+  // Same rule as Code.gs: the top LEADERBOARD_TOP plus your own place.
+  const ranked = Object.keys(metrics)
+    .filter((k) => Number(metrics[k].avgScore) > 0)
+    .sort((x, y) => Number(metrics[y].avgScore) - Number(metrics[x].avgScore) || String(x).localeCompare(String(y)));
   const leaderboard = {};
-  Object.keys(metrics).forEach((k) => {
-    leaderboard[k] = isMe(k) ? metrics[k] : publicMetrics(metrics[k]);
+  ranked.forEach((k, i) => {
+    if (i >= LEADERBOARD_TOP && !isMe(k)) return;
+    leaderboard[k] = { ...(isMe(k) ? metrics[k] : publicMetrics(metrics[k])), rank: i + 1 };
   });
   return clone({
     tasks: tasks.filter((t) => t.team === team || t.team === 'ALL'),
@@ -479,6 +485,7 @@ function buildDashboard(store, session) {
     mySubmissions: subs.filter((s) => isMe(s.member)),
     myMetrics: myKey ? metrics[myKey] : null,
     memberMetrics: leaderboard,
+    leaderboardSize: ranked.length,
     myEscalations: escalations.filter((es) => isMe(es.raisedBy)),
     announcements,
     quizzes: quizzes.filter((q) => q.scope === 'ALL' || q.scope === team),

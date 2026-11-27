@@ -96,3 +96,24 @@ test('F7: the instructor can reset a PIN from Admin (Demo Mode, same rule as the
     await browser.close();
   }
 });
+
+test('F6: a student sees the top 5 and their own place, at phone width too', { timeout: 60000 }, async () => {
+  const { browser, page, errors } = await openApp({ demo: true, viewport: { width: 390, height: 844 } });
+  try {
+    await page.fill('#login-name', 'Danish'); // sample student near the bottom
+    await page.fill('#login-pin', '2003');
+    await page.click('#btn-submit-login');
+    await page.click('.tab-btn[data-tab="leaderboard"]');
+    await page.waitForSelector('.row-me');
+    const rows = await page.$$eval('table.data-table tbody tr:not(.lb-gap)', (r) => r.length);
+    assert.ok(rows <= 6, `${rows} students shown`);
+    assert.ok(await page.$('.lb-gap'), 'a gap marks the students who are not shown');
+    assert.match(await page.textContent('.row-me'), /Danish/);
+    assert.match(await page.textContent('.card-note >> nth=1'), /top 5 and your place, out of \d+ students/);
+    assert.doesNotMatch(await page.textContent('main'), /Iqra/, 'the lowest score is not shown to other students');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= 390), true);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});

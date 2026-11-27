@@ -11,8 +11,10 @@ import { emptyState, teamChip, sameName } from "./ui.js";
  * @param {object} memberMetrics  — { name: { avgScore, team, streak, delta, atRisk? } }
  * @param {object} teamAverages   — { team: average }
  * @param {object} user
+ * @param {{ size?: number }} [opts] - size: how many students are ranked in total,
+ *   when the server sent only the top 5 and your own place (students' view).
  */
-export function renderLeaderboard(container, memberMetrics, teamAverages, user) {
+export function renderLeaderboard(container, memberMetrics, teamAverages, user, { size } = {}) {
   const teamRows = Object.entries(teamAverages)
     .map(([team, avg]) => ({ team, avg: Number(avg) }))
     .sort((a, b) => b.avg - a.avg);
@@ -25,9 +27,11 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
       streak: Number(m.streak || 0),
       delta: Number(m.delta || 0),
       atRisk: Boolean(m.atRisk),
+      rank: Number(m.rank) || 0,
     }))
     .filter((m) => m.avg > 0)
-    .sort((a, b) => b.avg - a.avg);
+    .sort((a, b) => (a.rank && b.rank ? a.rank - b.rank : b.avg - a.avg));
+  const partial = Number(size) > memberRows.length;
 
   const trend = (d) =>
     d > 0
@@ -66,7 +70,9 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
     <section class="card">
       <div class="card-header">
         <h3 class="card-title">Students</h3>
-        <span class="card-note">Average of each student's tests</span>
+        <span class="card-note">${
+          partial ? `The top 5 and your place, out of ${esc(size)} students` : "Average of each student's tests"
+        }</span>
       </div>
       ${
         memberRows.length === 0
@@ -81,9 +87,12 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
               .map((m, i) => {
                 const band = getScoreBand(m.avg);
                 const isMe = sameName(m.name, user.name);
-                return `
+                const rank = m.rank || i + 1;
+                const prev = i > 0 ? memberRows[i - 1].rank || i : 0;
+                const gap = m.rank && i > 0 && m.rank > prev + 1;
+                return `${gap ? `<tr class="lb-gap" aria-hidden="true"><td colspan="7">⋯</td></tr>` : ""}
               <tr class="${isMe ? "row-me" : ""}">
-                <td data-label="Rank" class="cell-strong">${esc(i + 1)}</td>
+                <td data-label="Rank" class="cell-strong">${esc(rank)}</td>
                 <td data-label="Student">
                   <strong>${esc(m.name)}</strong>
                   ${isMe ? `<span class="chip chip-accent">You</span>` : ""}

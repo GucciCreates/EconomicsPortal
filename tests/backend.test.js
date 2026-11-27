@@ -368,7 +368,7 @@ test("members only see their own marks and a summary of classmates' metrics", ()
   assert.ok(data.marks.every((m) => m.member === 'Ramesh'));
   assert.ok(data.myMarks.every((m) => m.member === 'Ramesh'));
   assert.ok(!JSON.stringify(data).includes('mamoon private'));
-  assert.deepEqual(Object.keys(data.memberMetrics.Mamoon).sort(), ['avgScore', 'delta', 'member', 'streak', 'team']);
+  assert.deepEqual(Object.keys(data.memberMetrics.Mamoon).sort(), ['avgScore', 'delta', 'member', 'rank', 'streak', 'team']);
   assert.ok('avgPeerRating' in data.memberMetrics.Ramesh);
   assert.equal(data.submissions, undefined);
   assert.equal(data.escalations, undefined);
@@ -758,4 +758,31 @@ test('F7: the instructor can reset a PIN too; other roles still cannot', () => {
   for (const who of ['Sajal', 'Amina', 'Minal']) {
     assert.equal(b.post({ action: 'updatePin', token: b.tokenFor(who), targetMember: 'Ramesh', newPin: '8642' }).code, 'FORBIDDEN', who);
   }
+});
+
+test('F6: students see the top 5 and their own place, not every classmate\'s score', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  // 8 students with marks: Ramesh is 7th of 8.
+  const scores = { Mamoon: 95, Minal: 91, Lareb: 88, Shaiman: 84, Amina: 80, Sajal: 77, Ramesh: 60, Haseeb: 31 };
+  Object.entries(scores).forEach(([member, quizScore]) => {
+    const r = b.post({ action: 'addMark', token: gl, member, cycle: 'Unit 1', quizScore, submission: 'Yes', withDashboard: false });
+    assert.equal(r.ok, true, `${member}: ${r.error}`);
+  });
+  const d = b.post({ action: 'dashboard', token: b.tokenFor('Ramesh') }).data;
+  const names = Object.keys(d.memberMetrics).sort();
+  assert.deepEqual(names, ['Amina', 'Lareb', 'Mamoon', 'Minal', 'Ramesh', 'Shaiman'].sort());
+  assert.equal(d.memberMetrics.Ramesh.rank, 7);
+  assert.equal(d.memberMetrics.Mamoon.rank, 1);
+  assert.equal(d.leaderboardSize, 8);
+  assert.ok(!JSON.stringify(d).includes('Haseeb'), 'the lowest score is not sent to other students');
+
+  // A student in the top 5 sees just the top 5.
+  const top = b.post({ action: 'dashboard', token: b.tokenFor('Minal') }).data;
+  assert.equal(Object.keys(top.memberMetrics).length, 5);
+  assert.equal(top.memberMetrics.Minal.rank, 2);
+
+  // Leaders still see everyone.
+  const lead = b.post({ action: 'dashboard', token: gl }).data;
+  assert.ok(lead.memberMetrics.Haseeb);
 });
