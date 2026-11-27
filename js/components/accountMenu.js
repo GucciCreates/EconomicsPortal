@@ -3,7 +3,7 @@
  * owner has turned it on), "Change my PIN", "Email reminders" and "Log out".
  */
 
-import { apiChangeMyPin, apiLinkGoogle, apiSetReminders, apiUnlinkGoogle, getCachedDashboard } from '../api.js';
+import { apiChangeMyPin, apiLinkGoogle, apiSetReminders, apiUnlinkGoogle, describeApiError, getCachedDashboard } from '../api.js';
 import { cachedGoogleClientId, renderGoogleButton } from '../googleSignIn.js';
 import { getCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
@@ -133,7 +133,7 @@ export function openGoogleLinkModal() {
           window.showEconomicsToast('Google sign-in turned off for your account.', 'success');
         } else if (res.code !== 'AUTH') showError(res.error || 'Could not save.');
       } catch (err) {
-        showError("Can't reach the class server. Try again in a moment.");
+        showError(describeApiError(err));
       } finally {
         btn.disabled = false;
       }
@@ -153,7 +153,7 @@ export function openGoogleLinkModal() {
           window.showEconomicsToast(`Done. Next time, sign in with Google as ${res.googleEmail}.`, 'success');
         } else if (res.code !== 'AUTH') showError(res.error || 'Could not link that account.');
       } catch (err) {
-        showError("Can't reach the class server. Try again in a moment.");
+        showError(describeApiError(err));
       }
     },
     { text: 'continue_with' },
@@ -220,7 +220,7 @@ export function openRemindersModal() {
         feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Could not save.')}</div>`;
       }
     } catch (err) {
-      feedback.innerHTML = '<div class="alert alert-error">Can\'t reach the class server. Try again in a moment.</div>';
+      feedback.innerHTML = `<div class="alert alert-error">${esc(describeApiError(err))}</div>`;
     } finally {
       btn.disabled = false;
     }
@@ -280,7 +280,7 @@ export function openChangeMyPinModal() {
         showError(res.error || 'Could not change your PIN.');
       }
     } catch (err) {
-      showError('Error: ' + err.message);
+      showError(describeApiError(err));
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = 'Change PIN';

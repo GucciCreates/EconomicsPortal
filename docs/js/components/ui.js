@@ -7,6 +7,7 @@
  * - emptyState(): the same "nothing here yet, here's what to do" block everywhere.
  */
 import { esc } from '../utils.js';
+import { describeApiError } from '../api.js';
 
 export const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
 
@@ -78,9 +79,7 @@ export async function runAction(button, busyLabel, call, { success, onDone, onEr
     }
     return res;
   } catch (err) {
-    const msg = navigator.onLine === false
-      ? "You're offline. Reconnect and try again."
-      : "Can't reach the class server. Try again in a moment.";
+    const msg = describeApiError(err);
     if (onError) onError(msg);
     else toast(msg, 'error');
     return null;

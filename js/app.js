@@ -16,6 +16,7 @@ import {
   getCachedDashboard,
   lastSyncedAt,
   forgetDashboards,
+  describeApiError,
 } from './api.js';
 import { formatRelative, formatFull } from './dates.js';
 // Dashboards are loaded only after sign-in, so the sign-in page stays small.
@@ -377,9 +378,7 @@ async function loadDashboard() {
     }
     await renderDashboard(user, res.data || {});
   } catch (err) {
-    const msg = navigator.onLine === false
-      ? "You're offline. Reconnect to the internet to load your latest data."
-      : "Can't reach the class server right now. Wait a moment, then try again.";
+    const msg = describeApiError(err);
     if (!cached) renderErrorScreen(msg);
     else window.showEconomicsToast && window.showEconomicsToast(msg + ' Showing what you saw last.', 'error');
   }
