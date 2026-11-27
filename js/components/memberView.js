@@ -27,6 +27,14 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   const myGoal = data.myGoal || null;
 
   const avgBand = teamAverage !== null ? getScoreBand(teamAverage) : null;
+  // Declared before the first switchTab() call below, which reads them.
+  const teamMessages = data.teamMessages || [];
+  const mentorshipPlans = data.mentorship || [];
+  const myMentorship = mentorshipPlans.find(
+    (p) =>
+      p.student.toLowerCase() === user.name.toLowerCase() ||
+      p.mentor.toLowerCase() === user.name.toLowerCase(),
+  );
 
   container.innerHTML = `
     <!-- Header Banner -->
@@ -52,7 +60,9 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
       </div>
     </div>
 
-    <!-- Tab Content Shell -->
+    <!-- Tab bar and content live in separate elements so rendering a tab
+         never wipes out the tab bar. -->
+    <div id="mem-tab-nav"></div>
     <div id="mem-tab-content"></div>
   `;
 
@@ -82,16 +92,8 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
   }
 
-  createTabNav(container.querySelector('#mem-tab-content'), tabs, switchTab);
+  createTabNav(container.querySelector('#mem-tab-nav'), tabs, switchTab);
   switchTab('overview');
-
-  const teamMessages = data.teamMessages || [];
-  const mentorshipPlans = data.mentorship || [];
-  const myMentorship = mentorshipPlans.find(
-    (p) =>
-      p.student.toLowerCase() === user.name.toLowerCase() ||
-      p.mentor.toLowerCase() === user.name.toLowerCase(),
-  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // TAB 1: OVERVIEW & SCORECARD
