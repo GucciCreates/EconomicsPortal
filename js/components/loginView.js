@@ -9,8 +9,10 @@
 
 import { apiLogin } from '../api.js';
 import { setCurrentUser } from '../auth.js';
+import { isDemoMode } from '../config.js';
+import { escapeHtml } from '../utils.js';
 
-export function renderModernLogin(container, onSuccess, onForceDemo) {
+export function renderModernLogin(container, onSuccess, onForceDemo, options = {}) {
   const rememberedName =
     localStorage.getItem('economics_portal_remember_name') || '';
 
@@ -34,7 +36,11 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           </div>
         </div>
 
-        <div id="login-error-box"></div>
+        <div id="login-error-box">${
+          options.notice
+            ? `<div class="alert alert-info" role="status">${escapeHtml(options.notice)}</div>`
+            : ''
+        }</div>
 
         <div class="auth-hero-box" aria-label="Portal summary">
           <div class="auth-hero-row">
@@ -63,7 +69,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           </div>
         </div>
 
-        <div class="quick-login-panel" aria-label="Quick login demo accounts">
+        ${isDemoMode() ? `<div class="quick-login-panel" aria-label="Quick login demo accounts">
           <p class="quick-login-title">Quick access workspace</p>
           <div class="quick-login-grid">
             <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan</button>
@@ -72,7 +78,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
             <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha</button>
             <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh</button>
           </div>
-        </div>
+        </div>` : ''}
 
         <!-- Secure Login Form -->
         <form id="form-login" class="auth-form">
@@ -85,7 +91,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
                 id="login-name"
                 class="form-control auth-input"
                 placeholder="e.g. Shehroz, Sajal, or Ramesh"
-                value="${rememberedName}"
+                value="${escapeHtml(rememberedName)}"
                 autocomplete="name"
                 required
               />

@@ -1184,6 +1184,11 @@ a:hover {
   color: var(--teal);
   border-color: var(--teal-border);
 }
+.alert-info {
+  background-color: var(--purple-soft);
+  color: var(--text-main);
+  border-color: var(--purple-border);
+}
 
 /* ==========================================================================
    Footer

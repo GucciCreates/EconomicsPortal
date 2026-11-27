@@ -4,7 +4,7 @@
 
 import { API_URL, isDemoMode } from './config.js';
 import { getCurrentUser, setCurrentUser, clearCurrentUser } from './auth.js';
-import { apiLogin, apiGetDashboard, resetDemoData } from './api.js';
+import { apiGetDashboard, resetDemoData } from './api.js';
 import { renderMemberDashboard } from './components/memberView.js';
 import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';
 import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
@@ -157,13 +157,21 @@ function renderFooter() {
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGIN VIEW
 // ─────────────────────────────────────────────────────────────────────────────
-function renderLogin() {
+function renderLogin(notice = '') {
   renderModernLogin(
     mainEl,
     () => refreshApp(),
     () => refreshApp(),
+    { notice },
   );
 }
+
+// The API client clears the session and fires this when the server rejects
+// the token (expired, PIN changed, or signed in from an old version).
+window.addEventListener('economics:session-expired', () => {
+  renderHeader();
+  renderLogin('Your session expired, please sign in again.');
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD VIEW LOADER
@@ -192,7 +200,8 @@ async function loadDashboard() {
   `;
 
   try {
-    const res = await apiGetDashboard(user.role, user.team, user.name);
+    const res = await apiGetDashboard();
+    if (res.code === 'AUTH') return; // login screen already shown
     if (!res.ok) {
       mainEl.innerHTML = `
         <div class="alert alert-error" style="max-width: 600px; margin: 2rem auto;">
