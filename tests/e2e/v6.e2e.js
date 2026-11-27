@@ -153,3 +153,110 @@ test('every tab of every role fits a 390px phone screen', { timeout: 240000 }, a
     await browser.close();
   }
 });
+
+test('Google sign-in: link once after a PIN sign-in, then one tap and one request', { timeout: 120000 }, async () => {
+  const backend = liveBackend();
+  const CLIENT = '123-e2e.apps.googleusercontent.com';
+  backend.props.GOOGLE_CLIENT_ID = CLIENT;
+  const credential = 'h.ramesh-e2e.s';
+  backend.google.tokens[credential] = {
+    iss: 'accounts.google.com',
+    aud: CLIENT,
+    email: 'ramesh@gmail.com',
+    email_verified: true,
+    exp: String(Math.floor(Date.now() / 1000) + 3600),
+  };
+  const { browser, page, errors, apiCalls } = await openApp({ demo: false, backend, fakeGoogle: true, viewport: { width: 390, height: 844 } });
+  try {
+    await page.waitForSelector('#google-signin:not([hidden]) .fake-gsi-button');
+    await page.evaluate((c) => (window.__fakeCredential = c), credential);
+
+    // Not linked yet: a clear message, and the PIN form still works.
+    await page.click('.fake-gsi-button');
+    // Wait for the answer (role=alert), not the "Signing in…" status line.
+    await page.waitForSelector('#login-error-box [role="alert"]');
+    assert.match(await page.textContent('#login-error-box'), /isn't linked to anyone/);
+
+    await page.fill('#login-name', 'Ramesh');
+    await page.fill('#login-pin', '1357');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('.tab-nav');
+    // A 4-digit PIN shows the PIN note first; link from the account menu instead.
+    await page.click('#btn-account-menu');
+    await page.click('#btn-google-link');
+    await page.waitForSelector('#google-link-host .fake-gsi-button');
+    await page.click('#google-link-host .fake-gsi-button');
+    await page.waitForSelector('.toast:has-text("Next time, sign in with Google")');
+
+    await page.click('#btn-account-menu');
+    await page.click('#btn-logout');
+    await page.waitForSelector('#google-signin:not([hidden]) .fake-gsi-button');
+    await page.evaluate((c) => (window.__fakeCredential = c), credential);
+    apiCalls.length = 0;
+    await page.click('.fake-gsi-button');
+    await page.waitForSelector('.tab-nav');
+    assert.deepEqual(apiCalls.filter((a) => a !== 'names'), ['googleLogin'], 'one request signs in and loads the dashboard');
+    assert.match(await page.textContent('#btn-account-menu'), /Ramesh/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= 390), true, 'no sideways scroll at 390 px');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('the Google button stays hidden in Demo Mode and when the server has no client ID', { timeout: 60000 }, async () => {
+  const backend = liveBackend();
+  const live = await openApp({ demo: false, backend, fakeGoogle: true });
+  try {
+    await live.page.waitForFunction(() => document.querySelectorAll('#login-name-options option').length > 10);
+    assert.equal(await live.page.isVisible('#google-signin'), false);
+  } finally {
+    await live.browser.close();
+  }
+  const demo = await openApp({ demo: true, fakeGoogle: true });
+  try {
+    await demo.page.waitForSelector('.quick-login-chip');
+    await demo.page.waitForTimeout(300);
+    assert.equal(await demo.page.isVisible('#google-signin'), false);
+  } finally {
+    await demo.browser.close();
+  }
+});
+
+test('the sign-in chart animates a demand shift, and stays still for reduced motion', { timeout: 60000 }, async () => {
+  const { browser, context, page, errors } = await openApp({ demo: true });
+  try {
+    await page.waitForSelector('.auth-figure .eq-dot');
+    const read = () =>
+      page.evaluate(() => {
+        const dot = document.querySelector('.auth-figure .eq-dot');
+        const s = document.querySelector('.auth-figure .curve-s');
+        const x = Number(dot.getAttribute('cx'));
+        const y = Number(dot.getAttribute('cy'));
+        // Distance from the dot to the supply curve: the dot must stay on it.
+        let best = Infinity;
+        const len = s.getTotalLength();
+        for (let i = 0; i <= 400; i++) {
+          const p = s.getPointAtLength((len * i) / 400);
+          best = Math.min(best, Math.hypot(p.x - x, p.y - y));
+        }
+        return { x, y, off: best, shift: document.querySelector('.auth-figure .curve-d').getAttribute('transform') || '' };
+      });
+    await page.waitForTimeout(4600); // draw-in + hold + most of the first shift
+    const moved = await read();
+    assert.ok(moved.x > 220, `equilibrium moved right with demand (x=${moved.x})`);
+    assert.ok(moved.off < 1.5, `dot stays on the supply curve (off by ${moved.off.toFixed(2)})`);
+    assert.match(moved.shift, /translate\(\d/);
+    assert.deepEqual(errors, []);
+
+    const still = await context.newPage();
+    await still.emulateMedia({ reducedMotion: 'reduce' });
+    await still.goto('http://portal.test/index.html');
+    await still.waitForSelector('.auth-figure .eq-dot');
+    await still.waitForTimeout(4600);
+    assert.equal(await still.getAttribute('.auth-figure .eq-dot', 'cx'), '216.03');
+    assert.equal(await still.getAttribute('.auth-figure .curve-d', 'transform'), 'translate(0.00 0)');
+  } finally {
+    await browser.close();
+  }
+});

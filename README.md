@@ -12,7 +12,7 @@ It runs entirely for free:
 
 ## 👥 Roles
 
-Names and PINs live only in the private Google Sheet. Each person gets their PIN from the group leader and can change it from the account menu (top right).
+Names and PINs live only in the private Google Sheet. Each person gets their PIN from the group leader and can change it from the account menu (top right). Once the owner turns it on, people can also link their Google account and sign in with Google in one tap (SETUP_GUIDE.md, section 2).
 
 | Role | What they can do |
 | :--- | :--- |
@@ -26,7 +26,8 @@ Names and PINs live only in the private Google Sheet. Each person gets their PIN
 
 ## 🔐 Security model (v6)
 
-- **Signed sessions.** Signing in with name + PIN returns a session token signed with HMAC-SHA256 (secret kept in the Apps Script project's Script Properties, never in code). Tokens are renewed automatically while in use and expire after 7 days without use.
+- **Sign in with Google (optional, free).** Google's button gives the browser a signed ID token. The backend asks Google's tokeninfo endpoint whether it is genuine, issued for this portal's client ID, unexpired and for a verified address, then matches it to the `googleEmail` column. No API key or billing.
+- **Signed sessions.** Signing in with name + PIN (or Google) returns a session token signed with HMAC-SHA256 (secret kept in the Apps Script project's Script Properties, never in code). Tokens are renewed automatically while in use and expire after 7 days without use.
 - **The server decides who you are.** Every request carries the token, and the backend looks up name, role and team in the Users sheet. Anything the browser claims is ignored.
 - **Scoped access.** Team leaders can only act on their own team; students only on themselves. Students receive only their own marks plus a leaderboard summary of classmates.
 - **PINs** are 4–8 digits, stored as salted SHA-256 hashes and never sent to the browser. The instructor, group leader and assistant must choose at least 6 digits. Changing or resetting a PIN signs that person out everywhere.

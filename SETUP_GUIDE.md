@@ -35,11 +35,54 @@ The tabs `setup()` creates: `Users`, `Marks`, `Tasks`, `Submissions`, `Escalatio
    * Execute as: **Me (bahriabatch30@gmail.com)**
    * Who has access: **Anyone**. This is required for the site to reach it; the token check protects the data.
 7. Copy the Web app URL into `js/config.js` (`API_URL`), run `npm run build`, then commit and push.
-8. Optional but recommended: run **`installBackupTrigger()`** (see section 5).
+8. Optional but recommended: run **`installBackupTrigger()`** (see section 6).
 
 ---
 
-## 2. ⚡ Upgrading to v6 (from v4 or v5)
+## 2. 🔑 Turning on "Sign in with Google" (v6.1, optional, free)
+
+People can sign in with one tap using their Google account instead of typing a name and PIN. Name and PIN keep working as a backup, so **nobody is locked out** while this is set up, and nothing changes until you finish step B4.
+
+It's free: a Google Cloud project for sign-in needs **no billing account and no credit card**.
+
+**A. Get a Google client ID (about 5 minutes, once)**
+
+1. Open [console.cloud.google.com](https://console.cloud.google.com/) signed in with the same Google account that owns the sheet. If asked, accept the terms. **Don't** start a free trial or add billing; it isn't needed.
+2. Create a project: project picker (top left) → **New project** → name it `EconomicsPortal` → **Create**, then select it.
+3. Go to **APIs & Services → OAuth consent screen** (it may be called **Google Auth Platform**) → **Get started**:
+   * App name `EconomicsPortal`, user support email = your address.
+   * Audience: **External**.
+   * Contact email = your address → **Create**.
+   * Then under **Audience**, press **Publish app** so any Google account can sign in. Sign-in only asks for name and email address, so Google doesn't need to review the app.
+4. Go to **Clients** (or **Credentials → Create credentials → OAuth client ID**):
+   * Application type: **Web application**, name `EconomicsPortal site`.
+   * **Authorized JavaScript origins → Add URI:** `https://guccicreates.github.io`.
+   * Leave **Authorized redirect URIs** empty → **Create**.
+5. Copy the **Client ID** (it ends in `.apps.googleusercontent.com`). It isn't a secret; it appears in every Google button. You never need the client secret.
+
+**B. Update Apps Script**
+
+1. **Back up the sheet:** **File → Make a copy**.
+2. Replace everything in **Extensions → Apps Script** with the new [`backend/Code.gs`](./backend/Code.gs), **Save**, then **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy** (the URL stays the same).
+3. **Run `setup()`** once. It adds a `googleEmail` column to the Users tab. Approve the new permission **"Connect to an external service"**: the script uses it to ask Google whether a sign-in is genuine.
+4. **Project Settings (⚙️) → Script Properties → Add script property:** `GOOGLE_CLIENT_ID` = the client ID from step A5 → **Save**.
+5. Merge the pull request into `main`. GitHub Pages updates within a few minutes.
+6. **Check:** open the site. A **Sign in with Google** button appears above the name and PIN form.
+
+**C. Link each person to their Google account.** Either way works:
+
+* **They do it themselves (easiest):** they sign in with name and PIN once. The portal offers **Use Google to sign in**, or they can use **their name (top right) → Sign in with Google**. After that the Google button signs them in.
+* **You do it in the sheet:** type each person's Gmail address into the `googleEmail` column of the Users tab, then run `clearCache()`.
+
+Someone who presses the Google button before linking sees "This Google account isn't linked to anyone in the class", with the next step to take. One Google account can belong to only one person.
+
+> **Turn it off again:** delete the `GOOGLE_CLIENT_ID` script property. The button disappears and name and PIN work as before.
+>
+> **Testing on your own computer** (`npm run dev`): also add `http://localhost:3000` as an authorized JavaScript origin in step A4.
+
+---
+
+## 3. ⚡ Upgrading to v6 (from v4 or v5)
 
 v6 makes the portal faster (one request to sign in or save), adds longer PINs, safer login locks and optional emails. **Nobody is signed out and every PIN keeps working.** Do these steps in order:
 
@@ -63,7 +106,7 @@ v6 makes the portal faster (one request to sign in or save), adds longer PINs, s
 
 ---
 
-## 3. Upgrading to v4 (from v3)
+## 4. Upgrading to v4 (from v3)
 
 v4 changes how logins work. **Everyone will have to sign in again**, and **everyone needs a new PIN**: the old default PINs were published in the public README and stay in the repository's history.
 
@@ -80,23 +123,23 @@ Do these steps in order, close together. Between steps 3 and 5, people using the
 5. **Publish the new website:** merge the v4 pull request into `main`. `docs/` is already built, so GitHub Pages updates within a few minutes.
 6. **Check `js/config.js`** still points at your web app URL. Open the site, log in as yourself, and check that your dashboard loads.
 7. **Tell everyone:** "The portal was upgraded. Sign in again with the new PIN I sent you. You can change it under your name (top right) → Change my PIN."
-8. Optional: run `installBackupTrigger()` (section 5).
+8. Optional: run `installBackupTrigger()` (section 6).
 
 > If someone still sees an old version of the site, a normal refresh fixes it. The app now uses network-first caching, so new releases appear straight away.
 
 ---
 
-## 4. Everyday administration
+## 5. Everyday administration
 
 * **Someone forgot their PIN:** the group leader opens **Member Access & PINs → Reset PIN** and tells them the new PIN in person. Nobody, including the group leader, can see existing PINs.
 * **"Too many wrong PINs":** after 5 wrong PINs a name is paused for 1 minute, then 5, 15 and 60 minutes if it keeps happening. Phones that have signed in as that person before aren't affected. Every lock is in the AuditLog tab; a locked leader account also emails you (at most once a day). There is nothing to reset.
 * **Sign everyone out at once** (for example, if a phone with an open session was lost): in Apps Script open **Project Settings → Script Properties** and delete `TOKEN_SECRET`. A new secret is created automatically and all existing sessions stop working. Changing one person's PIN signs out just that person.
 * **Who changed a mark?** The **Activity Log** tab (instructor and group leader) lists every change with before → after values. The raw data is in the `AuditLog` tab.
-* **Adding a person:** add a row to the `Users` tab with `name`, `role` (`instructor`, `group_leader`, `assistant`, `team_leader` or `member`) and `team` (`Shehroz`, `Amina`, `Ayesha`, `Lareb`, or `-` for the instructor), run `clearCache()`, then give them a PIN with `setPinForUser` or **Reset PIN** in the app. Don't type anything into `pinHash`, `salt`, `email` or `reminders`.
+* **Adding a person:** add a row to the `Users` tab with `name`, `role` (`instructor`, `group_leader`, `assistant`, `team_leader` or `member`) and `team` (`Shehroz`, `Amina`, `Ayesha`, `Lareb`, or `-` for the instructor), run `clearCache()`, then give them a PIN with `setPinForUser` or **Reset PIN** in the app. Don't type anything into `pinHash`, `salt`, `email` or `reminders`. You may type their Gmail address into `googleEmail` so they can use Google sign-in.
 
 ---
 
-## 5. Weekly backups
+## 6. Weekly backups
 
 Run **`installBackupTrigger()`** once and approve the Google Drive permission. It:
 
@@ -110,7 +153,7 @@ To stop backups: in Apps Script open **Triggers** (the clock icon) and delete th
 
 ---
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 | Symptom | Fix |
 | :--- | :--- |

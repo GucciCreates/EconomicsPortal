@@ -117,8 +117,9 @@ async function call(action, payload = {}, { withToken = true } = {}) {
     return res;
   }
   // Sliding renewal: the server sends a new token near the end of the old one.
-  if (res && res.ok && res.token && action !== 'login') updateSessionToken(res.token);
-  if (res && res.ok && res.data && action !== 'login') rememberDashboard(res.data);
+  const isSignIn = action === 'login' || action === 'googleLogin';
+  if (res && res.ok && res.token && !isSignIn) updateSessionToken(res.token);
+  if (res && res.ok && res.data && !isSignIn) rememberDashboard(res.data);
   return res;
 }
 
@@ -136,6 +137,18 @@ export async function apiLogin(name, pin) {
   }
   return res;
 }
+
+/** Sign in with a Google ID token from the Google button. Same response as apiLogin. */
+export async function apiGoogleLogin(credential) {
+  const res = await call('googleLogin', { credential, device: getDeviceId() }, { withToken: false });
+  if (res && res.ok && res.user) {
+    return { ...res, user: { ...res.user, token: res.token } };
+  }
+  return res;
+}
+
+export const apiLinkGoogle = (credential) => call('linkGoogle', { credential });
+export const apiUnlinkGoogle = () => call('unlinkGoogle');
 
 /** Call after the session from apiLogin has been saved. */
 export function acceptLoginDashboard(res) {

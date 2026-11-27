@@ -393,7 +393,7 @@ function actionLogin(store, p) {
 
 function myPrefs(store, session) {
   const u = findUser(store, session.name) || {};
-  return { email: String(u.email || ''), reminders: u.reminders === true };
+  return { email: String(u.email || ''), reminders: u.reminders === true, googleEmail: String(u.googleEmail || '') };
 }
 
 function buildDashboard(store, session) {
@@ -490,6 +490,17 @@ function buildDashboard(store, session) {
 
 const ACTIONS = {
   dashboard: { fn: (store, s) => ({ ok: true, data: buildDashboard(store, s) }) },
+  // Same rule as Code.gs: needs a Google client ID, which Demo Mode never has.
+  linkGoogle: { write: true, fn: () => { throw apiError("Google sign-in isn't available in Demo Mode.", 'NOT_CONFIGURED'); } },
+  unlinkGoogle: {
+    write: true,
+    fn(store, s) {
+      const me = findUser(store, s.name);
+      me.googleEmail = '';
+      audit(store, s, 'unlinkGoogle', s.name, {});
+      return { ok: true };
+    },
+  },
   users: { roles: LEADERS, fn: (store) => ({ ok: true, users: store.users.map(sanitizeUser) }) },
   auditLog: {
     roles: LEADERS,
@@ -890,8 +901,10 @@ export async function handleDemoRequest(params) {
     if (action === 'login') return actionLogin(store, params);
     if (action === 'names') {
       const names = [...new Set(store.users.map((u) => firstName(u.name)).filter(Boolean))].sort();
-      return { ok: true, names };
+      // No Google client ID in Demo Mode, so the sign-in page shows the PIN form only.
+      return { ok: true, names, googleClientId: '' };
     }
+    if (action === 'googleLogin') throw apiError("Google sign-in isn't available in Demo Mode. Use a name and PIN.", 'NOT_CONFIGURED');
 
     const entry = Object.prototype.hasOwnProperty.call(ACTIONS, action) ? ACTIONS[action] : null;
     if (!entry) throw apiError('Unknown action.', 'BAD_REQUEST');
