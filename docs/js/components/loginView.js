@@ -140,7 +140,7 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         </form>
 
         <p class="auth-footer-help">
-          Forgot your PIN, or locked out? Ask Shehroz (group leader) to reset it.
+          Forgot your PIN, or locked out? Ask your group leader or instructor to reset it.
         </p>
       </div>
     </div>

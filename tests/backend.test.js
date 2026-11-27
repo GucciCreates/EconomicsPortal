@@ -748,3 +748,14 @@ test('a PIN that was published online is refused at sign-in and can never be set
   assert.equal(b.post({ action: 'updatePin', token: leader, targetMember: 'Minal', newPin: '2002' }).ok, true);
   assert.ok(gl);
 });
+
+test('F7: the instructor can reset a PIN too; other roles still cannot', () => {
+  const b = freshBackend();
+  const res = b.post({ action: 'updatePin', token: b.tokenFor('Dr. Numan'), targetMember: 'Ramesh', newPin: '7531' });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(b.login('Ramesh', '7531').ok, true);
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'resetPin' && r.actor === 'Dr. Numan'));
+  for (const who of ['Sajal', 'Amina', 'Minal']) {
+    assert.equal(b.post({ action: 'updatePin', token: b.tokenFor(who), targetMember: 'Ramesh', newPin: '8642' }).code, 'FORBIDDEN', who);
+  }
+});

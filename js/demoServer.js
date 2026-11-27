@@ -758,7 +758,7 @@ const ACTIONS = {
 
   updatePin: {
     write: true,
-    roles: ['group_leader'],
+    roles: ['group_leader', 'instructor'],
     fn(store, s, p) {
       const newPin = String(p.newPin || '').trim();
       const target = findUser(store, p.targetMember);

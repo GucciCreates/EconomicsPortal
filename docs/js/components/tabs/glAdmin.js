@@ -13,13 +13,14 @@ import { bindActions, runAction, alertHtml, emptyState, teamChip, sameName } fro
 const LONG_PIN_ROLES = ['instructor', 'group_leader', 'assistant'];
 
 export function renderAdminTab(panel, ctx) {
-  const { data, canLead, isGroupLeader } = ctx;
+  const { data, canLead, isGroupLeader, isInstructor } = ctx;
+  const canResetPins = isGroupLeader || isInstructor; // same rule as updatePin on the server
   panel.innerHTML = `
-    ${isGroupLeader ? '<div id="pins-shell"></div>' : ''}
+    ${canResetPins ? '<div id="pins-shell"></div>' : ''}
     <div id="export-shell"></div>
     ${canLead ? '<div id="activity-shell"></div>' : ''}
   `;
-  if (isGroupLeader) renderPins(panel.querySelector('#pins-shell'), data);
+  if (canResetPins) renderPins(panel.querySelector('#pins-shell'), data);
   renderExportToolbar(panel.querySelector('#export-shell'), {
     marks: data.marks || [],
     submissions: data.submissions || [],

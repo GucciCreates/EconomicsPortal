@@ -148,7 +148,7 @@ const ACTIONS = {
 
   setGoal:                { fn: actionSetGoal, write: true },
 
-  updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader"] },
+  updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader", "instructor"] },
   changeMyPin:            { fn: actionChangeMyPin, write: true },
   setReminders:           { fn: actionSetReminders, write: true },
   linkGoogle:             { fn: actionLinkGoogle, write: true },

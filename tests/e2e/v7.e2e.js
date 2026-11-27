@@ -73,3 +73,26 @@ test('F5: a Google quota page instead of data is explained as such', { timeout: 
     await browser.close();
   }
 });
+
+test('F7: the instructor can reset a PIN from Admin (Demo Mode, same rule as the server)', { timeout: 60000 }, async () => {
+  const { browser, page, errors } = await openApp({ demo: true });
+  try {
+    await page.click('.quick-login-chip[data-demo-name="Dr. Numan"]');
+    await page.click('.tab-btn[data-tab="admin"]');
+    await page.waitForSelector('#pins-tbody [data-action="reset"][data-name="Bilal"]');
+    await page.click('#pins-tbody [data-action="reset"][data-name="Bilal"]');
+    await page.fill('#input-new-pin', '5317');
+    await page.click('#btn-save-pin');
+    await page.waitForSelector('#pin-modal-feedback .alert-success');
+    await page.waitForSelector('.modal-overlay', { state: 'detached' });
+    await page.click('#btn-account-menu');
+    await page.click('#btn-logout');
+    await page.fill('#login-name', 'Bilal');
+    await page.fill('#login-pin', '5317');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('.tab-nav');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
