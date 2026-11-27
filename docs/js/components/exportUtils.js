@@ -16,7 +16,10 @@ function toCSV(rows, cols) {
   if (!rows || rows.length === 0) return "";
   const headers = cols || Object.keys(rows[0]);
   const escape = (v) => {
-    const s = String(v == null ? "" : v).replace(/"/g, '""');
+    let s = String(v == null ? "" : v);
+    // Stop spreadsheet apps from running text that looks like a formula.
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = "'" + s;
+    s = s.replace(/"/g, '""');
     return /[,"\n\r]/.test(s) ? `"${s}"` : s;
   };
   const lines = [
@@ -79,49 +82,39 @@ export function exportMemberMetricsCSV(memberMetrics) {
 }
 
 /**
- * Render an export toolbar into a container element.
+ * Render the export buttons into a container element.
  * @param {HTMLElement} container
  * @param {object} data - { marks, submissions, memberMetrics }
  */
 export function renderExportToolbar(container, data) {
+  const count = {
+    marks: (data.marks || []).length,
+    subs: (data.submissions || []).length,
+    metrics: Object.keys(data.memberMetrics || {}).length,
+  };
   container.innerHTML = `
-    <div class="card">
+    <section class="card">
       <div class="card-header">
-        <h3 class="card-title">Export Data</h3>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">Downloads a CSV file directly to your device</span>
+        <div>
+          <h3 class="card-title">Download data</h3>
+          <p class="card-note">CSV files open in Excel or Google Sheets.</p>
+        </div>
       </div>
-      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.25rem 0;">
-        <button class="btn btn-secondary" id="btn-export-marks">
-          Download marks (CSV)
-        </button>
-        <button class="btn btn-secondary" id="btn-export-subs">
-          Download submissions (CSV)
-        </button>
-        <button class="btn btn-secondary" id="btn-export-metrics">
-          Download student metrics (CSV)
-        </button>
+      <div class="btn-group btn-group-wrap">
+        <button type="button" class="btn btn-secondary" data-export="marks" ${count.marks ? "" : "disabled"}>Marks (${count.marks})</button>
+        <button type="button" class="btn btn-secondary" data-export="subs" ${count.subs ? "" : "disabled"}>Submissions (${count.subs})</button>
+        <button type="button" class="btn btn-secondary" data-export="metrics" ${count.metrics ? "" : "disabled"}>Student metrics (${count.metrics})</button>
       </div>
-      <p class="form-hint" style="margin-top: 0.5rem;">
-        All exports include the current dataset. Refresh the page to get the latest data before exporting.
-      </p>
-    </div>
+      <p class="form-hint">Files contain what's on screen now. Use Refresh first if someone may have just made changes.</p>
+    </section>
   `;
 
-  container.querySelector("#btn-export-marks").addEventListener("click", () => {
-    if (!data.marks || data.marks.length === 0) return alert("No marks data to export.");
-    exportMarksCSV(data.marks);
-  });
-
-  container.querySelector("#btn-export-subs").addEventListener("click", () => {
-    if (!data.submissions || data.submissions.length === 0)
-      return alert("No submissions data to export.");
-    exportSubmissionsCSV(data.submissions);
-  });
-
-  container.querySelector("#btn-export-metrics").addEventListener("click", () => {
-    if (!data.memberMetrics || Object.keys(data.memberMetrics).length === 0)
-      return alert("No metrics data to export.");
-    exportMemberMetricsCSV(data.memberMetrics);
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-export]");
+    if (!btn) return;
+    if (btn.dataset.export === "marks") exportMarksCSV(data.marks);
+    if (btn.dataset.export === "subs") exportSubmissionsCSV(data.submissions);
+    if (btn.dataset.export === "metrics") exportMemberMetricsCSV(data.memberMetrics);
   });
 }
 

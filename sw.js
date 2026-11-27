@@ -10,7 +10,7 @@
  * Bump CACHE_VERSION on each release (keep it in step with index.html ?v=).
  */
 
-const CACHE_VERSION = 'v5.0.0';
+const CACHE_VERSION = 'v6.0.0';
 const CACHE_NAME = `economics-portal-${CACHE_VERSION}`;
 
 const APP_SHELL = [
@@ -23,14 +23,9 @@ const APP_SHELL = [
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png',
-  './js/app.js',
   './js/api.js',
+  './js/app.js',
   './js/auth.js',
-  './js/config.js',
-  './js/demoServer.js',
-  './js/lastSeen.js',
-  './js/mockData.js',
-  './js/utils.js',
   './js/components/accountMenu.js',
   './js/components/activityLog.js',
   './js/components/announcementsPanel.js',
@@ -50,7 +45,33 @@ const APP_SHELL = [
   './js/components/reportCardModal.js',
   './js/components/submissionTracker.js',
   './js/components/tabNav.js',
+  './js/components/tabs/glAdmin.js',
+  './js/components/tabs/glDoubts.js',
+  './js/components/tabs/glScores.js',
+  './js/components/tabs/glStudents.js',
+  './js/components/tabs/glTasks.js',
+  './js/components/tabs/glUpdates.js',
+  './js/components/tabs/memDoubts.js',
+  './js/components/tabs/memGoal.js',
+  './js/components/tabs/memLeaderboard.js',
+  './js/components/tabs/memScores.js',
+  './js/components/tabs/memTasks.js',
+  './js/components/tabs/memUpdates.js',
+  './js/components/tabs/tlClass.js',
+  './js/components/tabs/tlDoubts.js',
+  './js/components/tabs/tlNoticeboard.js',
+  './js/components/tabs/tlSubmissions.js',
+  './js/components/tabs/tlTasks.js',
+  './js/components/tabs/tlTeam.js',
   './js/components/teamLeaderView.js',
+  './js/components/ui.js',
+  './js/config.js',
+  './js/dates.js',
+  './js/demoServer.js',
+  './js/lastSeen.js',
+  './js/mockData.js',
+  './js/utils.js',
+  './js/vendor/chart.umd.js',
 ];
 
 self.addEventListener('install', (event) => {

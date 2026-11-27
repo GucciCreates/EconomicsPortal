@@ -1,0 +1,155 @@
+/**
+ * v6 browser tests: one-request sign-in and writes against the real
+ * backend/Code.gs (run in Node), Demo Mode isolation, and every tab of every
+ * role at phone width.
+ *
+ * Run: npm run test:e2e
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { openApp } = require('./harness');
+const { createBackend } = require('../gasFakes');
+
+function liveBackend() {
+  const b = createBackend();
+  b.api.setup();
+  b.api.setPinForUser('Shehroz', '246810');
+  b.api.setPinForUser('Ramesh', '1357');
+  return b;
+}
+
+test('signing in and saving each take one request to the server', { timeout: 120000 }, async () => {
+  const backend = liveBackend();
+  const { browser, page, errors, apiCalls } = await openApp({ demo: false, backend });
+  try {
+    await page.waitForSelector('#form-login');
+    assert.equal(await page.$$eval('.quick-login-chip', (x) => x.length), 0, 'no demo shortcuts on the live site');
+    // The name field suggests first names from the public `names` action.
+    await page.waitForFunction(() => document.querySelectorAll('#login-name-options option').length > 10);
+
+    apiCalls.length = 0;
+    await page.fill('#login-name', 'Shehroz');
+    await page.fill('#login-pin', '246810');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('.kpi-grid .kpi-val');
+    assert.deepEqual(apiCalls, ['login'], 'sign-in renders the dashboard that came back with login');
+    assert.ok(!(await page.$('.pin-offer')), 'a 6-digit PIN gets no "choose a longer PIN" note');
+
+    apiCalls.length = 0;
+    await page.click('.tab-btn[data-tab="updates"]');
+    await page.fill('#ann-title', 'One request');
+    await page.fill('#ann-body', 'Saved and shown with a single call');
+    await page.click('#form-add-announcement button[type=submit]');
+    await page.waitForSelector('.announcement-item:has-text("One request")');
+    assert.deepEqual(apiCalls, ['addAnnouncement'], 'a write returns the new dashboard');
+
+    // Reloading shows the last dashboard at once, then refreshes it behind.
+    apiCalls.length = 0;
+    await page.reload();
+    await page.waitForSelector('.announcement-item:has-text("One request")');
+    await page.waitForTimeout(300);
+    assert.deepEqual(apiCalls.filter((a) => a !== 'names'), ['dashboard']);
+    assert.match(await page.textContent('#sync-status'), /Synced/);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('first-name sign-in offers "Did you mean"; short PINs get a one-time note', { timeout: 120000 }, async () => {
+  const backend = liveBackend();
+  backend.api.setPinForUser('Ayesha (Quetta)', '3001');
+  const { browser, page, errors } = await openApp({ demo: false, backend });
+  try {
+    await page.fill('#login-name', 'ayesha');
+    await page.fill('#login-pin', '3001');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('#btn-use-suggestion');
+    assert.match(await page.textContent('#login-error-box'), /Did you mean Ayesha \(Quetta\)\?/);
+    await page.click('#btn-use-suggestion');
+    await page.waitForSelector('.tab-nav');
+    assert.ok(await page.isVisible('.pin-offer'), 'a 4-digit PIN gets the note');
+    await page.click('[data-pin-offer="later"]');
+    await page.click('#btn-account-menu');
+    await page.click('#btn-logout');
+    await page.fill('#login-name', 'Ayesha (Quetta)');
+    await page.fill('#login-pin', '3001');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('.tab-nav');
+    assert.ok(!(await page.$('.pin-offer')), 'shown only once');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('when the server is unreachable, sign-in offers Try again, not Demo Mode', { timeout: 60000 }, async () => {
+  const { browser, page } = await openApp({ demo: false }); // no backend: requests fail
+  try {
+    await page.fill('#login-name', 'Shehroz');
+    await page.fill('#login-pin', '246810');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('#btn-retry-login');
+    const text = await page.textContent('#login-error-box');
+    assert.match(text, /Can't reach the class server/);
+    assert.doesNotMatch(text, /demo/i);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('economics_portal_demo')), null);
+    assert.equal(await page.evaluate(() => localStorage.getItem('economics_portal_force_demo')), null);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('Demo Mode starts only from ?demo=1, lasts one tab, and is clearly marked', { timeout: 60000 }, async () => {
+  const { browser, context, page } = await openApp({ demo: false });
+  try {
+    assert.ok(!(await page.$('.demo-banner')), 'the live site shows no demo bar');
+    await page.goto('http://portal.test/index.html?demo=1');
+    await page.waitForSelector('.demo-banner');
+    assert.match(await page.textContent('.demo-banner'), /Nothing you do here is saved/);
+    await page.click('.quick-login-chip[data-demo-name="Ramesh"]');
+    await page.waitForSelector('.tab-nav');
+    assert.equal(await page.evaluate(() => localStorage.getItem('economics_portal_session_v1')), null, 'demo session is not in localStorage');
+    assert.ok(!(await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes('demo_db')))), 'demo data is not in localStorage');
+
+    await page.click('#btn-print-my-report');
+    await page.waitForSelector('.report-sheet.is-sample');
+    await page.click('#btn-close-report');
+
+    const other = await context.newPage();
+    await other.goto('http://portal.test/index.html');
+    await other.waitForSelector('#form-login');
+    assert.ok(!(await other.$('.demo-banner')), 'a new tab opens the live portal');
+    await other.close();
+
+    await page.click('#btn-exit-demo');
+    await page.waitForSelector('#form-login');
+    assert.ok(!(await page.$('.demo-banner')));
+  } finally {
+    await browser.close();
+  }
+});
+
+test('every tab of every role fits a 390px phone screen', { timeout: 240000 }, async () => {
+  const { browser, page, errors } = await openApp({ viewport: { width: 390, height: 844 } });
+  try {
+    for (const who of ['Shehroz', 'Dr. Numan', 'Amina', 'Ramesh']) {
+      await page.click(`.quick-login-chip[data-demo-name="${who}"]`);
+      await page.waitForSelector('.tab-nav');
+      const tabs = await page.$$eval('.tab-btn', (b) => b.map((x) => x.dataset.tab));
+      assert.ok(tabs.length <= 6, `${who} has ${tabs.length} tabs`);
+      for (const id of tabs) {
+        await page.click(`.tab-btn[data-tab="${id}"]`);
+        await page.waitForTimeout(150);
+        const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+        assert.ok(over <= 1, `${who}/${id} scrolls sideways by ${over}px`);
+      }
+      await page.click('#btn-account-menu');
+      await page.click('#btn-logout');
+      await page.waitForSelector('#form-login');
+    }
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});

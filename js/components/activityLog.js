@@ -5,6 +5,8 @@
 
 import { apiGetAuditLog } from '../api.js';
 import { esc } from '../utils.js';
+import { timeHtml } from '../dates.js';
+import { emptyState } from './ui.js';
 
 const ACTION_LABELS = {
   addMark: 'Added mark',
@@ -30,6 +32,8 @@ const ACTION_LABELS = {
   deleteTeamMessage: 'Removed team notice',
   createMentorshipPlan: 'Created mentorship plan',
   updateMentorshipStatus: 'Mentorship status',
+  setReminders: 'Email reminders',
+  loginLocked: 'Sign-in locked',
 };
 
 const FIELD_LABELS = {
@@ -76,13 +80,13 @@ export function describeEntry(entry) {
 
 export async function renderActivityLog(container) {
   container.innerHTML = `
-    <div class="card">
-      <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
+    <section class="card">
+      <div class="card-header">
         <div>
-          <h3 class="card-title">Activity Log</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Every change to marks, tasks, doubts and settings — who did it and when. Read-only.</span>
+          <h3 class="card-title">Activity log</h3>
+          <p class="card-note">Every change to marks, tasks, doubts and settings, with who made it and when.</p>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" id="btn-reload-audit">↻ Reload</button>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-reload-audit">Reload</button>
       </div>
       <div class="audit-filters">
         <div class="form-group">
@@ -104,14 +108,14 @@ export async function renderActivityLog(container) {
       </div>
       <p class="form-hint" id="audit-count" aria-live="polite">Loading activity…</p>
       <div class="table-responsive">
-        <table class="data-table">
+        <table class="data-table data-table-cards">
           <thead>
             <tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr>
           </thead>
           <tbody id="audit-tbody"></tbody>
         </table>
       </div>
-    </div>
+    </section>
   `;
 
   const tbody = container.querySelector('#audit-tbody');
@@ -145,14 +149,14 @@ export async function renderActivityLog(container) {
           .map(
             (e) => `
         <tr>
-          <td style="font-size: 0.8rem; white-space: nowrap;">${esc(new Date(e.timestamp).toLocaleString())}</td>
-          <td><strong>${esc(e.actor)}</strong><br /><span style="font-size: 0.7rem; color: var(--text-muted);">${esc(String(e.role || '').replace('_', ' '))}</span></td>
-          <td><span class="badge" style="background: var(--bg-subtle);">${esc(ACTION_LABELS[e.action] || e.action)}</span></td>
-          <td style="font-size: 0.82rem;">${describeEntry(e)}</td>
+          <td data-label="When" class="nowrap">${timeHtml(e.timestamp)}</td>
+          <td data-label="Who"><strong>${esc(e.actor)}</strong> <span class="muted small">${esc(String(e.role || '').replace('_', ' '))}</span></td>
+          <td data-label="Action"><span class="chip">${esc(ACTION_LABELS[e.action] || e.action)}</span></td>
+          <td data-label="Details" class="small">${describeEntry(e)}</td>
         </tr>`,
           )
           .join('')
-      : `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No activity matches these filters.</td></tr>`;
+      : `<tr class="row-empty"><td colspan="4">${emptyState(entries.length ? 'Nothing matches these filters.' : 'No activity yet.', entries.length ? 'Clear a filter to see more.' : 'Changes appear here as people use the portal.')}</td></tr>`;
   }
 
   async function load() {

@@ -22,7 +22,7 @@ const ROLES = [
     name: 'Shehroz',
     role: 'group_leader',
     async write(page) {
-      await page.click('.tab-btn[data-tab="announcements"]');
+      await page.click('.tab-btn[data-tab="updates"]');
       await page.fill('#ann-title', 'Heads up ' + XSS);
       await page.fill('#ann-body', 'Body ' + XSS);
       await page.click('#form-add-announcement button[type=submit]');
@@ -33,12 +33,14 @@ const ROLES = [
     name: 'Dr. Numan',
     role: 'instructor',
     async write(page) {
-      await page.click('.tab-btn[data-tab="ledger"]');
+      await page.click('.tab-btn[data-tab="scores"]');
       await page.selectOption('#gl-mark-member', 'Haseeb');
       await page.fill('#gl-mark-cycle', 'Unit 3: Trade');
       await page.fill('#gl-mark-quiz', '81');
-      await page.click('#form-gl-add-mark button[type=submit]');
-      await page.waitForSelector('#gl-marks-tbody td:has-text("Unit 3: Trade")');
+      await page.click('#form-gl-add-mark button[value="done"]');
+      // Newest unit first, open, with the new mark in it.
+      await page.waitForSelector('#gl-ledger details[open] summary:has-text("Unit 3: Trade")');
+      await page.waitForSelector('#gl-ledger details[open] td:has-text("Haseeb")');
     },
   },
   {
@@ -60,6 +62,8 @@ const ROLES = [
       await page.fill('#esc-details', 'Why does it slope upward?');
       await page.click('#btn-submit-esc');
       await page.waitForSelector('#my-doubts article:has-text("LM curve")');
+      await page.click('.tab-btn[data-tab="tasks"]');
+      await page.waitForSelector('#tasks-list');
     },
   },
 ];
@@ -86,7 +90,7 @@ test('every role can use every tab without errors, and HTML stays text', { timeo
       await page.waitForTimeout(300);
 
       const tabs = await page.$$eval('.tab-btn', (b) => b.map((x) => x.dataset.tab));
-      assert.ok(tabs.length >= 5, `${r.name} should have tabs`);
+      assert.ok(tabs.length >= 5 && tabs.length <= 6, `${r.name} should have 5–6 tabs, has ${tabs.length}`);
       for (const id of tabs) {
         await page.click(`.tab-btn[data-tab="${id}"]`);
         await page.waitForTimeout(150);
@@ -94,8 +98,10 @@ test('every role can use every tab without errors, and HTML stays text', { timeo
         assert.ok(!/Error connecting to API|Failed to load dashboard/.test(text), `${r.name}/${id} shows an error`);
       }
 
-      if (tabs.includes('announcements')) {
-        await page.click('.tab-btn[data-tab="announcements"]');
+      const newsTab = tabs.find((t) => t === 'updates' || t === 'class');
+      assert.ok(newsTab, `${r.name} should have an updates tab`);
+      {
+        await page.click(`.tab-btn[data-tab="${newsTab}"]`);
         const list = await page.textContent('main');
         assert.ok(list.includes('<img src=x onerror='), `${r.name}: the HTML announcement should render as text`);
         assert.equal(await page.$$eval('main .announcement-item img', (x) => x.length), 0);
@@ -127,17 +133,19 @@ test('session handling: old sessions and bad tokens go back to login', { timeout
   const { browser, page, errors } = await openApp();
   try {
     await page.evaluate(() =>
-      localStorage.setItem('economics_portal_session_v1', JSON.stringify({ name: 'Shehroz', role: 'group_leader', team: 'Shehroz' })),
+      sessionStorage.setItem('economics_portal_demo_session_v1', JSON.stringify({ name: 'Shehroz', role: 'group_leader', team: 'Shehroz' })),
     );
     await page.reload();
     assert.ok(await page.isVisible('#form-login'), 'a pre-v4 session without a token is discarded');
 
     await login(page, 'Ramesh');
     await page.evaluate(() => {
-      const s = JSON.parse(localStorage.getItem('economics_portal_session_v1'));
+      const s = JSON.parse(sessionStorage.getItem('economics_portal_demo_session_v1'));
       s.token = 'demo.not-a-real-token';
       s.role = 'instructor';
-      localStorage.setItem('economics_portal_session_v1', JSON.stringify(s));
+      sessionStorage.setItem('economics_portal_demo_session_v1', JSON.stringify(s));
+      // Drop the cached dashboard so the reload has to ask the server.
+      Object.keys(sessionStorage).filter((k) => k.startsWith('economics_portal_dash_v1:')).forEach((k) => sessionStorage.removeItem(k));
     });
     await page.reload();
     await page.waitForSelector('#form-login');

@@ -6,7 +6,7 @@
  * marked new; from then on anything newer than the last visit is.
  */
 
-import { normalizeUserName } from './demoServer.js';
+import { normalizeUserName } from './utils.js';
 
 const PREFIX = 'economics_portal_last_seen_v1:';
 

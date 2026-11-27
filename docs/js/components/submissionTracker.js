@@ -6,8 +6,9 @@
  * with a "copy reminder list" button for the students still missing.
  */
 
-import { esc } from '../utils.js';
-import { normalizeUserName } from '../api.js';
+import { esc, normalizeUserName } from '../utils.js';
+import { timeHtml, formatRelative, formatFull } from '../dates.js';
+import { bindActions, emptyState, copyText } from './ui.js';
 
 /** End of the due day in local time, or null when no due date is set. */
 export function dueDeadline(dueDate) {
@@ -33,8 +34,8 @@ export function trackTask(task, submissions, roster) {
 }
 
 const STATUS = {
-  on_time: { label: 'Submitted', cls: 'tracker-on-time', icon: '✓' },
-  late: { label: 'Late', cls: 'tracker-late', icon: '⏰' },
+  on_time: { label: 'On time', cls: 'tracker-on-time', icon: '✓' },
+  late: { label: 'Late', cls: 'tracker-late', icon: '!' },
   missing: { label: 'Not submitted', cls: 'tracker-missing', icon: '✗' },
 };
 
@@ -56,36 +57,37 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
   let selectedId = (upcoming[0] || sorted[0] || {}).id;
 
   if (!tasks.length) {
-    container.innerHTML = `<div class="card"><p style="color: var(--text-muted); padding: 1.5rem; text-align: center;">No tasks to track yet.</p></div>`;
+    container.innerHTML = `<section class="card">${emptyState('No tasks to track yet.', 'Once a task is assigned you can see who has submitted it here.')}</section>`;
     return;
   }
 
   container.innerHTML = `
-    <div class="card">
-      <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+    <section class="card">
+      <div class="card-header">
         <div>
-          <h3 class="card-title">Submission Tracker</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Who has turned in each task, who was late, and who still needs a reminder.</span>
+          <h3 class="card-title">Who has submitted</h3>
+          <p class="card-note">Pick a task to see who turned it in on time, late, or not yet.</p>
         </div>
-        <div class="form-group" style="margin: 0; min-width: 240px;">
+        <div class="form-group form-group-inline">
           <label class="form-label" for="tracker-task">Task</label>
           <select id="tracker-task" class="form-control">
             ${sorted
               .map(
                 (t) =>
-                  `<option value="${esc(t.id)}">${esc(t.title)} — ${esc(t.team === 'ALL' ? 'All teams' : 'Team ' + t.team)}${t.dueDate ? ' · due ' + esc(String(t.dueDate).slice(0, 10)) : ''}</option>`,
+                  `<option value="${esc(t.id)}">${esc(t.title)} · ${esc(t.team === 'ALL' ? 'all teams' : 'Team ' + t.team)}${t.dueDate ? ' · due ' + esc(formatRelative(String(t.dueDate).slice(0, 10))) : ''}</option>`,
               )
               .join('')}
           </select>
         </div>
       </div>
       <div id="tracker-body"></div>
-    </div>
+    </section>
   `;
 
   const select = container.querySelector('#tracker-task');
   const body = container.querySelector('#tracker-body');
   select.value = selectedId;
+  let reminderText = '';
 
   function draw() {
     const task = tasks.find((t) => String(t.id) === String(selectedId));
@@ -97,23 +99,24 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
     rows.forEach((r) => counts[r.status]++);
     const missing = rows.filter((r) => r.status === 'missing');
     const teams = [...new Set(rows.map((r) => r.team))];
+    const dueText = deadline ? formatFull(String(task.dueDate).slice(0, 10)) : '';
+    reminderText =
+      `Reminder: "${task.title}" ${deadline ? (pastDue ? `was due ${dueText}` : `is due ${dueText}`) : 'is waiting for you'}. ` +
+      `Still to submit: ${missing.map((m) => m.name).join(', ')}.`;
 
     body.innerHTML = `
       <div class="tracker-summary" role="status">
-        <span class="tracker-pill tracker-on-time">✓ ${counts.on_time} on time</span>
-        <span class="tracker-pill tracker-late">⏰ ${counts.late} late</span>
-        <span class="tracker-pill tracker-missing">✗ ${counts.missing} not submitted${pastDue && counts.missing ? ' (overdue)' : ''}</span>
-        <span style="font-size: 0.8rem; color: var(--text-muted);">
-          ${deadline ? `Due ${esc(deadline.toLocaleDateString())}${pastDue ? ' — deadline has passed' : ''}` : 'No due date set'}
-        </span>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-copy-reminders" ${missing.length ? '' : 'disabled'} style="margin-left: auto;">
-          Copy reminder list (${missing.length})
+        <span class="tracker-pill tracker-on-time">${counts.on_time} on time</span>
+        <span class="tracker-pill tracker-late">${counts.late} late</span>
+        <span class="tracker-pill tracker-missing">${counts.missing} not submitted${pastDue && counts.missing ? ' (overdue)' : ''}</span>
+        <span class="muted small">${deadline ? `Due ${timeHtml(String(task.dueDate).slice(0, 10))}` : 'No due date'}</span>
+        <button type="button" class="btn btn-primary btn-sm tracker-copy" data-action="copy" ${missing.length ? '' : 'disabled'}>
+          Copy reminder (${missing.length})
         </button>
       </div>
-      <div id="tracker-copy-fallback"></div>
       ${
         rows.length === 0
-          ? `<p style="color: var(--text-muted); padding: 1rem;">No students are assigned to this task.</p>`
+          ? emptyState('Nobody is assigned to this task.')
           : teams
               .map(
                 (team) => `
@@ -124,12 +127,11 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
               .filter((r) => r.team === team)
               .map((r) => {
                 const st = STATUS[r.status];
-                const when = r.submission ? new Date(r.submission.timestamp).toLocaleString() : '';
                 return `
-              <li class="tracker-cell ${st.cls}" title="${esc(when ? st.label + ' ' + when : st.label)}">
+              <li class="tracker-cell ${st.cls}">
                 <span aria-hidden="true">${st.icon}</span>
                 <span class="tracker-name">${esc(r.name)}</span>
-                <span class="tracker-status">${esc(st.label)}${when ? ` · ${esc(new Date(r.submission.timestamp).toLocaleDateString())}` : ''}</span>
+                <span class="tracker-status">${esc(st.label)}${r.submission ? ` · ${timeHtml(r.submission.timestamp)}` : ''}</span>
               </li>`;
               })
               .join('')}
@@ -139,26 +141,20 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
               .join('')
       }
     `;
-
-    const copyBtn = body.querySelector('#btn-copy-reminders');
-    copyBtn.addEventListener('click', async () => {
-      const text =
-        `Reminder: "${task.title}" ${deadline ? (pastDue ? `was due ${deadline.toLocaleDateString()}` : `is due ${deadline.toLocaleDateString()}`) : 'is waiting for you'}. ` +
-        `Still to submit: ${missing.map((m) => m.name).join(', ')}.`;
-      try {
-        await navigator.clipboard.writeText(text);
-        copyBtn.textContent = 'Copied ✓';
-        setTimeout(() => (copyBtn.textContent = `Copy reminder list (${missing.length})`), 2000);
-      } catch (e) {
-        const fb = body.querySelector('#tracker-copy-fallback');
-        fb.innerHTML = `<label class="form-label" for="tracker-copy-text">Copy this reminder:</label><textarea id="tracker-copy-text" class="form-control" rows="3" readonly></textarea>`;
-        const ta = fb.querySelector('textarea');
-        ta.value = text;
-        ta.select();
-      }
-    });
   }
 
+  bindActions(container, {
+    change: {},
+    click: {
+      copy: async (btn) => {
+        const label = btn.textContent;
+        if (await copyText(reminderText, 'Copy this reminder:')) {
+          btn.textContent = 'Copied';
+          setTimeout(() => btn.isConnected && (btn.textContent = label), 2000);
+        }
+      },
+    },
+  });
   select.addEventListener('change', () => {
     selectedId = select.value;
     draw();

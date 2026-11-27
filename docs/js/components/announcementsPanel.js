@@ -1,23 +1,20 @@
 /**
- * EconomicsPortal — Announcements Panel (v3)
- *
- * Displays announcements (pinned first, newest next).
- * Instructors / group leaders can post, pin, and delete.
+ * EconomicsPortal — class announcements (pinned first, then newest).
+ * The instructor and group leader can post, pin and delete.
  */
 
 import { apiAddAnnouncement, apiDeleteAnnouncement, apiPinAnnouncement } from "../api.js";
 import { esc } from "../utils.js";
 import { newPill } from "../lastSeen.js";
+import { timeHtml } from "../dates.js";
+import { bindActions, runAction, alertHtml, emptyState } from "./ui.js";
 
 /**
  * @param {HTMLElement} container
  * @param {object} user
- * @param {Array} announcements  — sorted by pinned desc, timestamp desc
+ * @param {Array} announcements
  * @param {Function} onRefresh
- */
-/**
- * @param {object} [opts]
- * @param {number} [opts.since] - last-seen time; newer posts by others get a "New" pill
+ * @param {{ since?: number }} [opts] - last-seen time; newer posts by others get a "New" pill
  */
 export function renderAnnouncementsPanel(container, user, announcements, onRefresh, opts = {}) {
   const canManage = user.role === "instructor" || user.role === "group_leader";
@@ -32,62 +29,55 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
       ${
         canManage
           ? `
-        <div class="card" style="margin-bottom: 1rem;">
-          <div class="card-header"><h3 class="card-title">Post Announcement</h3></div>
-          <div id="ann-feedback"></div>
-          <form id="form-add-announcement">
+        <section class="card">
+          <div class="card-header"><h3 class="card-title">Post an announcement</h3></div>
+          <div id="ann-feedback" aria-live="polite"></div>
+          <form id="form-add-announcement" data-form="add-announcement">
             <div class="form-group">
               <label class="form-label" for="ann-title">Title</label>
-              <input type="text" id="ann-title" class="form-control" placeholder="e.g. Quiz 3 rescheduled" required />
+              <input type="text" id="ann-title" class="form-control" maxlength="200" placeholder="e.g. Quiz 3 moved to Thursday" required />
             </div>
             <div class="form-group">
               <label class="form-label" for="ann-body">Message</label>
-              <textarea id="ann-body" class="form-control" rows="3" placeholder="Announcement details..." required></textarea>
+              <textarea id="ann-body" class="form-control" rows="3" maxlength="5000" placeholder="What everyone needs to know" required></textarea>
             </div>
-            <div style="display: flex; gap: 0.75rem; align-items: center;">
-              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; cursor: pointer;">
-                <input type="checkbox" id="ann-pin" /> Pin to top
-              </label>
-              <button type="submit" class="btn btn-primary" style="margin-left: auto;">Post Announcement</button>
+            <div class="form-actions">
+              <label class="custom-checkbox-label"><input type="checkbox" id="ann-pin" /> Pin to the top</label>
+              <button type="submit" class="btn btn-primary">Post announcement</button>
             </div>
           </form>
-        </div>
-      `
+        </section>`
           : ""
       }
 
-      <div id="ann-list">
+      <div id="ann-list" class="stack">
         ${
           list.length === 0
-            ? `<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No announcements yet.</p>`
+            ? `<section class="card">${emptyState(
+                "No announcements yet.",
+                canManage ? "Post one above and the whole class will see it." : "Class news from Dr. Numan and Shehroz will appear here.",
+              )}</section>`
             : list
                 .map(
                   (a) => `
-          <div class="announcement-item ${esc(a.pinned ? "pinned" : "")}" data-ann-id="${esc(a.id)}">
+          <article class="announcement-item ${a.pinned ? "pinned" : ""}" data-ann-id="${esc(a.id)}">
             <div class="ann-header">
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <h4 class="ann-title">
                 ${a.pinned ? `<span class="pin-badge">Pinned</span>` : ""}
-                <strong style="font-size: 0.95rem;">${esc(a.title)}</strong>${a.postedBy !== user.name ? newPill(a.timestamp, opts.since) : ""}
-              </div>
+                ${esc(a.title)}${a.postedBy !== user.name ? newPill(a.timestamp, opts.since) : ""}
+              </h4>
               ${
                 canManage
-                  ? `
-                <div style="display: flex; gap: 0.35rem;">
-                  <button class="btn btn-secondary btn-sm btn-pin-ann" data-id="${esc(a.id)}" data-pinned="${esc(a.pinned)}" title="${esc(a.pinned ? "Unpin" : "Pin")}">
-                    ${esc(a.pinned ? "Unpin" : "Pin")}
-                  </button>
-                  <button class="btn btn-danger btn-sm btn-delete-ann" data-id="${esc(a.id)}" title="Delete" aria-label="Delete announcement">Delete</button>
-                </div>
-              `
+                  ? `<div class="btn-group">
+                  <button type="button" class="btn btn-secondary btn-sm" data-action="pin" data-id="${esc(a.id)}" data-pinned="${esc(a.pinned)}">${esc(a.pinned ? "Unpin" : "Pin")}</button>
+                  <button type="button" class="btn btn-danger btn-sm" data-action="delete" data-id="${esc(a.id)}" aria-label="Delete announcement ${esc(a.title)}">Delete</button>
+                </div>`
                   : ""
               }
             </div>
             <p class="ann-body">${esc(a.body)}</p>
-            <div class="ann-meta">
-              Posted by <strong>${esc(a.postedBy)}</strong> · ${esc(new Date(a.timestamp).toLocaleString())}
-            </div>
-          </div>
-        `
+            <div class="ann-meta">${esc(a.postedBy)} · ${timeHtml(a.timestamp)}</div>
+          </article>`,
                 )
                 .join("")
         }
@@ -95,71 +85,33 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
     </div>
   `;
 
-  // Post form
-  if (canManage) {
-    const form = container.querySelector("#form-add-announcement");
-    const feedback = container.querySelector("#ann-feedback");
+  if (!canManage) return;
+  const feedback = container.querySelector("#ann-feedback");
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const btn = form.querySelector('button[type="submit"]');
-      btn.disabled = true;
-      btn.textContent = "Posting...";
-      try {
-        const res = await apiAddAnnouncement({
-          role: user.role,
-          name: user.name,
-          title: container.querySelector("#ann-title").value.trim(),
-          body: container.querySelector("#ann-body").value.trim(),
-          pinned: container.querySelector("#ann-pin").checked,
-          postedBy: user.name,
-        });
-        if (res.ok) {
-          feedback.innerHTML = `<div class="alert alert-success">Announcement posted!</div>`;
-          form.reset();
-          setTimeout(() => (feedback.innerHTML = ""), 3000);
-          onRefresh();
-        } else {
-          feedback.innerHTML = `<div class="alert alert-error">${esc(res.error)}</div>`;
-        }
-      } catch (err) {
-        feedback.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Post Announcement";
-      }
-    });
-
-    // Pin/Unpin
-    container.querySelectorAll(".btn-pin-ann").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-id");
-        const currentlyPinned = btn.getAttribute("data-pinned") === "true";
-        btn.disabled = true;
-        try {
-          const res = await apiPinAnnouncement({ role: user.role, id, pinned: !currentlyPinned });
-          if (res.ok) onRefresh();
-          else alert(res.error || "Failed.");
-        } catch (err) {
-          alert(err.message);
-        }
-      });
-    });
-
-    // Delete
-    container.querySelectorAll(".btn-delete-ann").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        if (!confirm("Delete this announcement?")) return;
-        const id = btn.getAttribute("data-id");
-        btn.disabled = true;
-        try {
-          const res = await apiDeleteAnnouncement({ role: user.role, id });
-          if (res.ok) onRefresh();
-          else alert(res.error || "Failed.");
-        } catch (err) {
-          alert(err.message);
-        }
-      });
-    });
-  }
+  bindActions(container, {
+    submit: {
+      "add-announcement": (form) =>
+        runAction(
+          form.querySelector('button[type="submit"]'),
+          "Posting…",
+          () =>
+            apiAddAnnouncement({
+              title: form.querySelector("#ann-title").value.trim(),
+              body: form.querySelector("#ann-body").value.trim(),
+              pinned: form.querySelector("#ann-pin").checked,
+            }),
+          { success: "Announcement posted.", onDone: onRefresh, onError: (m) => (feedback.innerHTML = alertHtml(m)) },
+        ),
+    },
+    click: {
+      pin: (btn) =>
+        runAction(btn, "", () => apiPinAnnouncement({ id: btn.dataset.id, pinned: btn.dataset.pinned !== "true" }), {
+          onDone: onRefresh,
+        }),
+      delete: (btn) => {
+        if (!window.confirmEconomicsAction("Delete this announcement? This can't be undone.")) return;
+        runAction(btn, "", () => apiDeleteAnnouncement({ id: btn.dataset.id }), { success: "Announcement deleted.", onDone: onRefresh });
+      },
+    },
+  });
 }

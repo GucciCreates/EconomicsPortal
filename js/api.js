@@ -1,21 +1,29 @@
 /**
- * EconomicsPortal — API Client (v4)
+ * EconomicsPortal — API Client (v6)
  *
  * Every call goes through `call()`, which attaches the signed session token
  * and sends the request either to the live Google Apps Script backend or to
- * the in-browser demo backend (js/demoServer.js), which enforces the same
- * rules. The server decides who you are from the token; role/name fields in
- * a payload are ignored.
+ * the in-browser demo backend (js/demoServer.js, loaded only in Demo Mode),
+ * which enforces the same rules. The server decides who you are from the
+ * token; role/name fields in a payload are ignored.
+ *
+ * Sign-in and every write return the updated dashboard, so the page never
+ * needs a second request. The latest dashboard is kept in memory and in
+ * sessionStorage (this tab only, never localStorage) so a refresh can show it
+ * instantly.
  */
 
 import { API_URL, isDemoMode } from './config.js';
-import { getSessionToken, clearCurrentUser, updateSessionToken } from './auth.js';
-import { handleDemoRequest, resetDemoStore, normalizeUserName } from './demoServer.js';
+import { getSessionToken, getCurrentUser, clearCurrentUser, updateSessionToken, getDeviceId } from './auth.js';
+import { normalizeUserName } from './utils.js';
 
 export { normalizeUserName };
 
-export function resetDemoData() {
-  return resetDemoStore();
+const demoBackend = () => import('./demoServer.js');
+
+export async function resetDemoData() {
+  const demo = await demoBackend();
+  return demo.resetDemoStore();
 }
 
 /**
@@ -34,16 +42,83 @@ async function postToAppsScript(body) {
   return await response.json();
 }
 
+// ── Latest dashboard ────────────────────────────────────────────────────────
+const DASH_PREFIX = 'economics_portal_dash_v1:';
+let latest = null; // { key, data, at, fresh }
+
+function dashKey() {
+  const user = getCurrentUser();
+  return user ? DASH_PREFIX + (isDemoMode() ? 'demo:' : '') + normalizeUserName(user.name) : '';
+}
+
+function rememberDashboard(data) {
+  const key = dashKey();
+  if (!key) return;
+  latest = { key, data, at: Date.now(), fresh: true };
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, at: latest.at }));
+  } catch (e) {
+    /* too big or storage unavailable: memory copy still works */
+  }
+  window.dispatchEvent(new CustomEvent('economics:synced', { detail: { at: latest.at } }));
+}
+
+/** The dashboard that just arrived with a sign-in or write, once. */
+export function takeFreshDashboard() {
+  if (latest && latest.fresh && latest.key === dashKey()) {
+    latest.fresh = false;
+    return latest.data;
+  }
+  return null;
+}
+
+/** The last dashboard this tab saw for the signed-in user (may be stale). */
+export function getCachedDashboard() {
+  const key = dashKey();
+  if (!key) return null;
+  if (latest && latest.key === key) return { data: latest.data, at: latest.at };
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (saved && saved.data) return saved;
+  } catch (e) {
+    /* ignore */
+  }
+  return null;
+}
+
+export function lastSyncedAt() {
+  const cached = getCachedDashboard();
+  return cached ? cached.at : null;
+}
+
+export function forgetDashboards() {
+  latest = null;
+  try {
+    Object.keys(sessionStorage)
+      .filter((k) => k.startsWith(DASH_PREFIX))
+      .forEach((k) => sessionStorage.removeItem(k));
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 async function call(action, payload = {}, { withToken = true } = {}) {
   const body = { ...payload, action };
   if (withToken) body.token = getSessionToken();
 
-  const res = isDemoMode() ? await handleDemoRequest(body) : await postToAppsScript(body);
+  const res = isDemoMode()
+    ? await (await demoBackend()).handleDemoRequest(body)
+    : await postToAppsScript(body);
 
   if (res && res.code === 'AUTH') {
     clearCurrentUser();
+    forgetDashboards();
     window.dispatchEvent(new CustomEvent('economics:session-expired'));
+    return res;
   }
+  // Sliding renewal: the server sends a new token near the end of the old one.
+  if (res && res.ok && res.token && action !== 'login') updateSessionToken(res.token);
+  if (res && res.ok && res.data && action !== 'login') rememberDashboard(res.data);
   return res;
 }
 
@@ -53,7 +128,7 @@ async function call(action, payload = {}, { withToken = true } = {}) {
 export async function apiLogin(name, pin) {
   const res = await call(
     'login',
-    { name: (name || '').trim(), pin: (pin || '').trim() },
+    { name: (name || '').trim(), pin: (pin || '').trim(), device: getDeviceId() },
     { withToken: false },
   );
   if (res && res.ok && res.user) {
@@ -62,11 +137,19 @@ export async function apiLogin(name, pin) {
   return res;
 }
 
-export async function apiChangeMyPin({ currentPin, newPin }) {
-  const res = await call('changeMyPin', { currentPin, newPin });
-  if (res && res.ok && res.token) updateSessionToken(res.token);
-  return res;
+/** Call after the session from apiLogin has been saved. */
+export function acceptLoginDashboard(res) {
+  if (res && res.data) rememberDashboard(res.data);
 }
+
+export async function apiChangeMyPin({ currentPin, newPin }) {
+  return call('changeMyPin', { currentPin, newPin, device: getDeviceId() });
+}
+
+/** First names for the login form's suggestions (no token). */
+export const apiNames = () => call('names', {}, { withToken: false });
+export const apiHealth = () => call('health', {}, { withToken: false });
+export const apiSetReminders = (payload) => call('setReminders', payload);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // READS

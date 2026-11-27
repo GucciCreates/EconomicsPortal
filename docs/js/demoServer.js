@@ -1,10 +1,14 @@
 /**
- * EconomicsPortal — In-browser demo backend (v4)
+ * EconomicsPortal — In-browser demo backend (v6)
  *
  * Mirrors backend/Code.gs so Demo Mode behaves like the live site: tokens on
  * every call, identity and role taken from the roster (never from the
- * request), team scoping, validation, sanitized responses, audit log and
- * doubt replies. Data lives in localStorage and is sample data only.
+ * request), team scoping, validation, sanitized responses, audit log, doubt
+ * replies, PIN rules, escalating login locks, one-request sign-in and writes,
+ * token renewal and reminder settings. Data lives in sessionStorage (this tab
+ * only) and is sample data: nothing is saved.
+ *
+ * Loaded with a dynamic import, only in Demo Mode.
  */
 
 import {
@@ -21,8 +25,11 @@ import {
   computeMockTeamAverages,
   computeMockMemberMetrics,
 } from './mockData.js';
+import { normalizeUserName } from './utils.js';
 
-const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v4';
+export { normalizeUserName };
+
+const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v6';
 const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
 const ROLES = ['instructor', 'group_leader', 'assistant', 'team_leader', 'member'];
 const LEADERS = ['group_leader', 'instructor'];
@@ -30,30 +37,26 @@ const MARK_EDITORS = ['group_leader', 'instructor', 'assistant'];
 const MARK_FIELDS = ['cycle', 'mockNumber', 'quizScore', 'submission', 'attendance', 'previewDone', 'peerRating', 'punctual', 'notes'];
 const TASK_FIELDS = ['title', 'description', 'team', 'dueDate', 'fileUrl'];
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+const RENEW_MS = 2 * 24 * 60 * 60 * 1000;
+const PIN_MIN = 4;
+const PIN_MAX = 8;
+const LEADER_PIN_MIN = 6;
+const LONG_PIN_ROLES = ['instructor', 'group_leader', 'assistant'];
+const LOGIN_MAX_FAILS = 5;
+const LOCK_STEPS_SECONDS = [60, 5 * 60, 15 * 60, 60 * 60];
 const MAX_TITLE = 200;
 const MAX_BODY = 5000;
 const MAX_SHORT = 100;
 
-// Login rate limiting is kept in memory for the demo (resets on reload).
-const loginFailures = {};
+// Login rate limiting and known devices are kept in memory for the demo.
+const loginBuckets = {};
+const knownDevices = {};
 
-// The v3 demo database used a different key and stored PINs alongside other
-// data; drop it so it doesn't linger in browsers.
+// Older demo databases lived in localStorage; drop them.
 try {
-  localStorage.removeItem('economics_portal_demo_db_v3');
+  ['economics_portal_demo_db_v3', 'economics_portal_demo_db_v4'].forEach((k) => localStorage.removeItem(k));
 } catch (e) {
   /* ignore */
-}
-
-export function normalizeUserName(value = '') {
-  return String(value == null ? '' : value)
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[()]/g, ' ')
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ let memoryStore = null;
 
 function getStore() {
   try {
-    const cached = localStorage.getItem(DEMO_STORAGE_KEY);
+    const cached = sessionStorage.getItem(DEMO_STORAGE_KEY);
     if (cached) return JSON.parse(cached);
   } catch (e) {
     /* storage unavailable: fall back to memory */
@@ -96,7 +99,7 @@ function getStore() {
 function saveStore(store) {
   memoryStore = store;
   try {
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
+    sessionStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
   } catch (e) {
     /* storage unavailable: keep in memory */
   }
@@ -105,7 +108,7 @@ function saveStore(store) {
 export function resetDemoStore() {
   memoryStore = null;
   try {
-    localStorage.removeItem(DEMO_STORAGE_KEY);
+    sessionStorage.removeItem(DEMO_STORAGE_KEY);
   } catch (e) {
     /* ignore */
   }
@@ -148,7 +151,52 @@ function requireSession(store, token) {
   if (!payload || payload.exp < Date.now()) throw expired();
   const user = findUser(store, payload.n);
   if (!user || pinFingerprint(user.pin) !== payload.f || !ROLES.includes(user.role)) throw expired();
-  return { name: user.name, role: user.role, team: user.team };
+  return { name: user.name, role: user.role, team: user.team, exp: payload.exp };
+}
+
+// ── PIN rules (same as Code.gs) ──────────────────────────────────────────
+const isPinFormat = (pin) => new RegExp(`^\\d{${PIN_MIN},${PIN_MAX}}$`).test(String(pin));
+const minPinLength = (role) => (LONG_PIN_ROLES.includes(role) ? LEADER_PIN_MIN : PIN_MIN);
+function checkNewPin(pin, role, label = 'PIN') {
+  const min = minPinLength(role);
+  if (!isPinFormat(pin) || String(pin).length < min) {
+    throw apiError(`${label} must be ${min} to ${PIN_MAX} digits.`, 'VALIDATION');
+  }
+}
+
+/** "Ayesha (Quetta)" → "Ayesha", "Dr. Numan" → "Numan". */
+function firstName(full) {
+  const words = String(full || '').replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return words.find((w) => !/\.$/.test(w)) || words[0] || '';
+}
+
+// ── Escalating login locks, per name + device ────────────────────────────
+function lockBucket(key, device) {
+  const d = /^[A-Za-z0-9_-]{16,64}$/.test(String(device || '')) ? String(device) : '';
+  const known = d && (knownDevices[key] || []).includes(d);
+  return `${key}:${known ? d : 'unknown'}`;
+}
+function lockMessage(seconds) {
+  const mins = Math.max(1, Math.ceil(seconds / 60));
+  return `Too many wrong PINs. Try again in ${mins} ${mins === 1 ? 'minute' : 'minutes'}.`;
+}
+function checkLock(bucket) {
+  const st = loginBuckets[bucket];
+  if (st && st.until > Date.now()) throw apiError(lockMessage((st.until - Date.now()) / 1000), 'LOCKED');
+}
+function recordFailure(store, bucket, name) {
+  const st = loginBuckets[bucket] || { n: 0, level: 0, until: 0 };
+  st.n += 1;
+  loginBuckets[bucket] = st;
+  if (st.n >= LOGIN_MAX_FAILS) {
+    st.level = Math.min(LOCK_STEPS_SECONDS.length, st.level + 1);
+    const seconds = LOCK_STEPS_SECONDS[st.level - 1];
+    st.until = Date.now() + seconds * 1000;
+    st.n = 0;
+    audit(store, { name: 'system', role: 'system' }, 'loginLocked', name, { minutes: seconds / 60, level: st.level });
+    saveStore(store);
+    throw apiError(lockMessage(seconds), 'LOCKED');
+  }
 }
 
 function findUser(store, name) {
@@ -308,27 +356,44 @@ function actionLogin(store, p) {
   const name = String(p.name || '').trim();
   const pin = String(p.pin || '').trim();
   const key = normalizeUserName(name);
-  if (!key || !/^\d{4}$/.test(pin)) throw apiError('Enter your full name and your 4-digit PIN.', 'VALIDATION');
+  if (!key || !isPinFormat(pin)) throw apiError('Enter your name and your PIN (4 to 8 digits).', 'VALIDATION');
 
-  const state = loginFailures[key];
-  if (state && state.lockedUntil > Date.now()) {
-    throw apiError('Too many failed attempts for this name. Try again in 15 minutes.', 'LOCKED');
-  }
   const user = findUser(store, name);
-  if (!user || String(user.pin) !== pin) {
-    const fails = (state && state.lockedUntil <= Date.now() && state.lockedUntil ? 0 : (state ? state.fails : 0)) + 1;
-    if (fails >= 5) {
-      loginFailures[key] = { fails: 0, lockedUntil: Date.now() + 15 * 60 * 1000 };
-      throw apiError('Too many failed attempts for this name. Try again in 15 minutes.', 'LOCKED');
+  if (!user) {
+    const matches = store.users.filter((u) => normalizeUserName(firstName(u.name)) === key);
+    if (matches.length === 1) {
+      return { ok: false, code: 'DID_YOU_MEAN', suggestion: matches[0].name, error: `Did you mean ${matches[0].name}?` };
     }
-    loginFailures[key] = { fails, lockedUntil: 0 };
+  }
+  const realKey = user ? normalizeUserName(user.name) : key;
+  const bucket = lockBucket(realKey, p.device);
+  checkLock(bucket);
+  if (!user || String(user.pin) !== pin) {
+    recordFailure(store, bucket, user ? user.name : name);
     throw apiError(
-      'Invalid name or PIN. (Demo: Shehroz / 1111, Dr. Numan / 0000, Amina / 2001, Ramesh / 2002, Ayesha (Quetta) / 3001)',
+      "That name and PIN don't match. (Demo PINs: Shehroz 1111, Dr. Numan 0000, Amina 2001, Ramesh 2002, Ayesha (Quetta) 3001)",
       'LOGIN_FAILED',
     );
   }
-  delete loginFailures[key];
-  return { ok: true, token: issueToken(user), user: { name: user.name, role: user.role, team: user.team }, demo: true };
+  delete loginBuckets[bucket];
+  if (p.device && /^[A-Za-z0-9_-]{16,64}$/.test(String(p.device))) {
+    knownDevices[realKey] = [String(p.device), ...(knownDevices[realKey] || []).filter((d) => d !== p.device)].slice(0, 5);
+  }
+  const session = { name: user.name, role: user.role, team: user.team, exp: Date.now() + SESSION_MS };
+  return {
+    ok: true,
+    token: issueToken(user),
+    user: { name: user.name, role: user.role, team: user.team },
+    pinUpgrade: pin.length < LEADER_PIN_MIN,
+    pinMinLength: minPinLength(user.role),
+    data: buildDashboard(store, session),
+    demo: true,
+  };
+}
+
+function myPrefs(store, session) {
+  const u = findUser(store, session.name) || {};
+  return { email: String(u.email || ''), reminders: u.reminders === true };
 }
 
 function buildDashboard(store, session) {
@@ -370,6 +435,7 @@ function buildDashboard(store, session) {
       canEdit: true,
     };
     if (role === 'group_leader') out.users = store.users.map(sanitizeUser);
+    out.me = myPrefs(store, session);
     return clone(out);
   }
 
@@ -393,6 +459,7 @@ function buildDashboard(store, session) {
       memberMetrics: teamMetrics,
       atRiskMembers: Object.values(teamMetrics).filter((m) => m.atRisk),
       roster: rosterFor(store, team),
+      me: myPrefs(store, session),
     });
   }
 
@@ -417,6 +484,7 @@ function buildDashboard(store, session) {
     teamMessages: teamMessages.filter((tm) => tm.team === team),
     mentorship: mentorship.filter((mp) => isMe(mp.student) || isMe(mp.mentor)),
     myGoal: goals.find((g) => isMe(g.name)) || null,
+    me: myPrefs(store, session),
   });
 }
 
@@ -681,9 +749,9 @@ const ACTIONS = {
     roles: ['group_leader'],
     fn(store, s, p) {
       const newPin = String(p.newPin || '').trim();
-      if (!/^\d{4}$/.test(newPin)) throw apiError('PIN must be exactly 4 numeric digits.', 'VALIDATION');
       const target = findUser(store, p.targetMember);
       if (!target) throw apiError('Member not found in roster.', 'NOT_FOUND');
+      checkNewPin(newPin, target.role, 'PIN');
       target.pin = newPin;
       audit(store, s, 'resetPin', target.name, {});
       return { ok: true };
@@ -695,12 +763,31 @@ const ACTIONS = {
       const me = findUser(store, s.name);
       const currentPin = String(p.currentPin || '').trim();
       const newPin = String(p.newPin || '').trim();
-      if (String(me.pin) !== currentPin) throw apiError('Your current PIN is not correct.', 'VALIDATION');
-      if (!/^\d{4}$/.test(newPin)) throw apiError('New PIN must be exactly 4 numeric digits.', 'VALIDATION');
+      const bucket = lockBucket(normalizeUserName(s.name), p.device);
+      checkLock(bucket);
+      if (String(me.pin) !== currentPin) {
+        recordFailure(store, bucket, s.name);
+        throw apiError('Your current PIN is not correct.', 'VALIDATION');
+      }
+      checkNewPin(newPin, s.role, 'New PIN');
       if (newPin === currentPin) throw apiError('Choose a PIN that is different from your current one.', 'VALIDATION');
       me.pin = newPin;
       audit(store, s, 'changeMyPin', s.name, {});
       return { ok: true, token: issueToken(me) };
+    },
+  },
+
+  setReminders: {
+    write: true,
+    fn(store, s, p) {
+      const on = p.reminders === true || p.reminders === 'true';
+      const email = text(p.email, 254, 'Email', on);
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw apiError('Enter a valid email address.', 'VALIDATION');
+      const me = findUser(store, s.name);
+      me.email = email;
+      me.reminders = on;
+      audit(store, s, 'setReminders', s.name, { after: { reminders: on, email: email ? 'set' : '' } });
+      return { ok: true };
     },
   },
 
@@ -799,7 +886,12 @@ export async function handleDemoRequest(params) {
   try {
     const store = getStore();
     const action = String(params.action || '');
+    if (action === 'health' || action === 'ping') return { ok: true, version: '6', time: nowIso(), demo: true };
     if (action === 'login') return actionLogin(store, params);
+    if (action === 'names') {
+      const names = [...new Set(store.users.map((u) => firstName(u.name)).filter(Boolean))].sort();
+      return { ok: true, names };
+    }
 
     const entry = Object.prototype.hasOwnProperty.call(ACTIONS, action) ? ACTIONS[action] : null;
     if (!entry) throw apiError('Unknown action.', 'BAD_REQUEST');
@@ -809,7 +901,13 @@ export async function handleDemoRequest(params) {
       throw apiError('You are not allowed to do this.', 'FORBIDDEN');
     }
     const result = entry.fn(store, session, params);
-    if (entry.write) saveStore(store);
+    if (entry.write) {
+      saveStore(store);
+      if (result && result.ok && params.withDashboard !== false) result.data = buildDashboard(store, session);
+    }
+    if (result && result.ok && !result.token && session.exp - Date.now() < RENEW_MS) {
+      result.token = issueToken(findUser(store, session.name));
+    }
     return result;
   } catch (err) {
     if (err && err.code) return { ok: false, error: err.message, code: err.code };

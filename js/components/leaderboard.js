@@ -1,28 +1,22 @@
 /**
- * EconomicsPortal — Leaderboard Component (v3)
- *
- * Displays ranked Team leaderboard (by average quiz score) and
- * Individual Member leaderboard with medals for top 3.
+ * EconomicsPortal — team and student leaderboards.
  */
 
 import { getScoreBand } from "./metricsPanel.js";
 import { esc } from "../utils.js";
-
-const MEDALS = []; // plain rank numbers
+import { emptyState, teamChip, sameName } from "./ui.js";
 
 /**
  * @param {HTMLElement} container
- * @param {object} memberMetrics  — { memberName: { avgScore, team, streak, ... } }
- * @param {object} teamAverages   — { teamName: avgScore }
+ * @param {object} memberMetrics  — { name: { avgScore, team, streak, delta, atRisk? } }
+ * @param {object} teamAverages   — { team: average }
  * @param {object} user
  */
 export function renderLeaderboard(container, memberMetrics, teamAverages, user) {
-  // ── Team Rankings ──────────────────────────────────────
   const teamRows = Object.entries(teamAverages)
     .map(([team, avg]) => ({ team, avg: Number(avg) }))
     .sort((a, b) => b.avg - a.avg);
 
-  // ── Individual Rankings ────────────────────────────────
   const memberRows = Object.entries(memberMetrics)
     .map(([name, m]) => ({
       name,
@@ -35,98 +29,78 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
     .filter((m) => m.avg > 0)
     .sort((a, b) => b.avg - a.avg);
 
-  container.innerHTML = `
-    <div class="leaderboard">
-      <!-- Team Leaderboard -->
-      <div class="card" style="margin-bottom: 1.25rem;">
-        <div class="card-header">
-          <h3 class="card-title">Team Leaderboard</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Ranked by mean quiz score across all tested units</span>
-        </div>
-        <div class="leaderboard-list">
-          ${
-            teamRows.length === 0
-              ? `<p style="color: var(--text-muted); padding: 1.5rem; text-align: center;">No scores recorded yet.</p>`
-              : teamRows
-                  .map((t, i) => {
-                    const band = getScoreBand(t.avg);
-                    const pct = Math.min(100, Math.round(t.avg));
-                    return `
-                  <div class="lb-row ${esc(i === 0 ? "lb-first" : "")}">
-                    <div class="lb-rank">${MEDALS[i] || esc(i + 1)}</div>
-                    <div class="lb-name">
-                      <strong>Team ${esc(t.team)}</strong>
-                      <span class="badge ${esc(band.cls)}" style="margin-left: 0.4rem;">${esc(band.label)}</span>
-                    </div>
-                    <div class="lb-bar-wrap">
-                      <div class="lb-bar" style="width: ${esc(pct)}%; background: ${esc(band.barColor)};"></div>
-                    </div>
-                    <div class="lb-score num">${esc(t.avg.toFixed(1))}</div>
-                  </div>
-                `;
-                  })
-                  .join("")
-          }
-        </div>
-      </div>
+  const trend = (d) =>
+    d > 0
+      ? `<span class="delta-pos">▲ ${esc(d.toFixed(1))}</span>`
+      : d < 0
+        ? `<span class="delta-neg">▼ ${esc(Math.abs(d).toFixed(1))}</span>`
+        : `<span class="delta-zero">—</span>`;
 
-      <!-- Individual Leaderboard -->
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Member Leaderboard</h3>
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Individual average — all tested units</span>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Member</th>
-                <th>Team</th>
-                <th>Avg Score</th>
-                <th>Streak</th>
-                <th>Trend</th>
-                <th>Band</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                memberRows.length === 0
-                  ? `<tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 1.5rem;">No data yet.</td></tr>`
-                  : memberRows
-                      .map((m, i) => {
-                        const band = getScoreBand(m.avg);
-                        const trendIcon =
-                          m.delta > 0
-                            ? `<span style="color: var(--teal);">▲ ${esc(m.delta.toFixed(1))}</span>`
-                            : m.delta < 0
-                            ? `<span style="color: var(--red);">▼ ${esc(Math.abs(m.delta).toFixed(1))}</span>`
-                            : `<span style="color: var(--text-muted);">—</span>`;
-                        const isMe = m.name === user.name;
-                        return `
-                      <tr ${isMe ? 'style="background: var(--primary-soft);"' : ""}>
-                        <td style="font-weight: 700; font-size: 1rem;">${MEDALS[i] || esc(i + 1)}</td>
-                        <td>
-                          <strong>${esc(m.name)}</strong>
-                          ${isMe ? `<span style="font-size: 0.7rem; color: var(--purple); margin-left: 0.3rem;">(You)</span>` : ""}
-                          ${m.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.3rem; font-size: 0.65rem;">At Risk</span>` : ""}
-                        </td>
-                        <td><span class="badge" style="background: var(--bg-subtle);">${esc(m.team)}</span></td>
-                        <td><strong class="num">${esc(m.avg.toFixed(1))}</strong></td>
-                        <td>
-                          ${m.streak > 0 ? `<span title="Consecutive passing units">${esc(m.streak)}</span>` : `<span style="color: var(--text-muted);">—</span>`}
-                        </td>
-                        <td>${trendIcon}</td>
-                        <td><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></td>
-                      </tr>
-                    `;
-                      })
-                      .join("")
-              }
-            </tbody>
-          </table>
-        </div>
+  container.innerHTML = `
+    <section class="card">
+      <div class="card-header">
+        <h3 class="card-title">Teams</h3>
+        <span class="card-note">Average quiz score, all units</span>
       </div>
-    </div>
+      ${
+        teamRows.length === 0
+          ? emptyState("No scores yet.", "Teams are ranked once marks are recorded.")
+          : `<ol class="leaderboard-list">
+          ${teamRows
+            .map((t, i) => {
+              const band = getScoreBand(t.avg);
+              const pct = Math.min(100, Math.round(t.avg));
+              return `
+            <li class="lb-row ${i === 0 ? "lb-first" : ""}">
+              <span class="lb-rank">${esc(i + 1)}</span>
+              <span class="lb-name">Team ${esc(t.team)} <span class="badge ${esc(band.cls)}">${esc(band.label)}</span></span>
+              <span class="lb-bar-wrap" aria-hidden="true"><span class="lb-bar" style="width: ${esc(pct)}%; background: ${esc(band.barColor)};"></span></span>
+              <span class="lb-score num">${esc(t.avg.toFixed(1))}</span>
+            </li>`;
+            })
+            .join("")}
+        </ol>`
+      }
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h3 class="card-title">Students</h3>
+        <span class="card-note">Average of each student's tests</span>
+      </div>
+      ${
+        memberRows.length === 0
+          ? emptyState("No scores yet.", "Students appear here after their first marked test.")
+          : `<div class="table-responsive">
+        <table class="data-table data-table-cards">
+          <thead>
+            <tr><th>Rank</th><th>Student</th><th>Team</th><th>Average</th><th>In a row</th><th>Trend</th><th>Band</th></tr>
+          </thead>
+          <tbody>
+            ${memberRows
+              .map((m, i) => {
+                const band = getScoreBand(m.avg);
+                const isMe = sameName(m.name, user.name);
+                return `
+              <tr class="${isMe ? "row-me" : ""}">
+                <td data-label="Rank" class="cell-strong">${esc(i + 1)}</td>
+                <td data-label="Student">
+                  <strong>${esc(m.name)}</strong>
+                  ${isMe ? `<span class="chip chip-accent">You</span>` : ""}
+                  ${m.atRisk ? `<span class="badge badge-atrisk">Needs support</span>` : ""}
+                </td>
+                <td data-label="Team">${teamChip(m.team)}</td>
+                <td data-label="Average"><strong class="num">${esc(m.avg.toFixed(1))}</strong></td>
+                <td data-label="In a row">${m.streak > 0 ? esc(m.streak) : `<span class="muted">—</span>`}</td>
+                <td data-label="Trend">${trend(m.delta)}</td>
+                <td data-label="Band"><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></td>
+              </tr>`;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>`
+      }
+    </section>
   `;
 }

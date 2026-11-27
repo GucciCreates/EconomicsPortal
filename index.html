@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Only this site, Google Fonts and the class's Apps Script backend may be used. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=5.0"
@@ -28,27 +33,24 @@
       href="./icons/icon.svg" type="image/svg+xml"
     />
 
-    <!-- Google Fonts: Bricolage Grotesque (headings) + Instrument Sans (text) -->
+    <!-- Google Fonts: Bricolage Grotesque 600/700 (headings) + Instrument Sans 400–700 (text).
+         The stylesheet is preloaded; the font files are fetched from it with display=swap,
+         so text shows immediately in a fallback font. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
+    />
     <link
       href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-
-    <!-- Chart.js 4.4.4 via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-
-    <!-- Cache Control Meta Tags to ensure immediate update in all browsers -->
-    <meta
-      http-equiv="Cache-Control"
-      content="no-cache, no-store, must-revalidate"
-    />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
+    <!-- Charts (Chart.js) load on demand from ./js/vendor/ when a chart tab opens. -->
 
     <!-- Main Ledger Stylesheet (Cache Busted) -->
-    <link rel="stylesheet" href="./css/style.css?v=5.0.0" />
+    <link rel="stylesheet" href="./css/style.css?v=6.0.0" />
   </head>
   <body>
     <!-- Demo / Fallback Mode Indicator Banner -->
@@ -59,15 +61,13 @@
 
     <!-- Dynamic Main Content (Login or Role Dashboards) -->
     <main class="main-wrapper" id="main-content">
-      <div style="text-align: center; padding: 3rem">
-        <p style="color: var(--text-muted)">Loading EconomicsPortal…</p>
-      </div>
+      <p class="loading-note">Loading EconomicsPortal…</p>
     </main>
 
     <!-- Persistent Footer -->
     <footer id="site-footer"></footer>
 
     <!-- Application Script (Cache Busted) -->
-    <script type="module" src="./js/app.js?v=5.0.0"></script>
+    <script type="module" src="./js/app.js?v=6.0.0"></script>
   </body>
 </html>

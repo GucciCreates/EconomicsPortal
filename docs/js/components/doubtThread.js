@@ -1,14 +1,16 @@
 /**
- * EconomicsPortal — Doubts & escalations with replies.
+ * EconomicsPortal — doubts with replies.
  *
- * Shared by the group leader / instructor view (reply + resolve), the team
- * leader view (reply, own team) and the member view (read-only thread of the
- * member's own questions).
+ * Used by the leaders' views (reply, and resolve for instructor / group
+ * leader), the team leader view (reply, own team) and the student view
+ * (read-only thread of their own questions).
  */
 
 import { apiAddEscalationReply, apiUpdateEscalationStatus } from '../api.js';
 import { esc } from '../utils.js';
 import { isNewer, newPill } from '../lastSeen.js';
+import { timeHtml } from '../dates.js';
+import { bindActions, runAction, emptyState } from './ui.js';
 
 function sortDoubts(list) {
   return [...list].sort((a, b) => {
@@ -34,46 +36,48 @@ export function countDoubtUpdates(list, since, user) {
  * @param {object} opts
  * @param {Array} opts.escalations
  * @param {object} opts.user
- * @param {boolean} opts.canReply
- * @param {boolean} opts.canResolve
- * @param {number} [opts.since] - last-seen timestamp for "New" pills
+ * @param {boolean} [opts.canReply]
+ * @param {boolean} [opts.canResolve]
+ * @param {number} [opts.since] - last-seen time for "New" pills
  * @param {string} [opts.title]
  * @param {string} [opts.emptyText]
+ * @param {string} [opts.emptyHint]
  * @param {Function} opts.onRefresh
  */
 export function renderDoubtThreads(container, opts) {
   const { escalations = [], user, canReply = false, canResolve = false, since = 0, onRefresh } = opts;
   const list = sortDoubts(escalations);
   const showFrom = user.role !== 'member';
+  const open = list.filter((d) => d.status !== 'closed').length;
 
   container.innerHTML = `
-    <div class="card">
+    <section class="card">
       <div class="card-header">
-        <h3 class="card-title">${esc(opts.title || `Doubts & Escalations (${list.length})`)}</h3>
+        <h3 class="card-title">${esc(opts.title || 'Doubts')}</h3>
+        ${list.length ? `<span class="card-note">${esc(open)} open · ${esc(list.length - open)} resolved</span>` : ''}
       </div>
       ${
         list.length === 0
-          ? `<p style="color: var(--text-muted); text-align: center; padding: 2rem;">${esc(opts.emptyText || 'No questions or issues reported.')}</p>`
-          : list
+          ? emptyState(opts.emptyText || 'No doubts yet.', opts.emptyHint || '')
+          : `<div class="stack">${list
               .map((d) => {
                 const isSevere = d.severity === 'severe';
                 const isClosed = d.status === 'closed';
                 const replies = d.replies || [];
                 return `
-        <article class="escalation-item ${isSevere ? 'severe' : ''}" style="margin-bottom: 0.85rem;" data-doubt-id="${esc(d.id)}">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-            <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(d.topic)} ${newPill(d.timestamp, user.name === d.raisedBy ? Infinity : since)}</h4>
-            <div style="display: flex; gap: 0.35rem; align-items: center; flex-shrink: 0;">
-              ${isSevere ? `<span class="badge badge-atrisk">URGENT</span>` : ''}
+        <article class="escalation-item ${isSevere ? 'severe' : ''}" data-doubt-id="${esc(d.id)}">
+          <div class="item-head">
+            <h4 class="item-title">${esc(d.topic)} ${newPill(d.timestamp, user.name === d.raisedBy ? Infinity : since)}</h4>
+            <div class="btn-group">
+              ${isSevere ? `<span class="badge badge-atrisk">Urgent</span>` : ''}
               <span class="badge ${isClosed ? 'badge-closed' : 'badge-open'}">${isClosed ? 'Resolved' : 'Open'}</span>
             </div>
           </div>
-          <p style="font-size: 0.85rem; margin-bottom: 0.45rem; white-space: pre-wrap;">${esc(d.details)}</p>
-          <div style="font-size: 0.75rem; color: var(--text-muted);">
-            ${showFrom ? `From <strong>${esc(d.raisedBy)}</strong> (Team ${esc(d.team)}) • ` : 'Asked '}${esc(new Date(d.timestamp).toLocaleDateString())}
-            ${isClosed && d.closedBy ? ` • Resolved by ${esc(d.closedBy)} ${d.closedBy !== user.name ? newPill(d.updatedAt, since) : ''}` : ''}
-          </div>
-
+          <p class="pre-wrap">${esc(d.details)}</p>
+          <p class="item-meta">
+            ${showFrom ? `${esc(d.raisedBy)} · Team ${esc(d.team)} · ` : 'Asked '}${timeHtml(d.timestamp)}
+            ${isClosed && d.closedBy ? ` · resolved by ${esc(d.closedBy)} ${d.closedBy !== user.name ? newPill(d.updatedAt, since) : ''}` : ''}
+          </p>
           ${
             replies.length
               ? `<ol class="doubt-replies" aria-label="Replies">
@@ -83,7 +87,7 @@ export function renderDoubtThreads(container, opts) {
                 <li class="doubt-reply">
                   <div class="doubt-reply-meta">
                     <strong>${esc(r.author)}</strong>
-                    <span>${esc(String(r.role || '').replace('_', ' '))} · ${esc(new Date(r.timestamp).toLocaleString())}</span>
+                    <span>${esc(String(r.role || '').replace('_', ' '))} · ${timeHtml(r.timestamp)}</span>
                     ${r.author !== user.name ? newPill(r.timestamp, since) : ''}
                   </div>
                   <p>${esc(r.message)}</p>
@@ -92,78 +96,46 @@ export function renderDoubtThreads(container, opts) {
                 .join('')}
             </ol>`
               : user.role === 'member'
-                ? `<p class="form-hint" style="margin-top: 0.5rem;">No reply yet — you'll see it here, marked New.</p>`
+                ? `<p class="form-hint">No reply yet. Replies show up here, marked New.</p>`
                 : ''
           }
-
           ${
             canReply || (canResolve && !isClosed)
               ? `<div class="doubt-actions">
               ${
                 canReply
-                  ? `<form class="doubt-reply-form" data-id="${esc(d.id)}">
+                  ? `<form class="doubt-reply-form" data-form="reply" data-id="${esc(d.id)}">
                   <label class="sr-only" for="reply-${esc(d.id)}">Reply to ${esc(d.raisedBy)}</label>
-                  <textarea id="reply-${esc(d.id)}" class="form-control" rows="2" maxlength="5000" placeholder="Write a reply to ${esc(d.raisedBy)}…" required></textarea>
+                  <textarea id="reply-${esc(d.id)}" class="form-control" rows="2" maxlength="5000" placeholder="Reply to ${esc(d.raisedBy)}" required></textarea>
                   <button type="submit" class="btn btn-primary btn-sm">Send reply</button>
                 </form>`
                   : ''
               }
-              ${
-                canResolve && !isClosed
-                  ? `<button type="button" class="btn btn-teal btn-sm btn-resolve-esc" data-id="${esc(d.id)}">Mark Resolved ✓</button>`
-                  : ''
-              }
+              ${canResolve && !isClosed ? `<button type="button" class="btn btn-teal btn-sm btn-resolve-esc" data-action="resolve" data-id="${esc(d.id)}">Mark resolved</button>` : ''}
             </div>`
               : ''
           }
         </article>`;
               })
-              .join('')
+              .join('')}</div>`
       }
-    </div>
+    </section>
   `;
 
-  container.querySelectorAll('.doubt-reply-form').forEach((form) => {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = form.querySelector('button[type="submit"]');
-      const message = form.querySelector('textarea').value.trim();
-      if (!message) return;
-      btn.disabled = true;
-      btn.textContent = 'Sending…';
-      try {
-        const res = await apiAddEscalationReply(form.getAttribute('data-id'), message);
-        if (res.ok) {
-          window.showEconomicsToast('Reply sent.', 'success');
-          onRefresh();
-        } else if (res.code !== 'AUTH') {
-          window.showEconomicsToast(res.error || 'Could not send reply.', 'error');
-        }
-      } catch (err) {
-        window.showEconomicsToast(err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Send reply';
-      }
-    });
-  });
-
-  container.querySelectorAll('.btn-resolve-esc').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      try {
-        const res = await apiUpdateEscalationStatus(btn.getAttribute('data-id'), 'closed');
-        if (res.ok) {
-          window.showEconomicsToast('Doubt marked as resolved.', 'success');
-          onRefresh();
-        } else if (res.code !== 'AUTH') {
-          window.showEconomicsToast(res.error || 'Update failed.', 'error');
-          btn.disabled = false;
-        }
-      } catch (err) {
-        window.showEconomicsToast(err.message, 'error');
-        btn.disabled = false;
-      }
-    });
+  bindActions(container, {
+    submit: {
+      reply: (form) => {
+        const message = form.querySelector('textarea').value.trim();
+        if (!message) return;
+        runAction(form.querySelector('button[type="submit"]'), 'Sending…', () => apiAddEscalationReply(form.dataset.id, message), {
+          success: 'Reply sent.',
+          onDone: onRefresh,
+        });
+      },
+    },
+    click: {
+      resolve: (btn) =>
+        runAction(btn, '', () => apiUpdateEscalationStatus(btn.dataset.id, 'closed'), { success: 'Marked as resolved.', onDone: onRefresh }),
+    },
   });
 }
