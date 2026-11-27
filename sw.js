@@ -27,6 +27,7 @@ const APP_SHELL = [
   './js/app.js',
   './js/auth.js',
   './js/googleSignIn.js',
+  './js/sha256.js',
   './js/components/accountMenu.js',
   './js/components/activityLog.js',
   './js/components/authFigure.js',

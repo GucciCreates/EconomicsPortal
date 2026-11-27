@@ -58,11 +58,11 @@ test('signing in and saving each take one request to the server', { timeout: 120
 
 test('first-name sign-in offers "Did you mean"; short PINs get a one-time note', { timeout: 120000 }, async () => {
   const backend = liveBackend();
-  backend.api.setPinForUser('Ayesha (Quetta)', '3001');
+  backend.api.setPinForUser('Ayesha (Quetta)', '3579');
   const { browser, page, errors } = await openApp({ demo: false, backend });
   try {
     await page.fill('#login-name', 'ayesha');
-    await page.fill('#login-pin', '3001');
+    await page.fill('#login-pin', '3579');
     await page.click('#btn-submit-login');
     await page.waitForSelector('#btn-use-suggestion');
     assert.match(await page.textContent('#login-error-box'), /Did you mean Ayesha \(Quetta\)\?/);
@@ -73,7 +73,7 @@ test('first-name sign-in offers "Did you mean"; short PINs get a one-time note',
     await page.click('#btn-account-menu');
     await page.click('#btn-logout');
     await page.fill('#login-name', 'Ayesha (Quetta)');
-    await page.fill('#login-pin', '3001');
+    await page.fill('#login-pin', '3579');
     await page.click('#btn-submit-login');
     await page.waitForSelector('.tab-nav');
     assert.ok(!(await page.$('.pin-offer')), 'shown only once');

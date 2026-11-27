@@ -26,6 +26,7 @@ import {
   computeMockMemberMetrics,
 } from './mockData.js';
 import { normalizeUserName } from './utils.js';
+import { sha256Hex } from './sha256.js';
 
 export { normalizeUserName };
 
@@ -371,7 +372,7 @@ function actionLogin(store, p) {
   if (!user || String(user.pin) !== pin) {
     recordFailure(store, bucket, user ? user.name : name);
     throw apiError(
-      "That name and PIN don't match. (Demo PINs: Shehroz 1111, Dr. Numan 0000, Amina 2001, Bilal 2002, Ayesha (Quetta) 3001)",
+      "That name and PIN don't match. (Demo PINs: Shehroz 111222, Dr. Numan 100200, Amina 2101, Bilal 2002, Ayesha (Quetta) 3101)",
       'LOGIN_FAILED',
     );
   }
@@ -893,12 +894,30 @@ const ACTIONS = {
  * Handle one request exactly like the Apps Script backend would.
  * @param {object} params - { action, token, ...fields }
  */
+// Same rule as Code.gs PUBLISHED_PINS: the first README published every
+// person's starting PIN, so those name + PIN pairs are refused everywhere.
+const PUBLISHED_PINS = ['fff4a103e0a26f5eb6ee069f', 'f8122729b48ae2e67e31deed', '77c9554014050ce3e982edb1', '27b1ca4deb94ea3af26e305e', 'cb0e3e27def67b05123adbb7', '190248acf92d2fdbebfba802', 'fce41495f1061cf4232d1196', 'c369435c5acf69a4ce687b84', 'c4a99445fc074a05d6168854', 'b59f515decc41dda4ab86fb7', '4fc3dfa6cd2574d64096e5bb', '5863e795c9118e3211b3b528', 'a7458dc4a94fd619f0ba0769', '1dcb3fd679b8b4d133edcb68', '636b70560c8fb1ebfbf12040', 'f3f53afc9ee4ed0bf7496cf1', '8f96b5befed87c7ce168f8d9'];
+
+function isPublishedPin(name, pin) {
+  const hex = sha256Hex('published-pin:' + normalizeUserName(name) + '|' + String(pin)).slice(0, 24);
+  return PUBLISHED_PINS.includes(hex);
+}
+
 export async function handleDemoRequest(params) {
   try {
     const store = getStore();
     const action = String(params.action || '');
     if (action === 'health' || action === 'ping') return { ok: true, version: '6', time: nowIso(), demo: true };
-    if (action === 'login') return actionLogin(store, params);
+    if (action === 'login') {
+      const who = findUser(store, params.name);
+      if (who && (isPublishedPin(who.name, String(params.pin || '').trim()))) {
+        throw apiError(
+          "This PIN was published online in an old version of the portal, so it can't be used any more. Ask your group leader or instructor to give you a new PIN.",
+          'PIN_PUBLISHED',
+        );
+      }
+      return actionLogin(store, params);
+    }
     if (action === 'names') {
       const names = [...new Set(store.users.map((u) => firstName(u.name)).filter(Boolean))].sort();
       // No Google client ID in Demo Mode, so the sign-in page shows the PIN form only.
@@ -910,6 +929,12 @@ export async function handleDemoRequest(params) {
     if (!entry) throw apiError('Unknown action.', 'BAD_REQUEST');
 
     const session = requireSession(store, params.token);
+    if (action === 'changeMyPin' || action === 'updatePin') {
+      const target = action === 'changeMyPin' ? session.name : (findUser(store, params.targetMember) || {}).name;
+      if (target && (isPublishedPin(target, String(params.newPin || '').trim()))) {
+        throw apiError('That PIN was published online in an old version of the portal. Choose a different one.', 'VALIDATION');
+      }
+    }
     if (entry.roles && !entry.roles.includes(session.role)) {
       throw apiError('You are not allowed to do this.', 'FORBIDDEN');
     }

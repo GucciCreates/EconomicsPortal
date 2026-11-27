@@ -79,15 +79,15 @@ test('migratePins converts an old plaintext pin column, including numbers Sheets
   const users = b.ss.insertSheet('Users');
   users.data = [
     ['name', 'role', 'team', 'pin'],
-    ['Dr. Numan', 'instructor', '-', 0], // "0000" saved as a number by Sheets
-    ['Ramesh', 'member', 'Amina', '2002'],
+    ['Dr. Numan', 'instructor', '-', 42], // "0042" saved as a number by Sheets
+    ['Ramesh', 'member', 'Amina', '2468'],
   ];
   b.api.migratePins();
   const [headers, ...rows] = users.data;
   assert.deepEqual(headers.slice(0, 5), ['name', 'role', 'team', 'pinHash', 'salt']);
   rows.forEach((r) => assert.ok(String(r[3]).startsWith('v1$')));
-  assert.equal(b.post({ action: 'login', name: 'Dr. Numan', pin: '0000' }).ok, true);
-  assert.equal(b.post({ action: 'login', name: 'Ramesh', pin: '2002' }).ok, true);
+  assert.equal(b.post({ action: 'login', name: 'Dr. Numan', pin: '0042' }).ok, true);
+  assert.equal(b.post({ action: 'login', name: 'Ramesh', pin: '2468' }).ok, true);
 });
 
 // ── Login & tokens ───────────────────────────────────────────────────────
@@ -712,4 +712,39 @@ test('the users list for leaders never includes Google addresses', () => {
   const res = b.post({ action: 'users', token: b.tokenFor('Shehroz') });
   assert.equal(res.ok, true);
   assert.ok(!JSON.stringify(res).includes('minal@gmail.com'));
+});
+
+// ── PINs that were published in the first README (AUDIT_v7 F2) ───────────
+
+test('a PIN that was published online is refused at sign-in and can never be set again', () => {
+  const b = freshBackend();
+  // Simulate an account that still has its original, published PIN.
+  b.api.setPinForUser('Shehroz', '1201');
+  const sheet = b.ss.getSheetByName('Users');
+  const h = sheet.data[0];
+  const row = sheet.data.findIndex((r) => r[0] === 'Shehroz');
+  const salt = 'legacy-salt';
+  sheet.data[row][h.indexOf('salt')] = salt;
+  sheet.data[row][h.indexOf('pinHash')] = b.api.hashPin('1111', salt);
+  b.api.clearCache();
+
+  const res = b.post({ action: 'login', name: 'Shehroz', pin: '1111' });
+  assert.equal(res.ok, false);
+  assert.equal(res.code, 'PIN_PUBLISHED');
+  assert.match(res.error, /published/i);
+  assert.ok(!res.token);
+  // Wrong guesses still behave as before (no hint that 1111 was right).
+  assert.equal(b.post({ action: 'login', name: 'Shehroz', pin: '9999' }).code, 'LOGIN_FAILED');
+
+  // Nobody can set a published PIN again, by any route.
+  assert.throws(() => b.api.setPinForUser('Ramesh', '2002'), /published/i);
+  const gl = b.tokenFor('Amina'); // team leader can't reset, so use the group leader after a fresh PIN
+  b.api.setPinForUser('Shehroz', '246810');
+  const leader = b.post({ action: 'login', name: 'Shehroz', pin: '246810' }).token;
+  assert.equal(b.post({ action: 'updatePin', token: leader, targetMember: 'Ramesh', newPin: '2002' }).code, 'VALIDATION');
+  const ramesh = b.tokenFor('Ramesh');
+  assert.equal(b.post({ action: 'changeMyPin', token: ramesh, currentPin: PINS.Ramesh, newPin: '2002' }).code, 'VALIDATION');
+  // Same digits are fine for someone they weren't published for.
+  assert.equal(b.post({ action: 'updatePin', token: leader, targetMember: 'Minal', newPin: '2002' }).ok, true);
+  assert.ok(gl);
 });

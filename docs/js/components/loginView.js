@@ -79,10 +79,10 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         ${isDemoMode() ? `<div class="quick-login-panel" aria-label="Demo accounts">
           <p class="quick-login-title">Demo mode: sign in as</p>
           <div class="quick-login-grid">
-            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan <small>instructor</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz <small>group leader</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2001">Amina <small>team leader</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha <small>team leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="100200">Dr. Numan <small>instructor</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="111222">Shehroz <small>group leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2101">Amina <small>team leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3101">Ayesha <small>team leader</small></button>
             <button type="button" class="quick-login-chip" data-demo-name="Bilal" data-demo-pin="2002">Bilal <small>student</small></button>
           </div>
         </div>` : ''}

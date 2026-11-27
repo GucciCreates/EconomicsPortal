@@ -278,6 +278,15 @@ function actionLogin(ss, params) {
   const bucket = lockBucket(key, found ? found.user.name : name, params.device);
   checkLock(bucket);
 
+  // Checked before the PIN itself, so it says nothing about whether it was right.
+  if (found && isPublishedPin(found.user.name, pin)) {
+    throw apiError(
+      "This PIN was published online in an old version of the portal, so it can't be used any more. " +
+        "Ask your group leader or instructor to give you a new PIN.",
+      "PIN_PUBLISHED"
+    );
+  }
+
   if (!found || !found.user.pinHash || !verifyPin(found.user, pin)) {
     recordLoginFailure(ss, bucket, found ? found.user : null);
     throw apiError("That name and PIN don't match.", "LOGIN_FAILED");
@@ -612,6 +621,30 @@ function minPinLength(role) {
 }
 
 /** Throws unless `pin` is a valid new PIN for someone with `role`. */
+// The first README (v1) published every person's starting PIN. Anyone who
+// never changed it could be signed in as by a stranger. These are
+// fingerprints of those name + PIN pairs (the pairs themselves are still in
+// the repository's history, so this adds nothing new). A matching PIN is
+// refused at sign-in and can never be chosen again.
+const PUBLISHED_PINS = [
+  "fff4a103e0a26f5eb6ee069f", "f8122729b48ae2e67e31deed", "77c9554014050ce3e982edb1",
+  "27b1ca4deb94ea3af26e305e", "cb0e3e27def67b05123adbb7", "190248acf92d2fdbebfba802",
+  "fce41495f1061cf4232d1196", "c369435c5acf69a4ce687b84", "c4a99445fc074a05d6168854",
+  "b59f515decc41dda4ab86fb7", "4fc3dfa6cd2574d64096e5bb", "5863e795c9118e3211b3b528",
+  "a7458dc4a94fd619f0ba0769", "1dcb3fd679b8b4d133edcb68", "636b70560c8fb1ebfbf12040",
+  "f3f53afc9ee4ed0bf7496cf1", "8f96b5befed87c7ce168f8d9"
+];
+
+function isPublishedPin(name, pin) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    "published-pin:" + normalizeName(name) + "|" + String(pin),
+    Utilities.Charset.UTF_8
+  );
+  const hex = bytes.map(b => ((b + 256) % 256).toString(16).padStart(2, "0")).join("").slice(0, 24);
+  return PUBLISHED_PINS.indexOf(hex) !== -1;
+}
+
 function checkNewPin(pin, role, label) {
   const min = minPinLength(role);
   if (!isPinFormat(pin) || String(pin).length < min) {
@@ -1323,6 +1356,9 @@ function actionSetReminders(ss, session, p) {
 function writePin(ss, name, pin) {
   const found = findUser(ss, name);
   if (!found) throw apiError("Member not found in roster: " + name, "NOT_FOUND");
+  if (isPublishedPin(found.user.name, pin)) {
+    throw apiError("That PIN was published online in an old version of the portal. Choose a different one.", "VALIDATION");
+  }
   const salt = newSalt();
   writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { pinHash: hashPin(pin, salt), salt: salt });
 }
