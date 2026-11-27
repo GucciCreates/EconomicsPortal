@@ -1,18 +1,21 @@
 /**
- * EconomicsPortal — Secure Private Login Component
+ * EconomicsPortal — Sign-in screen
  *
- * Strict Privacy:
- * - No public directory or PIN exposure on the login page.
- * - Credentials are verified securely via the backend.
- * - Only the Group Leader has access to view/change PINs.
+ * - Name field suggests first names (from the public `names` action).
+ *   Typing just a first name that belongs to one person offers
+ *   "Did you mean …?".
+ * - PINs are 4 to 8 digits.
+ * - Signing in is one request: the response carries the dashboard.
+ * - If the class server can't be reached, the screen says so and offers
+ *   Retry. It never switches to Demo Mode on its own.
  */
 
-import { apiLogin } from '../api.js';
+import { apiLogin, apiNames, acceptLoginDashboard } from '../api.js';
 import { setCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
 import { esc, escapeHtml } from '../utils.js';
 
-export function renderModernLogin(container, onSuccess, onForceDemo, options = {}) {
+export function renderModernLogin(container, onSuccess, options = {}) {
   const rememberedName =
     localStorage.getItem('economics_portal_remember_name') || '';
 
@@ -66,11 +69,13 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
               type="text"
               id="login-name"
               class="form-control auth-input"
-              placeholder="As on the class list, e.g. Ayesha (Quetta)"
+              placeholder="Start typing your name"
               value="${escapeHtml(rememberedName)}"
-              autocomplete="name"
+              autocomplete="username"
+              list="login-name-options"
               required
             />
+            <datalist id="login-name-options"></datalist>
           </div>
 
           <div class="form-group">
@@ -82,20 +87,16 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
               type="password"
               id="login-pin"
               class="form-control auth-input pin-input"
-              maxlength="4"
-              pattern="[0-9]{4}"
+              minlength="4"
+              maxlength="8"
+              pattern="[0-9]{4,8}"
               inputmode="numeric"
               autocomplete="current-password"
               aria-describedby="pin-dots-hint"
               required
             />
-            <div class="pin-dots-display" id="pin-dots" aria-hidden="true">
-              <span class="pin-dot"></span>
-              <span class="pin-dot"></span>
-              <span class="pin-dot"></span>
-              <span class="pin-dot"></span>
-            </div>
-            <span class="sr-only" id="pin-dots-hint">4 digits</span>
+            <div class="pin-dots-display" id="pin-dots" aria-hidden="true"></div>
+            <span class="form-hint" id="pin-dots-hint">4 to 8 digits</span>
           </div>
 
           <div class="form-group auth-remember-row">
@@ -121,49 +122,40 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
   const pinInput = container.querySelector('#login-pin');
   const submitBtn = container.querySelector('#btn-submit-login');
   const errorBox = container.querySelector('#login-error-box');
-  const pinDots = container.querySelectorAll('.pin-dot');
+  const pinDots = container.querySelector('#pin-dots');
   const togglePinBtn = container.querySelector('#btn-toggle-pin-visibility');
   const rememberChk = container.querySelector('#chk-remember');
-  const quickLoginButtons = container.querySelectorAll('.quick-login-chip');
 
-  quickLoginButtons.forEach((button) => {
+  // First-name suggestions. Best effort: the form works without them.
+  apiNames()
+    .then((res) => {
+      if (!res || !res.ok || !Array.isArray(res.names)) return;
+      container.querySelector('#login-name-options').innerHTML = res.names
+        .map((n) => `<option value="${escapeHtml(n)}"></option>`)
+        .join('');
+    })
+    .catch(() => {});
+
+  container.querySelectorAll('.quick-login-chip').forEach((button) => {
     button.addEventListener('click', () => {
-      const name = button.dataset.demoName || '';
-      const pin = button.dataset.demoPin || '';
-      nameInput.value = name;
-      pinInput.value = pin;
-      updatePinDots(pin);
-      if (rememberChk) {
-        rememberChk.checked = true;
-        localStorage.setItem('economics_portal_remember_name', name);
-      }
-      submitBtn.classList.add('pulse');
-      setTimeout(() => submitBtn.classList.remove('pulse'), 260);
+      nameInput.value = button.dataset.demoName || '';
+      pinInput.value = button.dataset.demoPin || '';
+      updatePinDots(pinInput.value);
       formLogin.requestSubmit();
     });
   });
 
-  // PIN indicator dots
+  // One bar per digit typed (at least four, at most eight).
   function updatePinDots(val) {
-    pinDots.forEach((dot, idx) => {
-      if (idx < val.length) {
-        dot.classList.add('filled');
-      } else {
-        dot.classList.remove('filled');
-      }
-    });
+    const n = Math.min(8, Math.max(4, val.length));
+    pinDots.innerHTML = Array.from({ length: n }, (_, i) => `<span class="pin-dot${i < val.length ? ' filled' : ''}"></span>`).join('');
   }
-
+  updatePinDots('');
   pinInput.addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
     updatePinDots(e.target.value);
-    if (e.target.value.length === 4) {
-      submitBtn.classList.add('pulse');
-    } else {
-      submitBtn.classList.remove('pulse');
-    }
   });
 
-  // Show/Hide PIN toggle
   let isPinVisible = false;
   togglePinBtn.addEventListener('click', () => {
     isPinVisible = !isPinVisible;
@@ -171,7 +163,6 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
     togglePinBtn.textContent = isPinVisible ? 'Hide PIN' : 'Show PIN';
   });
 
-  // Submit Handler
   formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = nameInput.value.trim();
@@ -191,35 +182,41 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
       const res = await apiLogin(name, pin);
       if (res.ok && res.user) {
         setCurrentUser(res.user);
+        acceptLoginDashboard(res);
         try {
           sessionStorage.removeItem(`economics_portal_tab:${res.user.name}`); // start each login on the first tab
         } catch (e) {}
-        onSuccess();
+        onSuccess(res);
+      } else if (res.code === 'DID_YOU_MEAN' && res.suggestion) {
+        errorBox.innerHTML = `
+          <div class="alert alert-info" role="status">
+            Did you mean <strong>${esc(res.suggestion)}</strong>?
+            <div class="btn-row">
+              <button type="button" class="btn btn-primary btn-sm" id="btn-use-suggestion">Sign in as ${esc(res.suggestion)}</button>
+            </div>
+          </div>`;
+        errorBox.querySelector('#btn-use-suggestion').addEventListener('click', () => {
+          nameInput.value = res.suggestion;
+          formLogin.requestSubmit();
+        });
       } else {
         triggerError(
-          res.error || 'That name and PIN don\'t match. Check the spelling of your name, or ask your group leader to reset your PIN.',
+          res.error || "That name and PIN don't match. Check the spelling of your name, or ask your group leader to reset your PIN.",
         );
       }
     } catch (err) {
       errorBox.innerHTML = `
-        <div class="alert alert-error auth-error-alert">
-          <strong>Couldn't reach the class server (${esc(err.message)}).</strong>
-          <p style="font-size: 0.85rem; margin: 0.35rem 0;">
-            Check your connection and try again, or explore the portal with sample data.
-          </p>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-force-demo-login" style="width: 100%; margin-top: 0.5rem;">
-            Continue in Demo Mode
-          </button>
+        <div class="alert alert-error auth-error-alert" role="alert">
+          <strong>Can't reach the class server right now.</strong>
+          <p class="alert-text">${
+            navigator.onLine === false
+              ? "You're offline. Reconnect to the internet, then try again."
+              : 'It may be busy or your connection dropped. Wait a moment, then try again.'
+          }</p>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-retry-login">Try again</button>
         </div>
       `;
-
-      const forceBtn = errorBox.querySelector('#btn-force-demo-login');
-      if (forceBtn) {
-        forceBtn.addEventListener('click', () => {
-          localStorage.setItem('economics_portal_force_demo', 'true');
-          onForceDemo();
-        });
-      }
+      errorBox.querySelector('#btn-retry-login').addEventListener('click', () => formLogin.requestSubmit());
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Sign in';
@@ -227,7 +224,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
   });
 
   function triggerError(msg) {
-    errorBox.innerHTML = `<div class="alert alert-error auth-error-alert">${esc(msg)}</div>`;
+    errorBox.innerHTML = `<div class="alert alert-error auth-error-alert" role="alert">${esc(msg)}</div>`;
     const card = container.querySelector('.auth-card');
     card.classList.remove('shake');
     void card.offsetWidth;

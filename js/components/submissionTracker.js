@@ -7,7 +7,7 @@
  */
 
 import { esc } from '../utils.js';
-import { normalizeUserName } from '../api.js';
+import { normalizeUserName } from '../utils.js';
 
 /** End of the due day in local time, or null when no due date is set. */
 export function dueDeadline(dueDate) {

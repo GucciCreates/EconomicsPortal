@@ -1,16 +1,29 @@
 /**
- * EconomicsPortal — Main Application Controller (v2)
+ * EconomicsPortal — Main application controller
+ *
+ * Dashboards render from, in order of preference:
+ *   1. the dashboard that came back with the last sign-in or write (no request),
+ *   2. the last dashboard this tab saw (shown instantly, then refreshed),
+ *   3. a fresh request, behind a loading skeleton.
  */
 
-import { isDemoMode } from './config.js';
+import { isDemoMode, exitDemo } from './config.js';
 import { getCurrentUser, clearCurrentUser } from './auth.js';
-import { apiGetDashboard, resetDemoData } from './api.js';
+import {
+  apiGetDashboard,
+  resetDemoData,
+  takeFreshDashboard,
+  getCachedDashboard,
+  lastSyncedAt,
+  forgetDashboards,
+} from './api.js';
+import { formatRelative, formatFull } from './dates.js';
 import { renderMemberDashboard } from './components/memberView.js';
 import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';
 import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
 import { renderModernLogin } from './components/loginView.js';
 import { esc } from './utils.js';
-import { renderAccountMenu } from './components/accountMenu.js';
+import { renderAccountMenu, openChangeMyPinModal } from './components/accountMenu.js';
 import { enhanceModal } from './components/modal.js';
 
 // DOM Root Elements
@@ -52,42 +65,33 @@ function toggleTheme() {
 function renderBanner() {
   if (isDemoMode()) {
     bannerEl.innerHTML = `
-      <div class="demo-banner">
-        <span>
-          <strong>Demo mode.</strong> You're using sample data stored in this browser; nothing is saved to the class sheet.
-        </span>
-        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          ${
-            localStorage.getItem('economics_portal_force_demo') === 'true'
-              ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" >Try the live portal</button>`
-              : `<a href="https://github.com/GucciCreates/EconomicsPortal/blob/main/SETUP_GUIDE.md" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">How to connect the live portal</a>`
-          }
-          <button id="btn-reset-demo" class="btn btn-secondary btn-sm" >Reset sample data</button>
+      <div class="demo-banner" role="note">
+        <span><strong>Sample data.</strong> Nothing you do here is saved, and it disappears when you close this tab.</span>
+        <div class="demo-banner-actions">
+          <button id="btn-reset-demo" class="btn btn-secondary btn-sm">Reset sample data</button>
+          <button id="btn-exit-demo" class="btn btn-secondary btn-sm">Leave demo</button>
         </div>
       </div>
     `;
     bannerEl.style.display = 'block';
+    document.body.classList.add('is-demo');
 
-    const retryLiveBtn = document.getElementById('btn-retry-live');
-    if (retryLiveBtn) {
-      retryLiveBtn.addEventListener('click', () => {
-        localStorage.removeItem('economics_portal_force_demo');
-        refreshApp();
-      });
-    }
-
-    const resetBtn = document.getElementById('btn-reset-demo');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (confirm('Reset demo data back to default sample state?')) {
-          resetDemoData();
-          window.location.reload();
-        }
-      });
-    }
+    document.getElementById('btn-exit-demo').addEventListener('click', () => {
+      clearCurrentUser();
+      forgetDashboards();
+      exitDemo();
+    });
+    document.getElementById('btn-reset-demo').addEventListener('click', async () => {
+      if (confirm('Reset the sample data to how it started?')) {
+        await resetDemoData();
+        forgetDashboards();
+        window.location.reload();
+      }
+    });
   } else {
     bannerEl.innerHTML = ``;
     bannerEl.style.display = 'none';
+    document.body.classList.remove('is-demo');
   }
 }
 
@@ -138,6 +142,7 @@ function renderHeader() {
   if (menuHost && user) {
     renderAccountMenu(menuHost, user, () => {
       clearCurrentUser();
+      forgetDashboards();
       refreshApp();
     });
   }
@@ -146,19 +151,42 @@ function renderHeader() {
 function renderFooter() {
   footerEl.innerHTML = `
     <div class="site-footer">
-      <p>Class portal for Dr. Numan's Economics class — built by Shehroz's team.</p>
+      <p>Class portal for Dr. Numan's Economics class, built by Shehroz's team.</p>
+      <p class="sync-status" id="sync-status" aria-live="off"></p>
     </div>
   `;
+  updateSyncStatus();
 }
+
+/** Footer line: "Synced 2 minutes ago" (full time in the tooltip). */
+function updateSyncStatus() {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const at = getCurrentUser() ? lastSyncedAt() : null;
+  if (!at) {
+    el.textContent = '';
+    el.removeAttribute('title');
+    return;
+  }
+  const rel = formatRelative(new Date(at));
+  el.textContent = `${isDemoMode() ? 'Sample data loaded' : 'Synced'} ${rel === 'just now' ? 'just now' : rel}`;
+  el.title = formatFull(new Date(at));
+}
+window.addEventListener('economics:synced', updateSyncStatus);
+setInterval(updateSyncStatus, 30 * 1000);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LOGIN VIEW
 // ─────────────────────────────────────────────────────────────────────────────
+let pinUpgradeOffer = null; // set right after a sign-in with a short PIN
+
 function renderLogin(notice = '') {
   renderModernLogin(
     mainEl,
-    () => refreshApp(),
-    () => refreshApp(),
+    (res) => {
+      pinUpgradeOffer = res && res.pinUpgrade ? { minLength: res.pinMinLength || 4 } : null;
+      refreshApp();
+    },
     { notice },
   );
 }
@@ -173,6 +201,97 @@ window.addEventListener('economics:session-expired', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD VIEW LOADER
 // ─────────────────────────────────────────────────────────────────────────────
+function renderSkeleton(user) {
+  mainEl.innerHTML = `
+    <div class="dashboard-loader-wrap" aria-busy="true">
+      <div class="page-head">
+        <div>
+          <div class="skeleton-shimmer skeleton-line skeleton-line-sm"></div>
+          <div class="skeleton-shimmer skeleton-line skeleton-line-lg"></div>
+        </div>
+      </div>
+      <div class="kpi-grid">
+        ${'<div class="kpi-card"><div class="skeleton-shimmer skeleton-line skeleton-line-sm"></div><div class="skeleton-shimmer skeleton-line skeleton-line-md"></div></div>'.repeat(4)}
+      </div>
+      <p class="loading-note">Loading ${esc(user.name)}'s dashboard…</p>
+    </div>
+  `;
+}
+
+function renderErrorScreen(message) {
+  mainEl.innerHTML = `
+    <div class="card error-screen" role="alert">
+      <h2 class="card-title">Can't load your dashboard</h2>
+      <p>${esc(message)}</p>
+      <button class="btn btn-primary btn-sm" id="btn-retry-load">Try again</button>
+    </div>
+  `;
+  document.getElementById('btn-retry-load').addEventListener('click', () => loadDashboard());
+}
+
+/** True while the person is typing or has a dialog open: don't redraw under them. */
+function userIsBusy() {
+  const active = document.activeElement;
+  if (active && mainEl.contains(active) && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return true;
+  if (document.querySelector('.modal-overlay')) return true;
+  return [...mainEl.querySelectorAll('input, textarea')].some(
+    (el) => el.type !== 'checkbox' && el.type !== 'radio' && el.type !== 'search' && el.value !== el.defaultValue,
+  );
+}
+
+let lastRenderedJson = '';
+
+function renderDashboard(user, data) {
+  const scrollY = window.scrollY;
+  lastRenderedJson = JSON.stringify(data);
+  if (user.role === 'instructor' || user.role === 'group_leader' || user.role === 'assistant') {
+    renderGroupLeaderDashboard(mainEl, user, data, loadDashboard);
+  } else if (user.role === 'team_leader') {
+    renderTeamLeaderDashboard(mainEl, user, data, loadDashboard);
+  } else {
+    renderMemberDashboard(mainEl, user, data, loadDashboard);
+  }
+  if (pinUpgradeOffer) showPinUpgradeOffer(user);
+  window.scrollTo(0, scrollY);
+  updateSyncStatus();
+}
+
+/**
+ * One-time suggestion after signing in with a short PIN. Not a dialog:
+ * nobody is blocked from using the portal.
+ */
+function showPinUpgradeOffer(user) {
+  const offer = pinUpgradeOffer;
+  pinUpgradeOffer = null;
+  const key = 'economics_portal_pin_offer_v1:' + String(user.name).toLowerCase();
+  try {
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch (e) {
+    /* show it anyway */
+  }
+  const leader = offer.minLength > 4;
+  const box = document.createElement('div');
+  box.className = 'alert alert-info pin-offer';
+  box.setAttribute('role', 'status');
+  box.innerHTML = `
+    <strong>Choose a longer PIN.</strong>
+    ${leader
+      ? 'Your account can change marks, so your next PIN must be at least 6 digits. A longer PIN is much harder to guess.'
+      : 'PINs can now be up to 8 digits. A longer PIN is much harder to guess.'}
+    <div class="btn-row">
+      <button type="button" class="btn btn-primary btn-sm" data-pin-offer="change">Change my PIN</button>
+      <button type="button" class="btn btn-secondary btn-sm" data-pin-offer="later">Not now</button>
+    </div>`;
+  mainEl.prepend(box);
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-pin-offer]');
+    if (!btn) return;
+    box.remove();
+    if (btn.dataset.pinOffer === 'change') openChangeMyPinModal();
+  });
+}
+
 async function loadDashboard() {
   const user = getCurrentUser();
   if (!user) {
@@ -180,70 +299,41 @@ async function loadDashboard() {
     return;
   }
 
-  mainEl.innerHTML = `
-    <div class="dashboard-loader-wrap">
-      <div class="kpi-grid" style="margin-bottom: 1.25rem;">
-        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 60px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 90px;"></div></div>
-        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 70px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 80px;"></div></div>
-        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 65px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 85px;"></div></div>
-        <div class="kpi-card skeleton-tile"><div class="skeleton-shimmer" style="height: 12px; width: 80px; margin-bottom: 8px;"></div><div class="skeleton-shimmer" style="height: 28px; width: 75px;"></div></div>
-      </div>
-      <div class="card skeleton-tile" style="padding: 1.5rem; text-align: center;">
-        <div class="auth-spinner" style="border: 3px solid rgba(83, 74, 183, 0.2); border-top-color: var(--purple); width: 32px; height: 32px; margin: 1rem auto;"></div>
-        <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">Loading Economics Ledger</h3>
-        <p style="color: var(--text-muted); font-size: 0.85rem;">Authenticating session for <strong>${esc(user.name)}</strong>...</p>
-      </div>
-    </div>
-  `;
+  // 1. Fresh data from the sign-in or write that just happened: no request.
+  const fresh = takeFreshDashboard();
+  if (fresh) {
+    renderDashboard(user, fresh);
+    return;
+  }
+
+  // 2. Show what this tab last saw straight away, then refresh behind it.
+  const cached = getCachedDashboard();
+  if (cached) renderDashboard(user, cached.data);
+  else renderSkeleton(user);
 
   try {
     const res = await apiGetDashboard();
     if (res.code === 'AUTH') return; // login screen already shown
     if (!res.ok) {
-      mainEl.innerHTML = `
-        <div class="alert alert-error" style="max-width: 600px; margin: 2rem auto;">
-          Failed to load dashboard: ${esc(res.error)}
-          <div style="margin-top: 0.75rem;">
-            <button class="btn btn-secondary btn-sm" id="btn-retry-load">Retry</button>
-          </div>
-        </div>
-      `;
-      document
-        .getElementById('btn-retry-load')
-        .addEventListener('click', loadDashboard);
+      if (!cached) renderErrorScreen(res.error || 'The class server returned an error.');
+      else window.showEconomicsToast && window.showEconomicsToast(`Couldn't refresh: ${res.error}`, 'error');
       return;
     }
-
-    const data = res.data || {};
-
-    if (
-      user.role === 'instructor' ||
-      user.role === 'group_leader' ||
-      user.role === 'assistant'
-    ) {
-      renderGroupLeaderDashboard(mainEl, user, data, loadDashboard);
-    } else if (user.role === 'team_leader') {
-      renderTeamLeaderDashboard(mainEl, user, data, loadDashboard);
-    } else {
-      // member
-      renderMemberDashboard(mainEl, user, data, loadDashboard);
+    takeFreshDashboard(); // consumed here
+    const current = getCurrentUser();
+    if (!current || current.name !== user.name) return; // signed out meanwhile
+    if (JSON.stringify(res.data || {}) === lastRenderedJson) return updateSyncStatus();
+    if (cached && userIsBusy()) {
+      window.showEconomicsToast && window.showEconomicsToast('New data is available. It will show after you finish.', 'info');
+      return;
     }
+    renderDashboard(user, res.data || {});
   } catch (err) {
-    mainEl.innerHTML = `
-      <div class="alert alert-error" style="max-width: 600px; margin: 2rem auto;">
-        ${
-          navigator.onLine === false
-            ? "You're offline. Reconnect to the internet to load your latest data."
-            : `Error connecting to API: ${esc(err.message)}`
-        }
-        <div style="margin-top: 0.75rem;">
-          <button class="btn btn-secondary btn-sm" id="btn-retry-load">Retry</button>
-        </div>
-      </div>
-    `;
-    document
-      .getElementById('btn-retry-load')
-      .addEventListener('click', loadDashboard);
+    const msg = navigator.onLine === false
+      ? "You're offline. Reconnect to the internet to load your latest data."
+      : "Can't reach the class server right now. Wait a moment, then try again.";
+    if (!cached) renderErrorScreen(msg);
+    else window.showEconomicsToast && window.showEconomicsToast(msg + ' Showing what you saw last.', 'error');
   }
 }
 

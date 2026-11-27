@@ -127,17 +127,19 @@ test('session handling: old sessions and bad tokens go back to login', { timeout
   const { browser, page, errors } = await openApp();
   try {
     await page.evaluate(() =>
-      localStorage.setItem('economics_portal_session_v1', JSON.stringify({ name: 'Shehroz', role: 'group_leader', team: 'Shehroz' })),
+      sessionStorage.setItem('economics_portal_demo_session_v1', JSON.stringify({ name: 'Shehroz', role: 'group_leader', team: 'Shehroz' })),
     );
     await page.reload();
     assert.ok(await page.isVisible('#form-login'), 'a pre-v4 session without a token is discarded');
 
     await login(page, 'Ramesh');
     await page.evaluate(() => {
-      const s = JSON.parse(localStorage.getItem('economics_portal_session_v1'));
+      const s = JSON.parse(sessionStorage.getItem('economics_portal_demo_session_v1'));
       s.token = 'demo.not-a-real-token';
       s.role = 'instructor';
-      localStorage.setItem('economics_portal_session_v1', JSON.stringify(s));
+      sessionStorage.setItem('economics_portal_demo_session_v1', JSON.stringify(s));
+      // Drop the cached dashboard so the reload has to ask the server.
+      Object.keys(sessionStorage).filter((k) => k.startsWith('economics_portal_dash_v1:')).forEach((k) => sessionStorage.removeItem(k));
     });
     await page.reload();
     await page.waitForSelector('#form-login');

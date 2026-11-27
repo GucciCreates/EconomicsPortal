@@ -27,6 +27,7 @@ const APP_SHELL = [
   './js/api.js',
   './js/auth.js',
   './js/config.js',
+  './js/dates.js',
   './js/demoServer.js',
   './js/lastSeen.js',
   './js/mockData.js',
@@ -51,6 +52,7 @@ const APP_SHELL = [
   './js/components/submissionTracker.js',
   './js/components/tabNav.js',
   './js/components/teamLeaderView.js',
+  './js/vendor/chart.umd.js',
 ];
 
 self.addEventListener('install', (event) => {

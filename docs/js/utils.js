@@ -54,3 +54,15 @@ export function linkHtml(url, label, attrs = '', fallback = '') {
 export function slug(value) {
   return String(value == null ? '' : value).replace(/[^a-zA-Z0-9_-]+/g, '_');
 }
+
+/** Same rules as normalizeName() in backend/Code.gs. */
+export function normalizeUserName(value = '') {
+  return String(value == null ? '' : value)
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[()]/g, ' ')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}

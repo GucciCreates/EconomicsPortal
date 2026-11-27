@@ -28,6 +28,31 @@ function palette() {
 
 const FONT = "'Instrument Sans', sans-serif";
 
+// Chart.js (MIT, v4.4.4) is served from this site and loaded only when a
+// chart is about to be drawn, so pages without charts never download it.
+let chartJsPromise = null;
+export function loadChartJs() {
+  if (typeof Chart !== "undefined") return Promise.resolve(true);
+  if (!chartJsPromise) {
+    chartJsPromise = new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = new URL("../vendor/chart.umd.js", import.meta.url).href;
+      script.async = true;
+      script.onload = () => resolve(typeof Chart !== "undefined");
+      script.onerror = () => {
+        chartJsPromise = null;
+        resolve(false);
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return chartJsPromise;
+}
+
+function canvasFor(target) {
+  return typeof target === "string" ? document.getElementById(target) : target;
+}
+
 export function getBandColor(score) {
   const p = palette();
   const num = Number(score);
@@ -41,10 +66,10 @@ export function getBandColor(score) {
 /**
  * Horizontal Bar Chart: Team Averages Comparison
  */
-export function renderTeamAveragesChart(canvasId, teamAverages) {
-  if (typeof Chart === "undefined") return null;
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return null;
+export async function renderTeamAveragesChart(canvasId, teamAverages) {
+  if (!(await loadChartJs())) return null;
+  const canvas = canvasFor(canvasId);
+  if (!canvas || !canvas.isConnected) return null;
 
   const existing = Chart.getChart(canvas);
   if (existing) existing.destroy();
@@ -97,10 +122,10 @@ export function renderTeamAveragesChart(canvasId, teamAverages) {
 /**
  * Donut Chart: Rating Band Distribution
  */
-export function renderBandDistributionChart(canvasId, memberMetrics, marks) {
-  if (typeof Chart === "undefined") return null;
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return null;
+export async function renderBandDistributionChart(canvasId, memberMetrics, marks) {
+  if (!(await loadChartJs())) return null;
+  const canvas = canvasFor(canvasId);
+  if (!canvas || !canvas.isConnected) return null;
 
   const existing = Chart.getChart(canvas);
   if (existing) existing.destroy();
@@ -159,33 +184,34 @@ export function renderBandDistributionChart(canvasId, memberMetrics, marks) {
 }
 
 /**
- * Sparkline Line Chart: Member Score Trend Across Cycles
+ * Sparkline: score trend over time.
+ * @param {HTMLCanvasElement|string} target - canvas or its id
+ * @param {Array<number|object>} values - scores, or mark rows (quizScore, cycle, timestamp)
  */
-export function renderSparkline(canvas, memberMarks) {
-  if (typeof Chart === "undefined" || !canvas) return null;
+export async function renderSparkline(target, values) {
+  const rows = (values || [])
+    .map((v) => (typeof v === "object" && v !== null ? v : { quizScore: v }))
+    .filter((m) => m.quizScore !== "" && m.quizScore !== null && !isNaN(Number(m.quizScore)));
+  if (rows.length < 2) return null;
+  if (rows.every((m) => m.timestamp)) rows.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  if (!(await loadChartJs())) return null;
+  const canvas = canvasFor(target);
+  if (!canvas || !canvas.isConnected) return null;
 
   const existing = Chart.getChart(canvas);
   if (existing) existing.destroy();
 
-  const sorted = memberMarks
-    .filter((m) => m.quizScore !== "" && !isNaN(Number(m.quizScore)))
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-  if (sorted.length === 0) return null;
-
-  const labels = sorted.map((m) => m.cycle || "C");
-  const data = sorted.map((m) => Number(m.quizScore));
-
-  const latestScore = data[data.length - 1];
-  const lineColor = getBandColor(latestScore);
+  const labels = rows.map((m, i) => m.cycle || `Test ${i + 1}`);
+  const data = rows.map((m) => Number(m.quizScore));
+  const lineColor = getBandColor(data[data.length - 1]);
 
   return new Chart(canvas, {
     type: "line",
     data: {
-      labels: labels,
+      labels,
       datasets: [
         {
-          data: data,
+          data,
           borderColor: lineColor,
           backgroundColor: "transparent",
           borderWidth: 2,
@@ -198,6 +224,7 @@ export function renderSparkline(canvas, memberMarks) {
     options: {
       responsive: false,
       maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -209,11 +236,7 @@ export function renderSparkline(canvas, memberMarks) {
       },
       scales: {
         x: { display: false },
-        y: {
-          display: false,
-          min: Math.max(0, Math.min(...data) - 10),
-          max: 100,
-        },
+        y: { display: false, min: Math.max(0, Math.min(...data) - 10), max: 100 },
       },
     },
   });

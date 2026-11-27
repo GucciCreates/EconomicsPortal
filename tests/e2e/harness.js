@@ -27,7 +27,7 @@ async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { w
     if (!file.startsWith(root) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: 'not found' });
     return route.fulfill({ status: 200, contentType: TYPES[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
   });
-  if (demo) await context.addInitScript(() => localStorage.setItem('economics_portal_force_demo', 'true'));
+  if (demo) await context.addInitScript(() => sessionStorage.setItem('economics_portal_demo', '1'));
   const page = await context.newPage();
   page.on('console', (m) => {
     if (m.type() === 'error' && !/Failed to load resource|ERR_|net::/.test(m.text())) errors.push(m.text());
