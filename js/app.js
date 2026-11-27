@@ -10,6 +10,7 @@ import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';
 import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
 import { renderModernLogin } from './components/loginView.js';
 import { esc } from './utils.js';
+import { renderAccountMenu } from './components/accountMenu.js';
 
 // DOM Root Elements
 const headerEl = document.getElementById('site-header');
@@ -109,19 +110,7 @@ function renderHeader() {
           ${themeIcons[theme] || '🌓'}
         </button>
 
-        ${
-          user
-            ? `
-          <div class="user-badge">
-            <span>${esc(user.name)}</span>
-            <span class="role-pill role-${esc(user.role)}">${esc(user.role.replace('_', ' '))}</span>
-          </div>
-          <button class="btn btn-secondary btn-sm" id="btn-logout" title="Log out">
-            Log out
-          </button>
-        `
-            : ''
-        }
+        ${user ? `<div id="account-menu-host"></div>` : ''}
       </div>
     </div>
   `;
@@ -138,9 +127,9 @@ function renderHeader() {
     });
   }
 
-  const logoutBtn = document.getElementById('btn-logout');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', () => {
+  const menuHost = document.getElementById('account-menu-host');
+  if (menuHost && user) {
+    renderAccountMenu(menuHost, user, () => {
       clearCurrentUser();
       refreshApp();
     });
