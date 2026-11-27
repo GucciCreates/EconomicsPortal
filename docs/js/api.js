@@ -1,87 +1,31 @@
 /**
- * EconomicsPortal — API Client (v3)
+ * EconomicsPortal — API Client (v4)
  *
- * Supports both:
- * 1. Live Google Apps Script Web App (production)
- * 2. In-browser simulated database (instant demo / fallback mode)
+ * Every call goes through `call()`, which attaches the signed session token
+ * and sends the request either to the live Google Apps Script backend or to
+ * the in-browser demo backend (js/demoServer.js), which enforces the same
+ * rules. The server decides who you are from the token; role/name fields in
+ * a payload are ignored.
  */
 
 import { API_URL, isDemoMode } from './config.js';
-import {
-  MOCK_USERS,
-  MOCK_TASKS,
-  MOCK_MARKS,
-  MOCK_SUBMISSIONS,
-  MOCK_ESCALATIONS,
-  MOCK_ANNOUNCEMENTS,
-  MOCK_QUIZZES,
-  MOCK_GOALS,
-  MOCK_TEAM_MESSAGES,
-  MOCK_MENTORSHIP,
-  computeMockTeamAverages,
-  computeMockMemberMetrics,
-} from './mockData.js';
+import { getSessionToken, clearCurrentUser, updateSessionToken } from './auth.js';
+import { handleDemoRequest, resetDemoStore, normalizeUserName } from './demoServer.js';
 
-export function normalizeUserName(value = '') {
-  return String(value)
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[()]/g, ' ')
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-// Persistent in-memory/localStorage store for Demo Mode
-const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v3';
-
-function getDemoStore() {
-  try {
-    const cached = localStorage.getItem(DEMO_STORAGE_KEY);
-    if (cached) return JSON.parse(cached);
-  } catch (e) {
-    console.warn('Could not read demo storage', e);
-  }
-  const initial = {
-    users: [...MOCK_USERS],
-    tasks: [...MOCK_TASKS],
-    marks: [...MOCK_MARKS],
-    submissions: [...MOCK_SUBMISSIONS],
-    escalations: [...MOCK_ESCALATIONS],
-    announcements: [...MOCK_ANNOUNCEMENTS],
-    quizzes: [...MOCK_QUIZZES],
-    goals: [...MOCK_GOALS],
-    teamMessages: [...MOCK_TEAM_MESSAGES],
-    mentorship: [...MOCK_MENTORSHIP],
-  };
-  saveDemoStore(initial);
-  return initial;
-}
-
-function saveDemoStore(store) {
-  try {
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(store));
-  } catch (e) {
-    console.warn('Could not save demo storage', e);
-  }
-}
+export { normalizeUserName };
 
 export function resetDemoData() {
-  localStorage.removeItem(DEMO_STORAGE_KEY);
-  return getDemoStore();
+  return resetDemoStore();
 }
 
 /**
- * Universal POST helper
- * Uses 'text/plain;charset=utf-8' with stringified body to avoid Apps Script CORS preflight issues.
+ * POST to Apps Script. Uses 'text/plain' with a JSON string body so the
+ * browser does not send a CORS preflight, which Apps Script cannot answer.
  */
 async function postToAppsScript(body) {
   const response = await fetch(API_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8',
-    },
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -90,665 +34,86 @@ async function postToAppsScript(body) {
   return await response.json();
 }
 
-/**
- * Universal GET helper
- */
-async function getFromAppsScript(params) {
-  const query = new URLSearchParams(params).toString();
-  const response = await fetch(`${API_URL}?${query}`);
-  if (!response.ok) {
-    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+async function call(action, payload = {}, { withToken = true } = {}) {
+  const body = { ...payload, action };
+  if (withToken) body.token = getSessionToken();
+
+  const res = isDemoMode() ? await handleDemoRequest(body) : await postToAppsScript(body);
+
+  if (res && res.code === 'AUTH') {
+    clearCurrentUser();
+    window.dispatchEvent(new CustomEvent('economics:session-expired'));
   }
-  return await response.json();
+  return res;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AUTH: LOGIN
+// AUTH
 // ─────────────────────────────────────────────────────────────────────────────
 export async function apiLogin(name, pin) {
-  const cleanName = (name || '').trim();
-  const cleanPin = (pin || '').trim();
-
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const user = store.users.find((u) => {
-      const userName = normalizeUserName(u.name);
-      const inputName = normalizeUserName(cleanName);
-      const pinStr = String(u.pin).trim();
-      const pinMatch =
-        pinStr === cleanPin || pinStr.padStart(4, '0') === cleanPin;
-      return userName === inputName && pinMatch;
-    });
-    if (!user) {
-      return {
-        ok: false,
-        error:
-          'Invalid name or PIN. (Demo: Shehroz / 1111, Dr. Numan / 0000, Amina / 2001, Ramesh / 2002, Ayesha (Quetta) / 3001)',
-      };
-    }
-    return {
-      ok: true,
-      user: { name: user.name, role: user.role, team: user.team },
-      demo: true,
-    };
+  const res = await call(
+    'login',
+    { name: (name || '').trim(), pin: (pin || '').trim() },
+    { withToken: false },
+  );
+  if (res && res.ok && res.user) {
+    return { ...res, user: { ...res.user, token: res.token } };
   }
+  return res;
+}
 
-  return await getFromAppsScript({
-    action: 'login',
-    name: cleanName,
-    pin: cleanPin,
-  });
+export async function apiChangeMyPin({ currentPin, newPin }) {
+  const res = await call('changeMyPin', { currentPin, newPin });
+  if (res && res.ok && res.token) updateSessionToken(res.token);
+  return res;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DASHBOARD DATA
+// READS
 // ─────────────────────────────────────────────────────────────────────────────
-export async function apiGetDashboard(role, team, name) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const tasks = store.tasks || [];
-    const marks = store.marks || [];
-    const subs = store.submissions || [];
-    const escalations = store.escalations || [];
-    const announcements = store.announcements || [];
-    const quizzes = store.quizzes || [];
-    const goals = store.goals || [];
-    const teamMessages = store.teamMessages || [];
-    const mentorship = store.mentorship || [];
-    const teamAverages = computeMockTeamAverages(marks);
-    const memberMetrics = computeMockMemberMetrics(marks, escalations);
-    const atRiskMembers = Object.values(memberMetrics).filter((m) => m.atRisk);
-
-    if (
-      role === 'instructor' ||
-      role === 'group_leader' ||
-      role === 'assistant'
-    ) {
-      return {
-        ok: true,
-        data: {
-          tasks,
-          marks,
-          submissions: subs,
-          escalations,
-          announcements,
-          quizzes,
-          goals,
-          teamMessages,
-          mentorship,
-          teamAverages,
-          memberMetrics,
-          atRiskMembers,
-          users: role === 'group_leader' ? store.users : undefined,
-          canEdit: true,
-        },
-      };
-    }
-
-    if (role === 'team_leader') {
-      const teamMetrics = {};
-      Object.keys(memberMetrics).forEach((m) => {
-        if (memberMetrics[m].team === team) teamMetrics[m] = memberMetrics[m];
-      });
-      return {
-        ok: true,
-        data: {
-          tasks: tasks.filter((t) => t.team === team || t.team === 'ALL'),
-          marks: marks.filter((m) => m.team === team),
-          submissions: subs.filter((s) => s.team === team),
-          escalations: escalations.filter((es) => es.team === team),
-          announcements,
-          quizzes: quizzes.filter((q) => q.scope === 'ALL' || q.scope === team),
-          goals: goals.filter((g) => g.team === team),
-          teamMessages: teamMessages.filter((tm) => tm.team === team),
-          mentorship: mentorship.filter((mp) => mp.team === team),
-          teamAverage: teamAverages[team] || null,
-          teamAverages,
-          memberMetrics: teamMetrics,
-          atRiskMembers: Object.values(teamMetrics).filter((m) => m.atRisk),
-        },
-      };
-    }
-
-    // member
-    const searchName = normalizeUserName(name);
-    const myGoal =
-      goals.find((g) => normalizeUserName(g.name) === searchName) || null;
-    return {
-      ok: true,
-      data: {
-        tasks: tasks.filter((t) => t.team === team || t.team === 'ALL'),
-        myMarks: marks.filter(
-          (m) => normalizeUserName(m.member) === searchName,
-        ),
-        marks: marks.filter(
-          (m) => m.team === team || normalizeUserName(m.member) === searchName,
-        ),
-        teamAverage: teamAverages[team] || null,
-        teamAverages,
-        mySubmissions: subs.filter(
-          (s) => normalizeUserName(s.member) === searchName,
-        ),
-        myMetrics:
-          memberMetrics[name] ||
-          Object.values(memberMetrics).find(
-            (m) => normalizeUserName(m.member || m.name) === searchName,
-          ) ||
-          null,
-        memberMetrics,
-        announcements,
-        quizzes: quizzes.filter((q) => q.scope === 'ALL' || q.scope === team),
-        teamMessages: teamMessages.filter((tm) => tm.team === team),
-        mentorship: mentorship.filter(
-          (mp) =>
-            normalizeUserName(mp.student) === searchName ||
-            normalizeUserName(mp.mentor) === searchName,
-        ),
-        myGoal,
-      },
-    };
-  }
-
-  return await getFromAppsScript({
-    action: 'dashboard',
-    role,
-    team,
-    name,
-  });
-}
+export const apiGetDashboard = () => call('dashboard');
+export const apiGetUsers = () => call('users');
+export const apiGetAuditLog = (limit = 500) => call('auditLog', { limit });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MARKS MUTATIONS
+// MARKS
 // ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiAddMark(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const newMark = {
-      id: 'mk-' + Math.random().toString(36).substr(2, 6),
-      member: payload.member,
-      team: payload.team,
-      cycle: payload.cycle,
-      mockNumber: payload.mockNumber || '',
-      quizScore: Number(payload.quizScore),
-      submission: payload.submission || 'Yes',
-      attendance: payload.attendance || '100%',
-      previewDone: payload.previewDone || '',
-      peerRating: payload.peerRating || '',
-      punctual: payload.punctual || '',
-      notes: payload.notes || '',
-      editedBy: payload.editedBy || payload.name || '',
-      timestamp: new Date().toISOString(),
-    };
-    store.marks.unshift(newMark);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addMark',
-    ...payload,
-  });
-}
-
-export async function apiEditMark(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const mark = store.marks.find((m) => m.id === payload.id);
-    if (mark) {
-      Object.assign(mark, payload.fields);
-      if (payload.editedBy || payload.name) {
-        mark.editedBy = payload.editedBy || payload.name;
-      }
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'editMark',
-    ...payload,
-  });
-}
-
-export async function apiDeleteMark(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    store.marks = store.marks.filter((m) => m.id !== payload.id);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'deleteMark',
-    ...payload,
-  });
-}
+export const apiAddMark = (payload) => call('addMark', payload);
+export const apiEditMark = (payload) => call('editMark', payload);
+export const apiDeleteMark = (payload) => call('deleteMark', payload);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TASKS MUTATIONS
+// TASKS & SUBMISSIONS
 // ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiAddTask(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const newTask = {
-      id: 'tsk-' + Math.random().toString(36).substr(2, 6),
-      title: payload.title,
-      description: payload.description || '',
-      team: payload.team,
-      dueDate: payload.dueDate || '',
-      fileUrl: payload.fileUrl || '',
-      createdBy: payload.createdBy,
-      status: 'open',
-      timestamp: new Date().toISOString(),
-    };
-    store.tasks.unshift(newTask);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addTask',
-    ...payload,
-  });
-}
-
-export async function apiEditTask(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const task = store.tasks.find((t) => t.id === payload.id);
-    if (task) {
-      Object.assign(task, payload.fields);
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'editTask',
-    ...payload,
-  });
-}
-
-export async function apiUpdateTaskStatus(id, status, role) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const task = store.tasks.find((t) => t.id === id);
-    if (task) {
-      task.status = status;
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'updateTaskStatus',
-    role,
-    id,
-    status,
-  });
-}
+export const apiAddTask = (payload) => call('addTask', payload);
+export const apiEditTask = (payload) => call('editTask', payload);
+export const apiUpdateTaskStatus = (id, status) => call('updateTaskStatus', { id, status });
+export const apiAddSubmission = (payload) => call('addSubmission', payload);
+export const apiRequestGrading = (payload) => call('requestGrading', payload);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SUBMISSIONS & ESCALATIONS
+// DOUBTS & ESCALATIONS
 // ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiAddSubmission(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const newSub = {
-      id: 'sub-' + Math.random().toString(36).substr(2, 6),
-      taskId: payload.taskId,
-      member: payload.member,
-      team: payload.team,
-      content: payload.content || '',
-      fileUrl: payload.fileUrl || '',
-      timestamp: new Date().toISOString(),
-    };
-    store.submissions.unshift(newSub);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addSubmission',
-    ...payload,
-  });
-}
-
-export async function apiAddEscalation(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const newEsc = {
-      id: 'esc-' + Math.random().toString(36).substr(2, 6),
-      raisedBy: payload.raisedBy,
-      team: payload.team,
-      topic: payload.topic,
-      details: payload.details,
-      severity: payload.severity || 'normal',
-      status: 'open',
-      timestamp: new Date().toISOString(),
-    };
-    store.escalations.unshift(newEsc);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addEscalation',
-    ...payload,
-  });
-}
-
-export async function apiUpdateEscalationStatus(id, status, role) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const esc = store.escalations.find((e) => e.id === id);
-    if (esc) {
-      esc.status = status;
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'updateEscalationStatus',
-    role,
-    id,
-    status,
-  });
-}
+export const apiAddEscalation = (payload) => call('addEscalation', payload);
+export const apiUpdateEscalationStatus = (id, status) => call('updateEscalationStatus', { id, status });
+export const apiAddEscalationReply = (escalationId, message) =>
+  call('addEscalationReply', { escalationId, message });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ANNOUNCEMENTS (v3)
+// ANNOUNCEMENTS, QUIZZES, GOALS, TEAM MESSAGES
 // ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiAddAnnouncement(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (!store.announcements) store.announcements = [];
-    const newAnn = {
-      id: 'ann-' + Math.random().toString(36).substr(2, 6),
-      title: payload.title,
-      body: payload.body,
-      pinned: Boolean(payload.pinned),
-      postedBy: payload.postedBy || payload.name,
-      timestamp: new Date().toISOString(),
-    };
-    store.announcements.unshift(newAnn);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addAnnouncement',
-    ...payload,
-  });
-}
-
-export async function apiDeleteAnnouncement(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (store.announcements) {
-      store.announcements = store.announcements.filter(
-        (a) => a.id !== payload.id,
-      );
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'deleteAnnouncement',
-    ...payload,
-  });
-}
-
-export async function apiPinAnnouncement(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (store.announcements) {
-      const ann = store.announcements.find((a) => a.id === payload.id);
-      if (ann) {
-        ann.pinned = Boolean(payload.pinned);
-        saveDemoStore(store);
-      }
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'pinAnnouncement',
-    ...payload,
-  });
-}
+export const apiAddAnnouncement = (payload) => call('addAnnouncement', payload);
+export const apiDeleteAnnouncement = (payload) => call('deleteAnnouncement', payload);
+export const apiPinAnnouncement = (payload) => call('pinAnnouncement', payload);
+export const apiAddQuiz = (payload) => call('addQuiz', payload);
+export const apiDeleteQuiz = (payload) => call('deleteQuiz', payload);
+export const apiSetGoal = (payload) => call('setGoal', payload);
+export const apiAddTeamMessage = (payload) => call('addTeamMessage', payload);
+export const apiDeleteTeamMessage = (payload) => call('deleteTeamMessage', payload);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// QUIZZES / TESTS (v3)
+// PINS & MENTORSHIP
 // ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiAddQuiz(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (!store.quizzes) store.quizzes = [];
-    const newQuiz = {
-      id: 'qz-' + Math.random().toString(36).substr(2, 6),
-      title: payload.title,
-      scheduledAt: payload.scheduledAt,
-      scope: payload.scope || 'ALL',
-      notes: payload.notes || '',
-      createdBy: payload.name,
-      timestamp: new Date().toISOString(),
-    };
-    store.quizzes.push(newQuiz);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addQuiz',
-    ...payload,
-  });
-}
-
-export async function apiDeleteQuiz(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (store.quizzes) {
-      store.quizzes = store.quizzes.filter((q) => q.id !== payload.id);
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'deleteQuiz',
-    ...payload,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// GOALS (v3)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiSetGoal(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (!store.goals) store.goals = [];
-    const existing = store.goals.find(
-      (g) => g.name.toLowerCase() === payload.name.toLowerCase(),
-    );
-    if (existing) {
-      existing.target = payload.target;
-      existing.description = payload.description;
-      existing.setAt = new Date().toISOString();
-    } else {
-      store.goals.push({
-        name: payload.name,
-        team: payload.team,
-        target: payload.target,
-        description: payload.description,
-        setAt: new Date().toISOString(),
-      });
-    }
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'setGoal',
-    ...payload,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PIN MANAGEMENT (Group Leader Only)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiUpdatePin(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const user = store.users.find(
-      (u) =>
-        u.name.toLowerCase() === String(payload.targetMember).toLowerCase(),
-    );
-    if (user) {
-      user.pin = String(payload.newPin);
-      saveDemoStore(store);
-      return { ok: true };
-    }
-    return { ok: false, error: 'Member not found in roster.' };
-  }
-
-  return await postToAppsScript({
-    action: 'updatePin',
-    ...payload,
-  });
-}
-
-export async function apiGetUsers(role) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    return { ok: true, users: store.users || [] };
-  }
-
-  return await getFromAppsScript({
-    action: 'users',
-    role,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TEAM LEADER POWERS: GRADING REQUESTS & TEAM MESSAGES (v3)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiRequestGrading(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    const sub = store.submissions.find((s) => s.id === payload.submissionId);
-    if (sub) {
-      sub.gradingRequested = true;
-      sub.requestedBy = payload.leaderName;
-      sub.reviewNotes = payload.reviewNotes || '';
-      saveDemoStore(store);
-      return { ok: true };
-    }
-    return { ok: false, error: 'Submission not found.' };
-  }
-
-  return await postToAppsScript({
-    action: 'requestGrading',
-    ...payload,
-  });
-}
-
-export async function apiAddTeamMessage(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (!store.teamMessages) store.teamMessages = [];
-    const newMsg = {
-      id: 'tm-' + Math.random().toString(36).substr(2, 6),
-      team: payload.team,
-      author: payload.author,
-      message: payload.message,
-      timestamp: new Date().toISOString(),
-    };
-    store.teamMessages.unshift(newMsg);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'addTeamMessage',
-    ...payload,
-  });
-}
-
-export async function apiDeleteTeamMessage(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (store.teamMessages) {
-      store.teamMessages = store.teamMessages.filter(
-        (m) => m.id !== payload.id,
-      );
-      saveDemoStore(store);
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'deleteTeamMessage',
-    ...payload,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AT-RISK MENTORSHIP & RECOVERY (v3)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export async function apiCreateMentorshipPlan(payload) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (!store.mentorship) store.mentorship = [];
-    const newPlan = {
-      id: 'mnt-' + Math.random().toString(36).substr(2, 6),
-      student: payload.student,
-      mentor: payload.mentor,
-      team: payload.team,
-      milestones: payload.milestones || [],
-      status: 'active',
-      assignedBy: payload.assignedBy,
-      timestamp: new Date().toISOString(),
-    };
-    store.mentorship.unshift(newPlan);
-    saveDemoStore(store);
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'createMentorshipPlan',
-    ...payload,
-  });
-}
-
-export async function apiUpdateMentorshipStatus(id, status, role) {
-  if (isDemoMode()) {
-    const store = getDemoStore();
-    if (store.mentorship) {
-      const plan = store.mentorship.find((p) => p.id === id);
-      if (plan) {
-        plan.status = status;
-        saveDemoStore(store);
-      }
-    }
-    return { ok: true };
-  }
-
-  return await postToAppsScript({
-    action: 'updateMentorshipStatus',
-    id,
-    status,
-    role,
-  });
-}
+export const apiUpdatePin = (payload) => call('updatePin', payload);
+export const apiCreateMentorshipPlan = (payload) => call('createMentorshipPlan', payload);
+export const apiUpdateMentorshipStatus = (id, status) => call('updateMentorshipStatus', { id, status });

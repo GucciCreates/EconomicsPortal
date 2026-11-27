@@ -1184,6 +1184,11 @@ a:hover {
   color: var(--teal);
   border-color: var(--teal-border);
 }
+.alert-info {
+  background-color: var(--purple-soft);
+  color: var(--text-main);
+  border-color: var(--purple-border);
+}
 
 /* ==========================================================================
    Footer
@@ -2426,4 +2431,17 @@ a:hover {
   .report-sheet {
     padding: 1.2cm !important;
   }
+}
+
+/* Visually hidden, still read by screen readers */
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -58,7 +58,7 @@ function renderBanner() {
           ${
             localStorage.getItem('economics_portal_force_demo') === 'true'
               ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Try Live API</button>`
-              : `<a href="./SETUP_GUIDE.md" target="_blank" style="font-weight: 600;">Upgrade to v2 ↗</a>`
+              : `<a href="https://github.com/GucciCreates/EconomicsPortal/blob/main/SETUP_GUIDE.md" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">Connect the live backend ↗</a>`
           }
           <button id="btn-reset-demo" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Reset Demo Data</button>
         </div>

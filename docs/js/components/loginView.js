@@ -9,8 +9,10 @@
 
 import { apiLogin } from '../api.js';
 import { setCurrentUser } from '../auth.js';
+import { isDemoMode } from '../config.js';
+import { esc, escapeHtml } from '../utils.js';
 
-export function renderModernLogin(container, onSuccess, onForceDemo) {
+export function renderModernLogin(container, onSuccess, onForceDemo, options = {}) {
   const rememberedName =
     localStorage.getItem('economics_portal_remember_name') || '';
 
@@ -24,7 +26,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           <p class="auth-subtitle">Dr. Numan's Economics Class • Executive Operations</p>
           <div style="margin-top: 0.65rem;">
             <span class="badge" style="background-color: var(--primary-soft); color: var(--purple); font-size: 0.75rem; border: 1px solid var(--purple-border); font-weight: 700;">
-              ✨ Premium Academic Command Layer • v4.0
+              ✨ Premium Academic Command Layer • v4.1
             </span>
           </div>
           <div style="margin-top: 0.4rem;">
@@ -34,7 +36,11 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           </div>
         </div>
 
-        <div id="login-error-box"></div>
+        <div id="login-error-box">${
+          options.notice
+            ? `<div class="alert alert-info" role="status">${escapeHtml(options.notice)}</div>`
+            : ''
+        }</div>
 
         <div class="auth-hero-box" aria-label="Portal summary">
           <div class="auth-hero-row">
@@ -63,7 +69,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
           </div>
         </div>
 
-        <div class="quick-login-panel" aria-label="Quick login demo accounts">
+        ${isDemoMode() ? `<div class="quick-login-panel" aria-label="Quick login demo accounts">
           <p class="quick-login-title">Quick access workspace</p>
           <div class="quick-login-grid">
             <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan</button>
@@ -72,7 +78,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
             <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha</button>
             <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh</button>
           </div>
-        </div>
+        </div>` : ''}
 
         <!-- Secure Login Form -->
         <form id="form-login" class="auth-form">
@@ -85,7 +91,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
                 id="login-name"
                 class="form-control auth-input"
                 placeholder="e.g. Shehroz, Sajal, or Ramesh"
-                value="${rememberedName}"
+                value="${escapeHtml(rememberedName)}"
                 autocomplete="name"
                 required
               />
@@ -229,7 +235,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
     } catch (err) {
       errorBox.innerHTML = `
         <div class="alert alert-error auth-error-alert">
-          <strong>Connection error: ${err.message}</strong>
+          <strong>Connection error: ${esc(err.message)}</strong>
           <p style="font-size: 0.8rem; margin: 0.35rem 0;">
             Could not reach Google Apps Script. You can continue in offline demo mode.
           </p>
@@ -253,7 +259,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo) {
   });
 
   function triggerError(msg) {
-    errorBox.innerHTML = `<div class="alert alert-error auth-error-alert">${msg}</div>`;
+    errorBox.innerHTML = `<div class="alert alert-error auth-error-alert">${esc(msg)}</div>`;
     const card = container.querySelector('.auth-card');
     card.classList.remove('shake');
     void card.offsetWidth;

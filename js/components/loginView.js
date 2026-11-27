@@ -26,7 +26,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
           <p class="auth-subtitle">Dr. Numan's Economics Class • Executive Operations</p>
           <div style="margin-top: 0.65rem;">
             <span class="badge" style="background-color: var(--primary-soft); color: var(--purple); font-size: 0.75rem; border: 1px solid var(--purple-border); font-weight: 700;">
-              ✨ Premium Academic Command Layer • v4.0
+              ✨ Premium Academic Command Layer • v4.1
             </span>
           </div>
           <div style="margin-top: 0.4rem;">

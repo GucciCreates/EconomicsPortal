@@ -4,6 +4,7 @@
  */
 
 import { apiCreateMentorshipPlan, apiUpdateMentorshipStatus } from "../api.js";
+import { esc } from "../utils.js";
 
 /**
  * Render the Mentorship & Recovery Panel.
@@ -56,7 +57,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
         atRiskMembers.length > 0
           ? `
         <div class="at-risk-panel" style="margin-bottom: 1.25rem;">
-          <div class="at-risk-title">⚠️ Students Requiring Recovery Action (${atRiskMembers.length})</div>
+          <div class="at-risk-title">⚠️ Students Requiring Recovery Action (${esc(atRiskMembers.length)})</div>
           <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
             The following students have failed recent benchmarks. A dedicated peer mentor should be assigned:
           </p>
@@ -66,8 +67,8 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                 const name = m.member || m.name;
                 const hasPlan = plans.some((p) => p.student.toLowerCase() === name.toLowerCase() && p.status !== "resolved");
                 return `
-                <span class="badge ${hasPlan ? "badge-done" : "badge-atrisk"}" style="padding: 0.35rem 0.65rem;">
-                  ${name} (${m.team}) • ${hasPlan ? "Plan Active ✓" : "Needs Mentor!"}
+                <span class="badge ${esc(hasPlan ? "badge-done" : "badge-atrisk")}" style="padding: 0.35rem 0.65rem;">
+                  ${esc(name)} (${esc(m.team)}) • ${esc(hasPlan ? "Plan Active ✓" : "Needs Mentor!")}
                 </span>
               `;
               })
@@ -87,7 +88,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🤝</div>
             <h4 style="font-weight: 700; margin-bottom: 0.3rem;">No Active Intervention Plans</h4>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
-              ${isLeader ? "All students are meeting baseline benchmarks or plans have not yet been assigned." : "You do not have any active mentorship assignments at this time."}
+              ${esc(isLeader ? "All students are meeting baseline benchmarks or plans have not yet been assigned." : "You do not have any active mentorship assignments at this time.")}
             </p>
           </div>
         `
@@ -98,21 +99,21 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                   const isMentor = plan.mentor.toLowerCase() === myName.toLowerCase();
 
                   return `
-                <div class="card plan-card ${isResolved ? "resolved" : "active"}" style="margin-bottom: 1rem;" data-plan-id="${plan.id}">
+                <div class="card plan-card ${esc(isResolved ? "resolved" : "active")}" style="margin-bottom: 1rem;" data-plan-id="${esc(plan.id)}">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
                     <div>
                       <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <span class="badge ${isResolved ? "badge-closed" : "badge-support"}">
-                          ${isResolved ? "✓ Recovered & Resolved" : "⚡ Active Recovery Plan"}
+                        <span class="badge ${esc(isResolved ? "badge-closed" : "badge-support")}">
+                          ${esc(isResolved ? "✓ Recovered & Resolved" : "⚡ Active Recovery Plan")}
                         </span>
-                        <span style="font-size: 0.8rem; color: var(--text-muted);">Assigned by ${plan.assignedBy}</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Assigned by ${esc(plan.assignedBy)}</span>
                       </div>
                       <h4 style="font-size: 1.1rem; font-weight: 700; margin-top: 0.35rem;">
-                        Student: <strong style="color: var(--purple);">${plan.student}</strong>
-                        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(Team ${plan.team})</span>
+                        Student: <strong style="color: var(--purple);">${esc(plan.student)}</strong>
+                        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(Team ${esc(plan.team)})</span>
                       </h4>
                       <p style="font-size: 0.9rem; margin-top: 0.2rem;">
-                        Assigned Peer Mentor: <strong>${plan.mentor}</strong> 🌟
+                        Assigned Peer Mentor: <strong>${esc(plan.mentor)}</strong> 🌟
                         ${isMentee ? `<span class="badge badge-teal" style="margin-left: 0.4rem;">You are the Mentee</span>` : ""}
                         ${isMentor ? `<span class="badge badge-teal" style="margin-left: 0.4rem;">You are the Mentor</span>` : ""}
                       </p>
@@ -121,7 +122,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                     ${
                       isLeader && !isResolved
                         ? `
-                      <button class="btn btn-teal btn-sm btn-resolve-plan" data-id="${plan.id}">
+                      <button class="btn btn-teal btn-sm btn-resolve-plan" data-id="${esc(plan.id)}">
                         Verify Recovery & Resolve Plan ✓
                       </button>
                     `
@@ -144,7 +145,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                           (m, i) => `
                         <li style="display: flex; align-items: center; gap: 0.5rem;">
                           <span style="color: var(--teal); font-weight: 700;">✓</span>
-                          <span>${m}</span>
+                          <span>${esc(m)}</span>
                         </li>
                       `
                         )
@@ -153,7 +154,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                   </div>
 
                   <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.65rem; font-size: 0.75rem; color: var(--text-muted);">
-                    <span>Initiated: ${new Date(plan.timestamp).toLocaleDateString()}</span>
+                    <span>Initiated: ${esc(new Date(plan.timestamp).toLocaleDateString())}</span>
                     <span>Target Recovery: Unit 3 Assessment</span>
                   </div>
                 </div>
@@ -196,7 +197,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                     ${atRiskMembers
                       .map((m) => {
                         const name = m.member || m.name;
-                        return `<option value="${name}" data-team="${m.team}">${name} (Team ${m.team})</option>`;
+                        return `<option value="${esc(name)}" data-team="${esc(m.team)}">${esc(name)} (Team ${esc(m.team)})</option>`;
                       })
                       .join("")}
                   </select>
@@ -207,7 +208,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                   <select id="plan-mentor" class="form-control" required>
                     <option value="">-- Select Candidate Mentor --</option>
                     ${candidateMentors
-                      .map((m) => `<option value="${m.name}">${m.name} (Team ${m.team} • Avg ${m.avg})</option>`)
+                      .map((m) => `<option value="${esc(m.name)}">${esc(m.name)} (Team ${esc(m.team)} • Avg ${esc(m.avg)})</option>`)
                       .join("")}
                   </select>
                 </div>
@@ -263,18 +264,18 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
             });
 
             if (res.ok) {
-              feedback.innerHTML = `<div class="alert alert-success">Mentorship plan activated for ${student}!</div>`;
+              feedback.innerHTML = `<div class="alert alert-success">Mentorship plan activated for ${esc(student)}!</div>`;
               setTimeout(() => {
                 closeModal();
                 onRefresh();
               }, 1200);
             } else {
-              feedback.innerHTML = `<div class="alert alert-error">${res.error || "Failed to create plan."}</div>`;
+              feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || "Failed to create plan.")}</div>`;
               submitBtn.disabled = false;
               submitBtn.textContent = "Activate Mentorship Plan";
             }
           } catch (err) {
-            feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">Error: ${esc(err.message)}</div>`;
             submitBtn.disabled = false;
             submitBtn.textContent = "Activate Mentorship Plan";
           }

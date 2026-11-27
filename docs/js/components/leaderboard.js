@@ -6,6 +6,7 @@
  */
 
 import { getScoreBand } from "./metricsPanel.js";
+import { esc } from "../utils.js";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -51,16 +52,16 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
                     const band = getScoreBand(t.avg);
                     const pct = Math.min(100, Math.round(t.avg));
                     return `
-                  <div class="lb-row ${i === 0 ? "lb-first" : ""}">
-                    <div class="lb-rank">${MEDALS[i] || `#${i + 1}`}</div>
+                  <div class="lb-row ${esc(i === 0 ? "lb-first" : "")}">
+                    <div class="lb-rank">${MEDALS[i] || `#${esc(i + 1)}`}</div>
                     <div class="lb-name">
-                      <strong>Team ${t.team}</strong>
-                      <span class="badge ${band.cls}" style="margin-left: 0.4rem;">${band.label}</span>
+                      <strong>Team ${esc(t.team)}</strong>
+                      <span class="badge ${esc(band.cls)}" style="margin-left: 0.4rem;">${esc(band.label)}</span>
                     </div>
                     <div class="lb-bar-wrap">
-                      <div class="lb-bar" style="width: ${pct}%; background: ${band.barColor};"></div>
+                      <div class="lb-bar" style="width: ${esc(pct)}%; background: ${esc(band.barColor)};"></div>
                     </div>
-                    <div class="lb-score num">${t.avg.toFixed(1)}</div>
+                    <div class="lb-score num">${esc(t.avg.toFixed(1))}</div>
                   </div>
                 `;
                   })
@@ -97,26 +98,26 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
                         const band = getScoreBand(m.avg);
                         const trendIcon =
                           m.delta > 0
-                            ? `<span style="color: var(--teal);">▲ ${m.delta.toFixed(1)}</span>`
+                            ? `<span style="color: var(--teal);">▲ ${esc(m.delta.toFixed(1))}</span>`
                             : m.delta < 0
-                            ? `<span style="color: var(--red);">▼ ${Math.abs(m.delta).toFixed(1)}</span>`
+                            ? `<span style="color: var(--red);">▼ ${esc(Math.abs(m.delta).toFixed(1))}</span>`
                             : `<span style="color: var(--text-muted);">—</span>`;
                         const isMe = m.name === user.name;
                         return `
                       <tr ${isMe ? 'style="background: var(--primary-soft);"' : ""}>
-                        <td style="font-weight: 700; font-size: 1rem;">${MEDALS[i] || `#${i + 1}`}</td>
+                        <td style="font-weight: 700; font-size: 1rem;">${MEDALS[i] || `#${esc(i + 1)}`}</td>
                         <td>
-                          <strong>${m.name}</strong>
+                          <strong>${esc(m.name)}</strong>
                           ${isMe ? `<span style="font-size: 0.7rem; color: var(--purple); margin-left: 0.3rem;">(You)</span>` : ""}
                           ${m.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.3rem; font-size: 0.65rem;">At Risk</span>` : ""}
                         </td>
-                        <td><span class="badge" style="background: var(--bg-subtle);">${m.team}</span></td>
-                        <td><strong class="num">${m.avg.toFixed(1)}</strong></td>
+                        <td><span class="badge" style="background: var(--bg-subtle);">${esc(m.team)}</span></td>
+                        <td><strong class="num">${esc(m.avg.toFixed(1))}</strong></td>
                         <td>
-                          ${m.streak > 0 ? `<span title="Consecutive passing units">🔥 ${m.streak}</span>` : `<span style="color: var(--text-muted);">—</span>`}
+                          ${m.streak > 0 ? `<span title="Consecutive passing units">🔥 ${esc(m.streak)}</span>` : `<span style="color: var(--text-muted);">—</span>`}
                         </td>
                         <td>${trendIcon}</td>
-                        <td><span class="badge ${band.cls}">${band.label}</span></td>
+                        <td><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></td>
                       </tr>
                     `;
                       })
