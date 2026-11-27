@@ -10,18 +10,9 @@ import { esc } from '../utils.js';
 
 export const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
 
-/** Students per team, used only if the server didn't send a roster. */
-export const TEAM_ROSTER = {
-  Shehroz: ['Gorsi', 'Haris'],
-  Amina: ['Amina', 'Ramesh', 'Mamoon', 'Tazneem'],
-  Ayesha: ['Ayesha (Quetta)', 'Minal', 'Anika', 'Ahmed bin Nasir'],
-  Lareb: ['Lareb', 'Shaiman', 'Aisha Amjad', 'Haseeb'],
-};
-
-/** [{ name, team }] for everyone who gets marks, from data.roster or the fallback. */
+/** [{ name, team }] for everyone who gets marks. Comes only from the server (never shipped in code). */
 export function rosterList(data) {
-  if (data && Array.isArray(data.roster) && data.roster.length) return data.roster.map((r) => ({ name: r.name, team: r.team }));
-  return Object.entries(TEAM_ROSTER).flatMap(([team, names]) => names.map((name) => ({ name, team })));
+  return data && Array.isArray(data.roster) ? data.roster.map((r) => ({ name: r.name, team: r.team })) : [];
 }
 
 /**

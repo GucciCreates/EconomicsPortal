@@ -11,7 +11,6 @@ import { createTabNav } from './tabNav.js';
 import { cleanupQuizCountdowns } from './quizScheduler.js';
 import { countDoubtUpdates } from './doubtThread.js';
 import { loadLastSeen, markSeen, isNewer } from '../lastSeen.js';
-import { TEAM_ROSTER } from './ui.js';
 import { renderTeamTab } from './tabs/tlTeam.js';
 import { renderSubmissionsTab } from './tabs/tlSubmissions.js';
 import { renderTeamTasksTab } from './tabs/tlTasks.js';
@@ -20,7 +19,6 @@ import { renderTeamDoubtsTab } from './tabs/tlDoubts.js';
 import { renderClassTab } from './tabs/tlClass.js';
 
 // Kept for older imports; the server's roster is preferred.
-export { TEAM_ROSTER };
 
 const TABS = {
   members: renderTeamTab,
@@ -35,7 +33,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
 
   const roster = (data.roster || []).filter((r) => r.team === user.team).map((r) => r.name);
-  const teamMembers = (roster.length ? roster : TEAM_ROSTER[user.team] || []).filter((m) => m !== user.name);
+  const teamMembers = roster.filter((m) => m !== user.name);
   const submissions = (data.submissions || []).filter((s) => s.team === user.team);
   const escalations = data.escalations || [];
   const announcements = data.announcements || [];
