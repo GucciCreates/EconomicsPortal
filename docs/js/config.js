@@ -7,7 +7,7 @@
  * `?demo=1`, and it lasts for this browser tab only (sessionStorage), so the
  * live portal is never silently swapped for the demo.
  */
-export const API_URL = "https://script.google.com/macros/s/AKfycbzvSmJSbA03qG2fL5wGR0AVJyTAnHJsVWEcqEwOrFKqFAv6glbgMjfEtVK-K1iTupsp/exec";
+export const API_URL = "https://script.google.com/macros/s/AKfycbysAVvCN2rMUxCSg12YzYUu8zXxbIVtFQjzxcmeYqZ3XD_K-AqMSEEzGDz_79pLtduN/exec";
 
 const DEMO_KEY = "economics_portal_demo";
 
