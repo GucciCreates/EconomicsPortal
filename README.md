@@ -16,17 +16,18 @@ Names and PINs live only in the private Google Sheet. Each person gets their PIN
 
 | Role | What they can do |
 | :--- | :--- |
-| **Instructor** | Everything the group leader can see; edit and **delete** marks; activity log |
+| **Instructor** | Everything the group leader can see; edit and **delete** marks; reset PINs; activity log |
 | **Group leader** | Assign tasks, enter and edit marks, announcements, quizzes, support plans, resolve doubts, reset PINs, activity log |
 | **Assistant** | Enter and edit marks, reply to doubts, view everything |
 | **Team leader** | Record marks, forward submissions for grading, team notices, reply to team doubts, submission tracker — **own team only** |
-| **Student** | Submit work, set a goal, ask doubts, see **own** marks and the class leaderboard |
+| **Student** | Submit work, set a goal, ask doubts, see **own** marks, and the leaderboard top 5 plus their own place |
 
 ---
 
-## 🔐 Security model (v6)
+## 🔐 Security model (v7)
 
 - **Sign in with Google (optional, free).** Google's button gives the browser a signed ID token. The backend asks Google's tokeninfo endpoint whether it is genuine, issued for this portal's client ID, unexpired and for a verified address, then matches it to the `googleEmail` column. No API key or billing.
+- **Old published PINs are refused.** The PINs printed in the first README can't be used to sign in or be chosen again.
 - **Signed sessions.** Signing in with name + PIN (or Google) returns a session token signed with HMAC-SHA256 (secret kept in the Apps Script project's Script Properties, never in code). Tokens are renewed automatically while in use and expire after 7 days without use.
 - **The server decides who you are.** Every request carries the token, and the backend looks up name, role and team in the Users sheet. Anything the browser claims is ignored.
 - **Scoped access.** Team leaders can only act on their own team; students only on themselves. Students receive only their own marks plus a leaderboard summary of classmates.

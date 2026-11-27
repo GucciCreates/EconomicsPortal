@@ -82,6 +82,32 @@ Someone who presses the Google button before linking sees "This Google account i
 
 ---
 
+## 2b. 🛡️ Upgrading to v7 (from v6 or v6.1)
+
+v7 fixes the problems found in [AUDIT_v7.md](./AUDIT_v7.md). **There are no new sheet columns.** One sign-in rule changes:
+
+* **The PINs printed in the very first README no longer work** (for example Shehroz `1111`, Dr. Numan `0000`). They have been public since v1, so anyone who never changed theirs could be signed in as by a stranger. Those people now see *"This PIN was published online… ask for a new PIN"*.
+
+Steps:
+
+1. **Back up the sheet:** **File → Make a copy**.
+2. **Replace the code:** paste the new [`backend/Code.gs`](./backend/Code.gs), **Save**, then **Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy**. The URL stays the same.
+3. **Run `setup()`** once. It's safe to re-run and makes sure the schema is current (needed if you skipped the v6.1 Google sign-in update). No new permission is asked for unless you skipped v6.1.
+4. Merge the v7 pull request into `main`.
+5. **If someone says their PIN stopped working:** reset it from **Admin → Member access & PINs**. Dr. Numan can now do this too, not only Shehroz. Or run `resetAllPins()` to give everyone a fresh 6-digit PIN at once.
+6. **Daily health check (nothing to set up):**
+   * The workflow **Live health check** runs every morning on GitHub.
+   * If the site or server is down, it opens an issue called *"Live health check failed"*. Watch the repository (or turn on issue notifications) to get an email.
+   * You can run it any time from **Actions → Live health check → Run workflow**.
+   * GitHub pauses scheduled workflows after 60 days without commits. If that happens, press **Enable workflow** on the same page.
+
+Other changes need no action:
+* Demo Mode uses a fictional class.
+* Students see the leaderboard top 5 plus their own place.
+* Requests give up after 30 seconds with a clear message.
+
+---
+
 ## 3. ⚡ Upgrading to v6 (from v4 or v5)
 
 v6 makes the portal faster (one request to sign in or save), adds longer PINs, safer login locks and optional emails. **Nobody is signed out and every PIN keeps working.** Do these steps in order:
@@ -131,7 +157,7 @@ Do these steps in order, close together. Between steps 3 and 5, people using the
 
 ## 5. Everyday administration
 
-* **Someone forgot their PIN:** the group leader opens **Member Access & PINs → Reset PIN** and tells them the new PIN in person. Nobody, including the group leader, can see existing PINs.
+* **Someone forgot their PIN:** the group leader or Dr. Numan opens **Admin → Member access & PINs → Reset PIN** and tells them the new PIN in person. Nobody, including the group leader, can see existing PINs.
 * **"Too many wrong PINs":** after 5 wrong PINs a name is paused for 1 minute, then 5, 15 and 60 minutes if it keeps happening. Phones that have signed in as that person before aren't affected. Every lock is in the AuditLog tab; a locked leader account also emails you (at most once a day). There is nothing to reset.
 * **Sign everyone out at once** (for example, if a phone with an open session was lost): in Apps Script open **Project Settings → Script Properties** and delete `TOKEN_SECRET`. A new secret is created automatically and all existing sessions stop working. Changing one person's PIN signs out just that person.
 * **Who changed a mark?** The **Activity Log** tab (instructor and group leader) lists every change with before → after values. The raw data is in the `AuditLog` tab.
