@@ -109,3 +109,21 @@ export function createTabNav(container, tabs, onTabChange, options = {}) {
 
   return { setActive, setBadge, initialTab };
 }
+
+/**
+ * Replace `content` with an empty panel for tab `id` and return the panel.
+ * A heading with the tab's name (visible to screen readers only) comes
+ * first, so headings go page title (h1) → tab (h2) → cards (h3).
+ */
+export function openTabPanel(content, id, tabs = []) {
+  const tab = tabs.find((t) => t.id === id);
+  const heading = document.createElement('h2');
+  heading.className = 'sr-only';
+  heading.textContent = tab ? tab.label : id;
+  const panel = document.createElement('div');
+  panel.className = 'tab-panel';
+  panel.setAttribute('role', 'tabpanel');
+  panel.setAttribute('aria-labelledby', `tab-${id}`);
+  content.replaceChildren(heading, panel);
+  return panel;
+}

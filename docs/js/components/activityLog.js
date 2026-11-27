@@ -27,6 +27,7 @@ const ACTION_LABELS = {
   setGoal: 'Set goal',
   resetPin: 'Reset a PIN',
   changeMyPin: 'Changed own PIN',
+  viewPins: 'Looked at PINs',
   requestGrading: 'Requested grading',
   addTeamMessage: 'Posted team notice',
   deleteTeamMessage: 'Removed team notice',

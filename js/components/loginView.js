@@ -13,7 +13,7 @@
  *   Retry. It never switches to Demo Mode on its own.
  */
 
-import { apiLogin, apiGoogleLogin, apiNames, acceptLoginDashboard } from '../api.js';
+import { apiLogin, apiGoogleLogin, apiNames, acceptLoginDashboard, describeApiError } from '../api.js';
 import { cachedGoogleClientId, rememberGoogleClientId, renderGoogleButton } from '../googleSignIn.js';
 import { setCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
@@ -79,11 +79,11 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         ${isDemoMode() ? `<div class="quick-login-panel" aria-label="Demo accounts">
           <p class="quick-login-title">Demo mode: sign in as</p>
           <div class="quick-login-grid">
-            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan <small>instructor</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz <small>group leader</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2001">Amina <small>team leader</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha <small>team leader</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh <small>student</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="100200">Dr. Numan <small>instructor</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="111222">Shehroz <small>group leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2101">Amina <small>team leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3101">Ayesha <small>team leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Bilal" data-demo-pin="2002">Bilal <small>student</small></button>
           </div>
         </div>` : ''}
 
@@ -140,7 +140,7 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         </form>
 
         <p class="auth-footer-help">
-          Forgot your PIN, or locked out? Ask Shehroz (group leader) to reset it.
+          Forgot your PIN, or locked out? Ask your group leader or instructor to reset it.
         </p>
       </div>
     </div>
@@ -196,8 +196,8 @@ export function renderModernLogin(container, onSuccess, options = {}) {
         res.error || "Google sign-in didn't work. Use your name and PIN.",
       )}</div>`;
     } catch (err) {
-      errorBox.innerHTML = `<div class="alert alert-error auth-error-alert" role="alert"><strong>Can't reach the class server right now.</strong>
-        <p class="alert-text">Wait a moment, then press the Google button again.</p></div>`;
+      errorBox.innerHTML = `<div class="alert alert-error auth-error-alert" role="alert"><strong>Couldn't sign you in.</strong>
+        <p class="alert-text">${esc(describeApiError(err))} Then press the Google button again.</p></div>`;
     }
   }
 
@@ -291,12 +291,8 @@ export function renderModernLogin(container, onSuccess, options = {}) {
     } catch (err) {
       errorBox.innerHTML = `
         <div class="alert alert-error auth-error-alert" role="alert">
-          <strong>Can't reach the class server right now.</strong>
-          <p class="alert-text">${
-            navigator.onLine === false
-              ? "You're offline. Reconnect to the internet, then try again."
-              : 'It may be busy or your connection dropped. Wait a moment, then try again.'
-          }</p>
+          <strong>Couldn't sign you in.</strong>
+          <p class="alert-text">${esc(describeApiError(err))}</p>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-retry-login">Try again</button>
         </div>
       `;

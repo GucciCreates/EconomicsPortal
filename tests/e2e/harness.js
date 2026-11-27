@@ -27,11 +27,14 @@ window.google = { accounts: { id: {
 /**
  * @param {object} [opts]
  * @param {boolean} [opts.demo=true] - start in Demo Mode (sessionStorage flag)
+ * @param {Function} [opts.apiHandler] - (route, body) => …: answer Apps Script
+ *   requests by hand (hang, send HTML, …). Overrides `backend`.
+ * @param {number} [opts.apiTimeoutMs] - shorter request time limit for tests.
  * @param {object} [opts.backend] - a createBackend() from ../gasFakes: requests
  *   to the Apps Script URL are answered by backend/Code.gs running in Node.
  *   `opts.latency` (ms) is added to each such request.
  */
-async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { width: 1280, height: 900 }, demo = true, backend = null, latency = 0, fakeGoogle = false } = {}) {
+async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { width: 1280, height: 900 }, demo = true, backend = null, latency = 0, fakeGoogle = false, apiHandler = null, apiTimeoutMs = 0 } = {}) {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport });
   const errors = [];
@@ -44,6 +47,7 @@ async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { w
         return route.fulfill({ status: 200, contentType: 'text/javascript', body: FAKE_GSI });
       }
       if (/script\.google\.com/.test(url.host)) {
+        if (apiHandler) return apiHandler(route, JSON.parse(route.request().postData() || '{}'));
         if (!backend) return route.abort();
         const body = JSON.parse(route.request().postData() || '{}');
         apiCalls.push(body.action);
@@ -59,6 +63,7 @@ async function openApp({ root = path.join(__dirname, '..', '..'), viewport = { w
     if (!file.startsWith(root) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: 'not found' });
     return route.fulfill({ status: 200, contentType: TYPES[path.extname(file)] || 'application/octet-stream', body: fs.readFileSync(file) });
   });
+  if (apiTimeoutMs) await context.addInitScript((ms) => (window.__economicsApiTimeoutMs = ms), apiTimeoutMs);
   if (demo) await context.addInitScript(() => sessionStorage.setItem('economics_portal_demo', '1'));
   const page = await context.newPage();
   page.on('console', (m) => {

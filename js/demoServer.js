@@ -26,11 +26,14 @@ import {
   computeMockMemberMetrics,
 } from './mockData.js';
 import { normalizeUserName } from './utils.js';
+import { sha256Hex } from './sha256.js';
 
 export { normalizeUserName };
 
-const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v6';
+const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v7';
 const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
+const LEADERBOARD_TOP = 5;
+const SERVER_VERSION = '8'; // same as Code.gs SCHEMA_VERSION
 const ROLES = ['instructor', 'group_leader', 'assistant', 'team_leader', 'member'];
 const LEADERS = ['group_leader', 'instructor'];
 const MARK_EDITORS = ['group_leader', 'instructor', 'assistant'];
@@ -68,7 +71,8 @@ function clone(v) {
 
 function initialStore() {
   return {
-    users: clone(MOCK_USERS),
+    // Like setup() in Code.gs: the starting PINs count as issued by a leader.
+    users: clone(MOCK_USERS).map((u) => ({ ...u, issuedPin: u.pin })),
     tasks: clone(MOCK_TASKS),
     marks: clone(MOCK_MARKS),
     submissions: clone(MOCK_SUBMISSIONS),
@@ -371,7 +375,7 @@ function actionLogin(store, p) {
   if (!user || String(user.pin) !== pin) {
     recordFailure(store, bucket, user ? user.name : name);
     throw apiError(
-      "That name and PIN don't match. (Demo PINs: Shehroz 1111, Dr. Numan 0000, Amina 2001, Ramesh 2002, Ayesha (Quetta) 3001)",
+      "That name and PIN don't match. (Demo PINs: Shehroz 111222, Dr. Numan 100200, Amina 2101, Bilal 2002, Ayesha (Quetta) 3101)",
       'LOGIN_FAILED',
     );
   }
@@ -397,6 +401,10 @@ function myPrefs(store, session) {
 }
 
 function buildDashboard(store, session) {
+  return { ...buildDashboardFor(store, session), serverVersion: SERVER_VERSION };
+}
+
+function buildDashboardFor(store, session) {
   const { role, team } = session;
   const me = normalizeUserName(session.name);
   const isMe = (v) => normalizeUserName(v) === me;
@@ -465,9 +473,14 @@ function buildDashboard(store, session) {
 
   const myMarks = marks.filter((m) => isMe(m.member));
   const myKey = Object.keys(metrics).find((k) => isMe(k));
+  // Same rule as Code.gs: the top LEADERBOARD_TOP plus your own place.
+  const ranked = Object.keys(metrics)
+    .filter((k) => Number(metrics[k].avgScore) > 0)
+    .sort((x, y) => Number(metrics[y].avgScore) - Number(metrics[x].avgScore) || String(x).localeCompare(String(y)));
   const leaderboard = {};
-  Object.keys(metrics).forEach((k) => {
-    leaderboard[k] = isMe(k) ? metrics[k] : publicMetrics(metrics[k]);
+  ranked.forEach((k, i) => {
+    if (i >= LEADERBOARD_TOP && !isMe(k)) return;
+    leaderboard[k] = { ...(isMe(k) ? metrics[k] : publicMetrics(metrics[k])), rank: i + 1 };
   });
   return clone({
     tasks: tasks.filter((t) => t.team === team || t.team === 'ALL'),
@@ -478,6 +491,7 @@ function buildDashboard(store, session) {
     mySubmissions: subs.filter((s) => isMe(s.member)),
     myMetrics: myKey ? metrics[myKey] : null,
     memberMetrics: leaderboard,
+    leaderboardSize: ranked.length,
     myEscalations: escalations.filter((es) => isMe(es.raisedBy)),
     announcements,
     quizzes: quizzes.filter((q) => q.scope === 'ALL' || q.scope === team),
@@ -757,15 +771,29 @@ const ACTIONS = {
 
   updatePin: {
     write: true,
-    roles: ['group_leader'],
+    roles: ['group_leader', 'instructor'],
     fn(store, s, p) {
       const newPin = String(p.newPin || '').trim();
       const target = findUser(store, p.targetMember);
       if (!target) throw apiError('Member not found in roster.', 'NOT_FOUND');
       checkNewPin(newPin, target.role, 'PIN');
       target.pin = newPin;
+      target.issuedPin = newPin;
       audit(store, s, 'resetPin', target.name, {});
       return { ok: true };
+    },
+  },
+  // Same rule as Code.gs: only a PIN a leader set, and only while it's still the person's PIN.
+  issuedPins: {
+    write: true,
+    roles: ['group_leader', 'instructor'],
+    fn(store, s) {
+      const pins = store.users.map((u) => {
+        const pin = u.issuedPin && String(u.issuedPin) === String(u.pin) ? String(u.pin) : '';
+        return { name: u.name, pin, status: pin ? 'issued' : u.pin ? 'own' : 'none' };
+      });
+      audit(store, s, 'viewPins', '', { shown: pins.filter((p) => p.pin).length });
+      return { ok: true, pins };
     },
   },
   changeMyPin: {
@@ -783,6 +811,7 @@ const ACTIONS = {
       checkNewPin(newPin, s.role, 'New PIN');
       if (newPin === currentPin) throw apiError('Choose a PIN that is different from your current one.', 'VALIDATION');
       me.pin = newPin;
+      me.issuedPin = ''; // a PIN people choose themselves is never shown to anyone
       audit(store, s, 'changeMyPin', s.name, {});
       return { ok: true, token: issueToken(me) };
     },
@@ -893,12 +922,30 @@ const ACTIONS = {
  * Handle one request exactly like the Apps Script backend would.
  * @param {object} params - { action, token, ...fields }
  */
+// Same rule as Code.gs PUBLISHED_PINS: the first README published every
+// person's starting PIN, so those name + PIN pairs are refused everywhere.
+const PUBLISHED_PINS = ['fff4a103e0a26f5eb6ee069f', 'f8122729b48ae2e67e31deed', '77c9554014050ce3e982edb1', '27b1ca4deb94ea3af26e305e', 'cb0e3e27def67b05123adbb7', '190248acf92d2fdbebfba802', 'fce41495f1061cf4232d1196', 'c369435c5acf69a4ce687b84', 'c4a99445fc074a05d6168854', 'b59f515decc41dda4ab86fb7', '4fc3dfa6cd2574d64096e5bb', '5863e795c9118e3211b3b528', 'a7458dc4a94fd619f0ba0769', '1dcb3fd679b8b4d133edcb68', '636b70560c8fb1ebfbf12040', 'f3f53afc9ee4ed0bf7496cf1', '8f96b5befed87c7ce168f8d9'];
+
+function isPublishedPin(name, pin) {
+  const hex = sha256Hex('published-pin:' + normalizeUserName(name) + '|' + String(pin)).slice(0, 24);
+  return PUBLISHED_PINS.includes(hex);
+}
+
 export async function handleDemoRequest(params) {
   try {
     const store = getStore();
     const action = String(params.action || '');
-    if (action === 'health' || action === 'ping') return { ok: true, version: '6', time: nowIso(), demo: true };
-    if (action === 'login') return actionLogin(store, params);
+    if (action === 'health' || action === 'ping') return { ok: true, version: SERVER_VERSION, time: nowIso(), demo: true };
+    if (action === 'login') {
+      const who = findUser(store, params.name);
+      if (who && (isPublishedPin(who.name, String(params.pin || '').trim()))) {
+        throw apiError(
+          "This PIN was published online in an old version of the portal, so it can't be used any more. Ask your group leader or instructor to give you a new PIN.",
+          'PIN_PUBLISHED',
+        );
+      }
+      return actionLogin(store, params);
+    }
     if (action === 'names') {
       const names = [...new Set(store.users.map((u) => firstName(u.name)).filter(Boolean))].sort();
       // No Google client ID in Demo Mode, so the sign-in page shows the PIN form only.
@@ -910,6 +957,12 @@ export async function handleDemoRequest(params) {
     if (!entry) throw apiError('Unknown action.', 'BAD_REQUEST');
 
     const session = requireSession(store, params.token);
+    if (action === 'changeMyPin' || action === 'updatePin') {
+      const target = action === 'changeMyPin' ? session.name : (findUser(store, params.targetMember) || {}).name;
+      if (target && (isPublishedPin(target, String(params.newPin || '').trim()))) {
+        throw apiError('That PIN was published online in an old version of the portal. Choose a different one.', 'VALIDATION');
+      }
+    }
     if (entry.roles && !entry.roles.includes(session.role)) {
       throw apiError('You are not allowed to do this.', 'FORBIDDEN');
     }

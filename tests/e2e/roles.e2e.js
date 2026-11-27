@@ -34,13 +34,13 @@ const ROLES = [
     role: 'instructor',
     async write(page) {
       await page.click('.tab-btn[data-tab="scores"]');
-      await page.selectOption('#gl-mark-member', 'Haseeb');
+      await page.selectOption('#gl-mark-member', 'Moiz');
       await page.fill('#gl-mark-cycle', 'Unit 3: Trade');
       await page.fill('#gl-mark-quiz', '81');
       await page.click('#form-gl-add-mark button[value="done"]');
       // Newest unit first, open, with the new mark in it.
       await page.waitForSelector('#gl-ledger details[open] summary:has-text("Unit 3: Trade")');
-      await page.waitForSelector('#gl-ledger details[open] td:has-text("Haseeb")');
+      await page.waitForSelector('#gl-ledger details[open] td:has-text("Moiz")');
     },
   },
   {
@@ -54,7 +54,7 @@ const ROLES = [
     },
   },
   {
-    name: 'Ramesh',
+    name: 'Bilal',
     role: 'member',
     async write(page) {
       await page.click('.tab-btn[data-tab="doubts"]');
@@ -138,7 +138,7 @@ test('session handling: old sessions and bad tokens go back to login', { timeout
     await page.reload();
     assert.ok(await page.isVisible('#form-login'), 'a pre-v4 session without a token is discarded');
 
-    await login(page, 'Ramesh');
+    await login(page, 'Bilal');
     await page.evaluate(() => {
       const s = JSON.parse(sessionStorage.getItem('economics_portal_demo_session_v1'));
       s.token = 'demo.not-a-real-token';

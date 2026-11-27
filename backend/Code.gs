@@ -37,8 +37,9 @@
 // ─────────────────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────────────────
-const SCHEMA_VERSION = "7";
+const SCHEMA_VERSION = "8";
 const TEAMS = ["Shehroz", "Amina", "Ayesha", "Lareb"];
+const LEADERBOARD_TOP = 5; // students see this many classmates on the leaderboard, plus themselves
 const ROLES = ["instructor", "group_leader", "assistant", "team_leader", "member"];
 const SESSION_DAYS = 7;
 const SESSION_RENEW_DAYS = 2;            // renew tokens in their last 2 days
@@ -98,7 +99,7 @@ const SHEET_NAMES = {
 };
 
 const HEADERS = {
-  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders", "googleEmail"],
+  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders", "googleEmail", "issuedPin"],
   Marks:             ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
   Tasks:             ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
   Submissions:       ["id", "taskId", "member", "team", "content", "fileUrl", "gradingRequested", "requestedBy", "reviewNotes", "timestamp"],
@@ -148,7 +149,8 @@ const ACTIONS = {
 
   setGoal:                { fn: actionSetGoal, write: true },
 
-  updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader"] },
+  updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader", "instructor"] },
+  issuedPins:             { fn: actionIssuedPins, write: true, roles: ["group_leader", "instructor"] },
   changeMyPin:            { fn: actionChangeMyPin, write: true },
   setReminders:           { fn: actionSetReminders, write: true },
   linkGoogle:             { fn: actionLinkGoogle, write: true },
@@ -277,6 +279,15 @@ function actionLogin(ss, params) {
 
   const bucket = lockBucket(key, found ? found.user.name : name, params.device);
   checkLock(bucket);
+
+  // Checked before the PIN itself, so it says nothing about whether it was right.
+  if (found && isPublishedPin(found.user.name, pin)) {
+    throw apiError(
+      "This PIN was published online in an old version of the portal, so it can't be used any more. " +
+        "Ask your group leader or instructor to give you a new PIN.",
+      "PIN_PUBLISHED"
+    );
+  }
 
   if (!found || !found.user.pinHash || !verifyPin(found.user, pin)) {
     recordLoginFailure(ss, bucket, found ? found.user : null);
@@ -572,6 +583,44 @@ function verifyPin(user, pin) {
   return safeEqual(hashPin(pin, user.salt), String(user.pinHash));
 }
 
+// ── Issued PINs ─────────────────────────────────────────────────────────
+// A PIN that a leader sets (Reset PIN, setup(), resetAllPins, setPinForUser)
+// is also kept in `issuedPin`, encrypted with TOKEN_SECRET (Script
+// Properties, never in the sheet), so the group leader and instructor can
+// look it up later. A PIN the person chooses themselves is never kept: any
+// other PIN change clears `issuedPin`, and the copy is bound to the current
+// pinHash, so a stale copy can never be read.
+function issuedKeystream(nonce) {
+  return Utilities.computeHmacSha256Signature("issued-pin-key:" + nonce, getSecret());
+}
+
+function issuedTag(name, pinHash, nonce, body) {
+  return sign("issued-pin-tag:" + normalizeName(name) + "|" + pinHash + "|" + nonce + "|" + body).slice(0, 22);
+}
+
+function sealIssuedPin(name, pinHash, pin) {
+  const nonce = Utilities.getUuid().replace(/-/g, "");
+  const ks = issuedKeystream(nonce);
+  const digits = String(pin);
+  const bytes = [];
+  for (let i = 0; i < digits.length; i++) bytes.push(((digits.charCodeAt(i) ^ ks[i]) << 24) >> 24);
+  const body = Utilities.base64EncodeWebSafe(bytes);
+  return "e1$" + nonce + "$" + body + "$" + issuedTag(name, pinHash, nonce, body);
+}
+
+/** The issued PIN, or "" if there is none, it was replaced, or it was tampered with. */
+function openIssuedPin(user) {
+  const parts = String(user.issuedPin || "").split("$");
+  if (parts.length !== 4 || parts[0] !== "e1" || !user.pinHash) return "";
+  const nonce = parts[1], body = parts[2];
+  if (!safeEqual(issuedTag(user.name, String(user.pinHash), nonce, body), parts[3])) return "";
+  const ks = issuedKeystream(nonce);
+  const bytes = Utilities.base64DecodeWebSafe(body);
+  let pin = "";
+  for (let i = 0; i < bytes.length && i < ks.length; i++) pin += String.fromCharCode((bytes[i] ^ ks[i]) & 0xff);
+  return /^\d{4,8}$/.test(pin) && verifyPin(user, pin) ? pin : "";
+}
+
 function safeEqual(a, b) {
   a = String(a);
   b = String(b);
@@ -612,6 +661,30 @@ function minPinLength(role) {
 }
 
 /** Throws unless `pin` is a valid new PIN for someone with `role`. */
+// The first README (v1) published every person's starting PIN. Anyone who
+// never changed it could be signed in as by a stranger. These are
+// fingerprints of those name + PIN pairs (the pairs themselves are still in
+// the repository's history, so this adds nothing new). A matching PIN is
+// refused at sign-in and can never be chosen again.
+const PUBLISHED_PINS = [
+  "fff4a103e0a26f5eb6ee069f", "f8122729b48ae2e67e31deed", "77c9554014050ce3e982edb1",
+  "27b1ca4deb94ea3af26e305e", "cb0e3e27def67b05123adbb7", "190248acf92d2fdbebfba802",
+  "fce41495f1061cf4232d1196", "c369435c5acf69a4ce687b84", "c4a99445fc074a05d6168854",
+  "b59f515decc41dda4ab86fb7", "4fc3dfa6cd2574d64096e5bb", "5863e795c9118e3211b3b528",
+  "a7458dc4a94fd619f0ba0769", "1dcb3fd679b8b4d133edcb68", "636b70560c8fb1ebfbf12040",
+  "f3f53afc9ee4ed0bf7496cf1", "8f96b5befed87c7ce168f8d9"
+];
+
+function isPublishedPin(name, pin) {
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    "published-pin:" + normalizeName(name) + "|" + String(pin),
+    Utilities.Charset.UTF_8
+  );
+  const hex = bytes.map(b => ((b + 256) % 256).toString(16).padStart(2, "0")).join("").slice(0, 24);
+  return PUBLISHED_PINS.indexOf(hex) !== -1;
+}
+
 function checkNewPin(pin, role, label) {
   const min = minPinLength(role);
   if (!isPinFormat(pin) || String(pin).length < min) {
@@ -635,10 +708,11 @@ function setup() {
     PEOPLE.forEach(p => {
       const pin = randomPin();
       const salt = newSalt();
-      appendObject(usersSheet, { name: p[0], role: p[1], team: p[2], pinHash: hashPin(pin, salt), salt: salt });
+      const pinHash = hashPin(pin, salt);
+      appendObject(usersSheet, { name: p[0], role: p[1], team: p[2], pinHash: pinHash, salt: salt, issuedPin: sealIssuedPin(p[0], pinHash, pin) });
       lines.push(p[0] + " → " + pin);
     });
-    Logger.log("Users created. Hand out these PINs privately — they are not stored anywhere in plain text:\n" + lines.join("\n"));
+    Logger.log("Users created. Hand out these PINs privately. The group leader and instructor can also see them under Admin → Show PINs until each person picks their own:\n" + lines.join("\n"));
   }
   Logger.log("Setup v" + SCHEMA_VERSION + " complete.");
 }
@@ -746,11 +820,11 @@ function resetAllPins() {
   const lines = [];
   readTable(ss, SHEET_NAMES.USERS).rows.forEach(u => {
     const pin = randomPin();
-    writePin(ss, u.name, pin);
+    writePin(ss, u.name, pin, { issued: true });
     lines.push(u.name + " → " + pin);
   });
   bumpDataVersions([SHEET_NAMES.USERS]);
-  Logger.log("New PINs (hand them out privately — they are not stored anywhere in plain text):\n" + lines.join("\n"));
+  Logger.log("New PINs (hand them out privately; they also show under Admin → Show PINs until each person picks their own):\n" + lines.join("\n"));
   return lines.length;
 }
 
@@ -759,7 +833,7 @@ function setPinForUser(name, pin) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSchema(ss);
   if (!isPinFormat(pin)) throw new Error("PIN must be " + PIN_MIN + " to " + PIN_MAX + " digits.");
-  writePin(ss, name, String(pin));
+  writePin(ss, name, String(pin), { issued: true });
   bumpDataVersions([SHEET_NAMES.USERS]);
   Logger.log("PIN updated for " + name + ".");
 }
@@ -925,7 +999,12 @@ function actionDashboard(ss, session) {
   return { ok: true, data: buildDashboard(ss, session) };
 }
 
+/** Every dashboard says which server version built it, so the site can warn leaders about old code. */
 function buildDashboard(ss, session) {
+  return Object.assign(buildDashboardFor(ss, session), { serverVersion: SCHEMA_VERSION });
+}
+
+function buildDashboardFor(ss, session) {
   const role = session.role;
   const team = session.team;
   const me = normalizeName(session.name);
@@ -1000,9 +1079,15 @@ function buildDashboard(ss, session) {
   // Member: only their own detail, plus a public leaderboard summary.
   const myMarks = marks.filter(m => isMe(m.member));
   const myMetricsKey = Object.keys(metrics).find(k => isMe(k));
+  // Students see the top LEADERBOARD_TOP and their own place, never the
+  // whole class's scores (so nobody can see who is at the bottom).
+  const ranked = Object.keys(metrics)
+    .filter(k => Number(metrics[k].avgScore) > 0)
+    .sort((a, b) => Number(metrics[b].avgScore) - Number(metrics[a].avgScore) || String(a).localeCompare(String(b)));
   const leaderboard = {};
-  Object.keys(metrics).forEach(k => {
-    leaderboard[k] = isMe(k) ? metrics[k] : publicMetrics(metrics[k]);
+  ranked.forEach((k, i) => {
+    if (i >= LEADERBOARD_TOP && !isMe(k)) return;
+    leaderboard[k] = Object.assign({}, isMe(k) ? metrics[k] : publicMetrics(metrics[k]), { rank: i + 1 });
   });
   return {
     tasks: tasks.filter(t => t.team === team || t.team === "ALL"),
@@ -1013,6 +1098,7 @@ function buildDashboard(ss, session) {
     mySubmissions: subs.filter(s => isMe(s.member)),
     myMetrics: myMetricsKey ? metrics[myMetricsKey] : null,
     memberMetrics: leaderboard,
+    leaderboardSize: ranked.length,
     myEscalations: escalations.filter(es => isMe(es.raisedBy)),
     announcements: announcements,
     quizzes: quizzes.filter(q => q.scope === "ALL" || q.scope === team),
@@ -1286,7 +1372,7 @@ function actionUpdatePin(ss, session, p) {
   const target = findUser(ss, p.targetMember);
   if (!target) throw apiError("Member not found in roster.", "NOT_FOUND");
   checkNewPin(newPin, target.user.role, "PIN");
-  writePin(ss, target.user.name, newPin);
+  writePin(ss, target.user.name, newPin, { issued: true });
   audit(ss, session, "resetPin", String(target.user.name), {});
   return { ok: true };
 }
@@ -1320,11 +1406,30 @@ function actionSetReminders(ss, session, p) {
   return { ok: true };
 }
 
-function writePin(ss, name, pin) {
+/** Sets a PIN. `opts.issued` keeps an encrypted copy for leaders; otherwise any copy is cleared. */
+function writePin(ss, name, pin, opts) {
   const found = findUser(ss, name);
   if (!found) throw apiError("Member not found in roster: " + name, "NOT_FOUND");
+  if (isPublishedPin(found.user.name, pin)) {
+    throw apiError("That PIN was published online in an old version of the portal. Choose a different one.", "VALIDATION");
+  }
   const salt = newSalt();
-  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { pinHash: hashPin(pin, salt), salt: salt });
+  const pinHash = hashPin(pin, salt);
+  const issued = opts && opts.issued ? sealIssuedPin(found.user.name, pinHash, pin) : "";
+  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { pinHash: pinHash, salt: salt, issuedPin: issued });
+}
+
+/**
+ * The PINs a leader set that the person hasn't replaced yet. Each look is
+ * written to the activity log. A write action only so it runs under the lock.
+ */
+function actionIssuedPins(ss, session) {
+  const pins = readTable(ss, SHEET_NAMES.USERS).rows.map(u => {
+    const pin = openIssuedPin(u);
+    return { name: String(u.name), pin: pin, status: pin ? "issued" : u.pinHash ? "own" : "none" };
+  });
+  audit(ss, session, "viewPins", "", { shown: pins.filter(p => p.pin).length });
+  return { ok: true, pins: pins };
 }
 
 function actionRequestGrading(ss, session, p) {
@@ -1699,7 +1804,7 @@ function readTable(ss, name) {
 function stripRow(row) {
   const out = {};
   Object.keys(row).forEach(k => {
-    if (k === "_row" || k === "pinHash" || k === "salt" || k === "pin") return;
+    if (k === "_row" || k === "pinHash" || k === "salt" || k === "pin" || k === "issuedPin") return;
     out[k] = row[k];
   });
   return out;

@@ -79,15 +79,15 @@ test('migratePins converts an old plaintext pin column, including numbers Sheets
   const users = b.ss.insertSheet('Users');
   users.data = [
     ['name', 'role', 'team', 'pin'],
-    ['Dr. Numan', 'instructor', '-', 0], // "0000" saved as a number by Sheets
-    ['Ramesh', 'member', 'Amina', '2002'],
+    ['Dr. Numan', 'instructor', '-', 42], // "0042" saved as a number by Sheets
+    ['Ramesh', 'member', 'Amina', '2468'],
   ];
   b.api.migratePins();
   const [headers, ...rows] = users.data;
   assert.deepEqual(headers.slice(0, 5), ['name', 'role', 'team', 'pinHash', 'salt']);
   rows.forEach((r) => assert.ok(String(r[3]).startsWith('v1$')));
-  assert.equal(b.post({ action: 'login', name: 'Dr. Numan', pin: '0000' }).ok, true);
-  assert.equal(b.post({ action: 'login', name: 'Ramesh', pin: '2002' }).ok, true);
+  assert.equal(b.post({ action: 'login', name: 'Dr. Numan', pin: '0042' }).ok, true);
+  assert.equal(b.post({ action: 'login', name: 'Ramesh', pin: '2468' }).ok, true);
 });
 
 // ── Login & tokens ───────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ test("members only see their own marks and a summary of classmates' metrics", ()
   assert.ok(data.marks.every((m) => m.member === 'Ramesh'));
   assert.ok(data.myMarks.every((m) => m.member === 'Ramesh'));
   assert.ok(!JSON.stringify(data).includes('mamoon private'));
-  assert.deepEqual(Object.keys(data.memberMetrics.Mamoon).sort(), ['avgScore', 'delta', 'member', 'streak', 'team']);
+  assert.deepEqual(Object.keys(data.memberMetrics.Mamoon).sort(), ['avgScore', 'delta', 'member', 'rank', 'streak', 'team']);
   assert.ok('avgPeerRating' in data.memberMetrics.Ramesh);
   assert.equal(data.submissions, undefined);
   assert.equal(data.escalations, undefined);
@@ -712,4 +712,205 @@ test('the users list for leaders never includes Google addresses', () => {
   const res = b.post({ action: 'users', token: b.tokenFor('Shehroz') });
   assert.equal(res.ok, true);
   assert.ok(!JSON.stringify(res).includes('minal@gmail.com'));
+});
+
+// ── PINs that were published in the first README (AUDIT_v7 F2) ───────────
+
+test('a PIN that was published online is refused at sign-in and can never be set again', () => {
+  const b = freshBackend();
+  // Simulate an account that still has its original, published PIN.
+  b.api.setPinForUser('Shehroz', '1201');
+  const sheet = b.ss.getSheetByName('Users');
+  const h = sheet.data[0];
+  const row = sheet.data.findIndex((r) => r[0] === 'Shehroz');
+  const salt = 'legacy-salt';
+  sheet.data[row][h.indexOf('salt')] = salt;
+  sheet.data[row][h.indexOf('pinHash')] = b.api.hashPin('1111', salt);
+  b.api.clearCache();
+
+  const res = b.post({ action: 'login', name: 'Shehroz', pin: '1111' });
+  assert.equal(res.ok, false);
+  assert.equal(res.code, 'PIN_PUBLISHED');
+  assert.match(res.error, /published/i);
+  assert.ok(!res.token);
+  // Wrong guesses still behave as before (no hint that 1111 was right).
+  assert.equal(b.post({ action: 'login', name: 'Shehroz', pin: '9999' }).code, 'LOGIN_FAILED');
+
+  // Nobody can set a published PIN again, by any route.
+  assert.throws(() => b.api.setPinForUser('Ramesh', '2002'), /published/i);
+  const gl = b.tokenFor('Amina'); // team leader can't reset, so use the group leader after a fresh PIN
+  b.api.setPinForUser('Shehroz', '246810');
+  const leader = b.post({ action: 'login', name: 'Shehroz', pin: '246810' }).token;
+  assert.equal(b.post({ action: 'updatePin', token: leader, targetMember: 'Ramesh', newPin: '2002' }).code, 'VALIDATION');
+  const ramesh = b.tokenFor('Ramesh');
+  assert.equal(b.post({ action: 'changeMyPin', token: ramesh, currentPin: PINS.Ramesh, newPin: '2002' }).code, 'VALIDATION');
+  // Same digits are fine for someone they weren't published for.
+  assert.equal(b.post({ action: 'updatePin', token: leader, targetMember: 'Minal', newPin: '2002' }).ok, true);
+  assert.ok(gl);
+});
+
+test('F7: the instructor can reset a PIN too; other roles still cannot', () => {
+  const b = freshBackend();
+  const res = b.post({ action: 'updatePin', token: b.tokenFor('Dr. Numan'), targetMember: 'Ramesh', newPin: '7531' });
+  assert.equal(res.ok, true, res.error);
+  assert.equal(b.login('Ramesh', '7531').ok, true);
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'resetPin' && r.actor === 'Dr. Numan'));
+  for (const who of ['Sajal', 'Amina', 'Minal']) {
+    assert.equal(b.post({ action: 'updatePin', token: b.tokenFor(who), targetMember: 'Ramesh', newPin: '8642' }).code, 'FORBIDDEN', who);
+  }
+});
+
+test('F6: students see the top 5 and their own place, not every classmate\'s score', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  // 8 students with marks: Ramesh is 7th of 8.
+  const scores = { Mamoon: 95, Minal: 91, Lareb: 88, Shaiman: 84, Amina: 80, Sajal: 77, Ramesh: 60, Haseeb: 31 };
+  Object.entries(scores).forEach(([member, quizScore]) => {
+    const r = b.post({ action: 'addMark', token: gl, member, cycle: 'Unit 1', quizScore, submission: 'Yes', withDashboard: false });
+    assert.equal(r.ok, true, `${member}: ${r.error}`);
+  });
+  const d = b.post({ action: 'dashboard', token: b.tokenFor('Ramesh') }).data;
+  const names = Object.keys(d.memberMetrics).sort();
+  assert.deepEqual(names, ['Amina', 'Lareb', 'Mamoon', 'Minal', 'Ramesh', 'Shaiman'].sort());
+  assert.equal(d.memberMetrics.Ramesh.rank, 7);
+  assert.equal(d.memberMetrics.Mamoon.rank, 1);
+  assert.equal(d.leaderboardSize, 8);
+  assert.ok(!JSON.stringify(d).includes('Haseeb'), 'the lowest score is not sent to other students');
+
+  // A student in the top 5 sees just the top 5.
+  const top = b.post({ action: 'dashboard', token: b.tokenFor('Minal') }).data;
+  assert.equal(Object.keys(top.memberMetrics).length, 5);
+  assert.equal(top.memberMetrics.Minal.rank, 2);
+
+  // Leaders still see everyone.
+  const lead = b.post({ action: 'dashboard', token: gl }).data;
+  assert.ok(lead.memberMetrics.Haseeb);
+});
+
+// ── Actions that had no tests before AUDIT_v7 (F8) ──────────────────────
+
+test('F8 addQuiz / deleteQuiz: valid date required, team scope respected, deletes logged', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  assert.equal(b.post({ action: 'addQuiz', token: gl, title: 'Bad date', scheduledAt: 'not a date' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'addQuiz', token: gl, title: '', scheduledAt: '2030-01-05T10:00:00Z' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'addQuiz', token: gl, title: 'X', scheduledAt: '2030-01-05T10:00:00Z', scope: 'Nowhere' }).code, 'VALIDATION');
+  const id = b.post({ action: 'addQuiz', token: gl, title: 'Lareb quiz', scheduledAt: '2030-01-05T10:00:00Z', scope: 'Lareb' }).id;
+  assert.ok(id);
+  const titles = (who) => b.post({ action: 'dashboard', token: b.tokenFor(who) }).data.quizzes.map((q) => q.title);
+  assert.ok(titles('Shaiman').includes('Lareb quiz'), 'Lareb students see it');
+  assert.ok(!titles('Ramesh').includes('Lareb quiz'), 'other teams do not');
+  assert.equal(b.post({ action: 'deleteQuiz', token: gl, id }).ok, true);
+  assert.ok(!titles('Shaiman').includes('Lareb quiz'));
+  assert.equal(b.post({ action: 'deleteQuiz', token: gl, id }).code, 'NOT_FOUND');
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'deleteQuiz' && String(r.details).includes('Lareb quiz')), 'the deleted quiz is kept in the log');
+});
+
+test('F8 pinAnnouncement / deleteAnnouncement: pin and unpin, delete keeps a copy in the log', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const id = b.post({ action: 'addAnnouncement', token: gl, title: 'Exam hall', body: 'Room 4' }).id;
+  const ann = () => b.post({ action: 'dashboard', token: b.tokenFor('Ramesh') }).data.announcements.find((a) => a.id === id);
+  assert.equal(b.post({ action: 'pinAnnouncement', token: gl, id, pinned: true }).ok, true);
+  assert.equal(String(ann().pinned), 'true');
+  assert.equal(b.post({ action: 'pinAnnouncement', token: gl, id, pinned: 'false' }).ok, true);
+  assert.equal(String(ann().pinned), 'false');
+  assert.equal(b.post({ action: 'pinAnnouncement', token: gl, id: 'id-missing', pinned: true }).code, 'NOT_FOUND');
+  assert.equal(b.post({ action: 'deleteAnnouncement', token: gl, id }).ok, true);
+  assert.equal(ann(), undefined);
+  assert.ok(b.sheetRows('AuditLog').some((r) => r.action === 'deleteAnnouncement' && String(r.details).includes('Exam hall')));
+});
+
+test('F8 editTask: changes only the given fields, validates, and logs before/after', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const id = b.post({ action: 'addTask', token: gl, title: 'Problem set 4', team: 'Amina', dueDate: '2030-02-01' }).id;
+  assert.equal(b.post({ action: 'editTask', token: gl, id, fields: {} }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'editTask', token: gl, id, fields: { team: 'Nowhere' } }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'editTask', token: gl, id, fields: { title: 'Problem set 4 (revised)', createdBy: 'Hacker' } }).ok, true);
+  const task = b.post({ action: 'dashboard', token: gl }).data.tasks.find((t) => t.id === id);
+  assert.equal(task.title, 'Problem set 4 (revised)');
+  assert.equal(task.team, 'Amina', 'untouched fields stay');
+  assert.notEqual(task.createdBy, 'Hacker', 'fields outside the edit list are ignored');
+  const entry = b.sheetRows('AuditLog').find((r) => r.action === 'editTask');
+  assert.match(String(entry.details), /Problem set 4"/);
+  assert.match(String(entry.details), /revised/);
+});
+
+test('F8 createMentorshipPlan / updateMentorshipStatus: real students only, no self-mentoring, status checked', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  assert.equal(b.post({ action: 'createMentorshipPlan', token: gl, student: 'Ramesh', mentor: 'Ramesh' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'createMentorshipPlan', token: gl, student: 'Dr. Numan', mentor: 'Ramesh' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'createMentorshipPlan', token: gl, student: 'Ramesh', mentor: 'Nobody' }).code, 'VALIDATION');
+  const milestones = Array.from({ length: 14 }, (_, i) => `Step ${i + 1}`);
+  const id = b.post({ action: 'createMentorshipPlan', token: gl, student: 'Mamoon', mentor: 'Minal', milestones }).id;
+  assert.ok(id);
+  const plan = (who) => b.post({ action: 'dashboard', token: b.tokenFor(who) }).data.mentorship.find((p) => p.id === id);
+  assert.ok(plan('Mamoon'), 'the student sees it');
+  assert.ok(plan('Minal'), 'the mentor sees it');
+  assert.equal(plan('Ramesh'), undefined, 'other students do not');
+  const saved = plan('Mamoon').milestones;
+  assert.equal((Array.isArray(saved) ? saved : JSON.parse(saved)).length, 10, 'at most 10 milestones');
+  assert.equal(b.post({ action: 'updateMentorshipStatus', token: gl, id, status: 'done' }).code, 'VALIDATION');
+  assert.equal(b.post({ action: 'updateMentorshipStatus', token: gl, id, status: 'resolved' }).ok, true);
+  assert.equal(plan('Mamoon').status, 'resolved');
+});
+
+test('every dashboard says which server version built it, and Demo Mode claims the same version', () => {
+  const b = freshBackend();
+  const gs = require('fs').readFileSync(require('path').join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
+  const demo = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'demoServer.js'), 'utf8');
+  const cfg = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'config.js'), 'utf8');
+  const version = /const SCHEMA_VERSION = "(\d+)"/.exec(gs)[1];
+  assert.equal(/const SERVER_VERSION = '(\d+)'/.exec(demo)[1], version);
+  assert.ok(Number(/REQUIRED_SERVER_VERSION = (\d+)/.exec(cfg)[1]) <= Number(version), 'the site never requires a newer server than Code.gs');
+  for (const who of ['Shehroz', 'Amina', 'Ramesh']) {
+    assert.equal(b.post({ action: 'dashboard', token: b.tokenFor(who) }).data.serverVersion, version, who);
+  }
+  assert.equal(b.login('Shehroz').data.serverVersion, version, 'sign-in dashboard too');
+});
+
+test('Show PINs: leaders see PINs they set, never a PIN someone chose, and the sheet holds no plain PIN', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const doc = b.tokenFor('Dr. Numan');
+  assert.equal(b.post({ action: 'updatePin', token: gl, targetMember: 'Ramesh', newPin: '583920' }).ok, true);
+  assert.equal(b.post({ action: 'updatePin', token: doc, targetMember: 'Sajal', newPin: '771204' }).ok, true);
+
+  const byName = (res) => Object.fromEntries(res.pins.map((p) => [p.name, p]));
+  let pins = byName(b.post({ action: 'issuedPins', token: doc }));
+  assert.equal(pins.Ramesh.pin, '583920');
+  assert.equal(pins.Sajal.pin, '771204');
+  assert.equal(pins.Shehroz.pin, '1201'); // set with setPinForUser from the editor
+
+  // The sheet keeps only an encrypted copy, never the digits.
+  const row = b.sheetRows('Users').find((u) => u.name === 'Ramesh');
+  assert.match(String(row.issuedPin), /^e1\$/);
+  assert.ok(!String(row.issuedPin).includes('583920'));
+
+  // Ramesh picks his own PIN: nobody can see it any more.
+  const ramesh = b.post({ action: 'login', name: 'Ramesh', pin: '583920' }).token;
+  assert.equal(b.post({ action: 'changeMyPin', token: ramesh, currentPin: '583920', newPin: '4826' }).ok, true);
+  pins = byName(b.post({ action: 'issuedPins', token: gl }));
+  assert.equal(pins.Ramesh.pin, '');
+  assert.equal(pins.Ramesh.status, 'own');
+  assert.equal(b.sheetRows('Users').find((u) => u.name === 'Ramesh').issuedPin, '');
+
+  // A copied or edited issuedPin cell doesn't open for another person.
+  const users = b.ss.getSheetByName('Users').data;
+  const col = users[0].indexOf('issuedPin');
+  const sajalRow = users.findIndex((r) => r[0] === 'Sajal');
+  const mamoonRow = users.findIndex((r) => r[0] === 'Mamoon');
+  users[mamoonRow][col] = users[sajalRow][col];
+  b.api.clearCache();
+  pins = byName(b.post({ action: 'issuedPins', token: gl }));
+  assert.equal(pins.Mamoon.pin, '');
+  assert.equal(pins.Sajal.pin, '771204');
+
+  // Others can't look, dashboards never carry it, and each look is logged.
+  assert.equal(b.post({ action: 'issuedPins', token: b.tokenFor('Amina') }).code, 'FORBIDDEN');
+  assert.equal(b.post({ action: 'issuedPins', token: b.login('Sajal', '771204').token }).code, 'FORBIDDEN');
+  assert.equal(deepHasKey(b.post({ action: 'dashboard', token: gl }), 'issuedPin'), false);
+  assert.equal(b.sheetRows('AuditLog').filter((r) => r.action === 'viewPins').length, 3);
 });

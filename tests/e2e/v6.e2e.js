@@ -58,11 +58,11 @@ test('signing in and saving each take one request to the server', { timeout: 120
 
 test('first-name sign-in offers "Did you mean"; short PINs get a one-time note', { timeout: 120000 }, async () => {
   const backend = liveBackend();
-  backend.api.setPinForUser('Ayesha (Quetta)', '3001');
+  backend.api.setPinForUser('Ayesha (Quetta)', '3579');
   const { browser, page, errors } = await openApp({ demo: false, backend });
   try {
     await page.fill('#login-name', 'ayesha');
-    await page.fill('#login-pin', '3001');
+    await page.fill('#login-pin', '3579');
     await page.click('#btn-submit-login');
     await page.waitForSelector('#btn-use-suggestion');
     assert.match(await page.textContent('#login-error-box'), /Did you mean Ayesha \(Quetta\)\?/);
@@ -73,7 +73,7 @@ test('first-name sign-in offers "Did you mean"; short PINs get a one-time note',
     await page.click('#btn-account-menu');
     await page.click('#btn-logout');
     await page.fill('#login-name', 'Ayesha (Quetta)');
-    await page.fill('#login-pin', '3001');
+    await page.fill('#login-pin', '3579');
     await page.click('#btn-submit-login');
     await page.waitForSelector('.tab-nav');
     assert.ok(!(await page.$('.pin-offer')), 'shown only once');
@@ -107,7 +107,7 @@ test('Demo Mode starts only from ?demo=1, lasts one tab, and is clearly marked',
     await page.goto('http://portal.test/index.html?demo=1');
     await page.waitForSelector('.demo-banner');
     assert.match(await page.textContent('.demo-banner'), /Nothing you do here is saved/);
-    await page.click('.quick-login-chip[data-demo-name="Ramesh"]');
+    await page.click('.quick-login-chip[data-demo-name="Bilal"]');
     await page.waitForSelector('.tab-nav');
     assert.equal(await page.evaluate(() => localStorage.getItem('economics_portal_session_v1')), null, 'demo session is not in localStorage');
     assert.ok(!(await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes('demo_db')))), 'demo data is not in localStorage');
@@ -133,7 +133,7 @@ test('Demo Mode starts only from ?demo=1, lasts one tab, and is clearly marked',
 test('every tab of every role fits a 390px phone screen', { timeout: 240000 }, async () => {
   const { browser, page, errors } = await openApp({ viewport: { width: 390, height: 844 } });
   try {
-    for (const who of ['Shehroz', 'Dr. Numan', 'Amina', 'Ramesh']) {
+    for (const who of ['Shehroz', 'Dr. Numan', 'Amina', 'Bilal']) {
       await page.click(`.quick-login-chip[data-demo-name="${who}"]`);
       await page.waitForSelector('.tab-nav');
       const tabs = await page.$$eval('.tab-btn', (b) => b.map((x) => x.dataset.tab));

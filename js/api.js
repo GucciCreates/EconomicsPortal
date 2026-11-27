@@ -30,16 +30,61 @@ export async function resetDemoData() {
  * POST to Apps Script. Uses 'text/plain' with a JSON string body so the
  * browser does not send a CORS preflight, which Apps Script cannot answer.
  */
-async function postToAppsScript(body) {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+/** How long to wait for the class server before giving up (Apps Script can be slow to wake). */
+const DEFAULT_TIMEOUT_MS = 30000;
+const timeoutMs = () => Number(window.__economicsApiTimeoutMs) || DEFAULT_TIMEOUT_MS;
+
+/** An error with a `kind` the screens can explain: offline, timeout, quota, bad-reply, network. */
+function apiFailure(kind, detail) {
+  const err = new Error(`${kind}: ${detail || ''}`);
+  err.kind = kind;
+  return err;
+}
+
+/** Plain words for an error thrown by a request, for any screen to show. */
+export function describeApiError(err) {
+  const kind = (err && err.kind) || (navigator.onLine === false ? 'offline' : 'network');
+  switch (kind) {
+    case 'offline':
+      return "You're offline. Reconnect to the internet, then try again.";
+    case 'timeout':
+      return 'The class server is taking too long to answer. It may be waking up: try again in a moment.';
+    case 'quota':
+      return "The class server has hit Google's daily limit. It resets within 24 hours; tell your group leader if it lasts.";
+    case 'bad-reply':
+      return 'The class server sent an unexpected reply. Try again in a minute.';
+    default:
+      return "Can't reach the class server right now. Wait a moment, then try again.";
   }
-  return await response.json();
+}
+
+async function postToAppsScript(body) {
+  if (navigator.onLine === false) throw apiFailure('offline');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs());
+  let response;
+  let text;
+  try {
+    response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    text = await response.text();
+  } catch (err) {
+    throw apiFailure(controller.signal.aborted ? 'timeout' : 'network', err && err.message);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!response.ok) throw apiFailure('network', `HTTP ${response.status}`);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Apps Script answers with an HTML page when a Google quota is used up or the
+    // deployment is broken; say so instead of blaming the connection.
+    throw apiFailure(/too many times|quota|rate limit|exceeded/i.test(text) ? 'quota' : 'bad-reply', text.slice(0, 120));
+  }
 }
 
 // ── Latest dashboard ────────────────────────────────────────────────────────
@@ -211,5 +256,6 @@ export const apiDeleteTeamMessage = (payload) => call('deleteTeamMessage', paylo
 // PINS & MENTORSHIP
 // ─────────────────────────────────────────────────────────────────────────────
 export const apiUpdatePin = (payload) => call('updatePin', payload);
+export const apiIssuedPins = () => call('issuedPins', { withDashboard: false });
 export const apiCreateMentorshipPlan = (payload) => call('createMentorshipPlan', payload);
 export const apiUpdateMentorshipStatus = (id, status) => call('updateMentorshipStatus', { id, status });

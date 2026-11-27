@@ -7,7 +7,7 @@
  *   3. a fresh request, behind a loading skeleton.
  */
 
-import { isDemoMode, exitDemo } from './config.js';
+import { isDemoMode, exitDemo, REQUIRED_SERVER_VERSION } from './config.js';
 import { getCurrentUser, clearCurrentUser } from './auth.js';
 import {
   apiGetDashboard,
@@ -16,6 +16,7 @@ import {
   getCachedDashboard,
   lastSyncedAt,
   forgetDashboards,
+  describeApiError,
 } from './api.js';
 import { formatRelative, formatFull } from './dates.js';
 // Dashboards are loaded only after sign-in, so the sign-in page stays small.
@@ -80,13 +81,13 @@ function toggleTheme() {
 function renderBanner() {
   if (isDemoMode()) {
     bannerEl.innerHTML = `
-      <div class="demo-banner" role="note">
+      <section class="demo-banner" aria-label="Demo Mode">
         <span><strong>Sample data.</strong> Nothing you do here is saved, and it disappears when you close this tab.</span>
         <div class="demo-banner-actions">
           <button id="btn-reset-demo" class="btn btn-secondary btn-sm">Reset sample data</button>
           <button id="btn-exit-demo" class="btn btn-secondary btn-sm">Leave demo</button>
         </div>
-      </div>
+      </section>
     `;
     bannerEl.style.display = 'block';
     document.body.classList.add('is-demo');
@@ -266,10 +267,31 @@ async function renderDashboard(user, data) {
   const scrollY = window.scrollY;
   lastRenderedJson = JSON.stringify(data);
   render(mainEl, user, data, loadDashboard);
+  showServerOutdated(user, data);
   if (pinUpgradeOffer) showPinUpgradeOffer(user);
   else if (googleOffer) showGoogleOffer(user);
   window.scrollTo(0, scrollY);
   updateSyncStatus();
+}
+
+/**
+ * Leaders are told when the Apps Script server runs older code than this
+ * site needs; otherwise things like PIN resets fail with confusing errors.
+ */
+const LEADER_ROLES = ['instructor', 'group_leader', 'assistant'];
+function showServerOutdated(user, data) {
+  if (!LEADER_ROLES.includes(user.role)) return;
+  const version = Number(data && data.serverVersion);
+  if (version >= REQUIRED_SERVER_VERSION) return;
+  const box = document.createElement('div');
+  box.className = 'alert alert-warning server-outdated';
+  box.setAttribute('role', 'status');
+  box.innerHTML = `
+    <strong>The class server is out of date${version ? ` (version ${esc(version)})` : ''}.</strong>
+    The website was updated but the Apps Script code wasn't, so some actions, such as resetting PINs, will fail.
+    The sheet owner needs to paste the new <code>backend/Code.gs</code> into Apps Script and deploy a new version
+    (SETUP_GUIDE.md, "Upgrading to v7").`;
+  mainEl.prepend(box);
 }
 
 /**
@@ -377,9 +399,7 @@ async function loadDashboard() {
     }
     await renderDashboard(user, res.data || {});
   } catch (err) {
-    const msg = navigator.onLine === false
-      ? "You're offline. Reconnect to the internet to load your latest data."
-      : "Can't reach the class server right now. Wait a moment, then try again.";
+    const msg = describeApiError(err);
     if (!cached) renderErrorScreen(msg);
     else window.showEconomicsToast && window.showEconomicsToast(msg + ' Showing what you saw last.', 'error');
   }

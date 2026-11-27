@@ -9,8 +9,8 @@ export function renderMyUpdatesTab(panel, ctx) {
   const { user, data, onRefresh, seen } = ctx;
   panel.innerHTML = `
     <div class="split">
-      <div><h2 class="section-title">Quizzes</h2><div id="mem-quiz-shell"></div></div>
-      <div><h2 class="section-title">Announcements</h2><div id="mem-ann-shell"></div></div>
+      <div><h3 class="section-title">Quizzes</h3><div id="mem-quiz-shell"></div></div>
+      <div><h3 class="section-title">Announcements</h3><div id="mem-ann-shell"></div></div>
     </div>
   `;
   renderQuizScheduler(panel.querySelector('#mem-quiz-shell'), user, data.quizzes || [], onRefresh);
