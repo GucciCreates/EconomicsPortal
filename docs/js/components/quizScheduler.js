@@ -6,6 +6,7 @@
  */
 
 import { apiAddQuiz, apiDeleteQuiz } from "../api.js";
+import { esc } from "../utils.js";
 
 let _countdownIntervals = [];
 
@@ -36,16 +37,16 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
           <div id="quiz-feedback"></div>
           <form id="form-add-quiz">
             <div class="form-group">
-              <label class="form-label">Quiz / Test Title</label>
+              <label class="form-label" for="quiz-title">Quiz / Test Title</label>
               <input type="text" id="quiz-title" class="form-control" placeholder="e.g. Mock 3 — Macroeconomics" required />
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Date & Time</label>
+                <label class="form-label" for="quiz-datetime">Date & Time</label>
                 <input type="datetime-local" id="quiz-datetime" class="form-control" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Scope</label>
+                <label class="form-label" for="quiz-scope">Scope</label>
                 <select id="quiz-scope" class="form-control">
                   <option value="ALL">All Teams (Class-wide)</option>
                   <option value="Shehroz">Team Shehroz</option>
@@ -56,7 +57,7 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
               </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Topics / Notes</label>
+              <label class="form-label" for="quiz-notes">Topics / Notes</label>
               <input type="text" id="quiz-notes" class="form-control" placeholder="Chapters covered, format, duration..." />
             </div>
             <button type="submit" class="btn btn-primary" style="width: 100%;">Schedule Quiz</button>
@@ -72,14 +73,14 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
           : upcoming
               .map(
                 (q, i) => `
-          <div class="card quiz-countdown-card" style="margin-bottom: 0.75rem;" data-scheduled="${q.scheduledAt}">
+          <div class="card quiz-countdown-card" style="margin-bottom: 0.75rem;" data-scheduled="${esc(q.scheduledAt)}">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
               <div>
                 <div style="font-size: 0.75rem; color: var(--teal); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.25rem;">Upcoming</div>
-                <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.2rem;">${escHtml(q.title)}</h4>
+                <h4 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.2rem;">${esc(q.title)}</h4>
                 <div style="font-size: 0.8rem; color: var(--text-muted);">
-                  ${new Date(q.scheduledAt).toLocaleString()} · Scope: <strong>${q.scope || "ALL"}</strong>
-                  ${q.notes ? ` · ${escHtml(q.notes)}` : ""}
+                  ${esc(new Date(q.scheduledAt).toLocaleString())} · Scope: <strong>${esc(q.scope || "ALL")}</strong>
+                  ${q.notes ? ` · ${esc(q.notes)}` : ""}
                 </div>
               </div>
               <div style="text-align: right; flex-shrink: 0;">
@@ -89,7 +90,7 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
                 <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.1rem;">remaining</div>
                 ${
                   canManage
-                    ? `<button class="btn btn-danger btn-sm btn-delete-quiz" data-id="${q.id}" style="margin-top: 0.5rem;">Remove</button>`
+                    ? `<button class="btn btn-danger btn-sm btn-delete-quiz" data-id="${esc(q.id)}" style="margin-top: 0.5rem;">Remove</button>`
                     : ""
                 }
               </div>
@@ -113,10 +114,10 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
                   .map(
                     (q) => `
                   <tr>
-                    <td><strong>${escHtml(q.title)}</strong></td>
-                    <td style="font-size: 0.8rem; white-space: nowrap;">${new Date(q.scheduledAt).toLocaleDateString()}</td>
-                    <td><span class="badge" style="background: var(--bg-subtle);">${q.scope || "ALL"}</span></td>
-                    <td style="font-size: 0.8rem; color: var(--text-muted);">${escHtml(q.notes) || "—"}</td>
+                    <td><strong>${esc(q.title)}</strong></td>
+                    <td style="font-size: 0.8rem; white-space: nowrap;">${esc(new Date(q.scheduledAt).toLocaleDateString())}</td>
+                    <td><span class="badge" style="background: var(--bg-subtle);">${esc(q.scope || "ALL")}</span></td>
+                    <td style="font-size: 0.8rem; color: var(--text-muted);">${esc(q.notes) || "—"}</td>
                   </tr>
                 `
                   )
@@ -181,10 +182,10 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
             setTimeout(() => (feedback.innerHTML = ""), 3000);
             onRefresh();
           } else {
-            feedback.innerHTML = `<div class="alert alert-error">${res.error}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">${esc(res.error)}</div>`;
           }
         } catch (err) {
-          feedback.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+          feedback.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
         } finally {
           btn.disabled = false;
           btn.textContent = "Schedule Quiz";
@@ -217,11 +218,4 @@ export function cleanupQuizCountdowns() {
 
 function pad(n) {
   return String(n).padStart(2, "0");
-}
-
-function escHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }

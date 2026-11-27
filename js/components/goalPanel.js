@@ -6,6 +6,7 @@
  */
 
 import { apiSetGoal } from "../api.js";
+import { esc } from "../utils.js";
 
 /**
  * @param {HTMLElement} container
@@ -34,35 +35,35 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
 
           <div style="margin-bottom: 1rem;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 0.35rem; font-size: 0.9rem;">
-              <span>${goal.description || "Score " + target + " or above"}</span>
-              <strong class="num">${avg.toFixed(1)} / ${target}</strong>
+              <span>${esc(goal.description || "Score " + target + " or above")}</span>
+              <strong class="num">${esc(avg.toFixed(1))} / ${esc(target)}</strong>
             </div>
             <div class="progress-bar-track">
-              <div class="progress-bar-fill ${achieved ? "fill-done" : "fill-progress"}"
-                   style="width: ${progressPct}%; transition: width 0.6s ease;">
+              <div class="progress-bar-fill ${esc(achieved ? "fill-done" : "fill-progress")}"
+                   style="width: ${esc(progressPct)}%; transition: width 0.6s ease;">
               </div>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;">
-              <span>Current avg: <strong class="num">${avg.toFixed(1)}</strong></span>
-              <span>Target: <strong class="num">${target}</strong></span>
-              <span>${progressPct}% there</span>
+              <span>Current avg: <strong class="num">${esc(avg.toFixed(1))}</strong></span>
+              <span>Target: <strong class="num">${esc(target)}</strong></span>
+              <span>${esc(progressPct)}% there</span>
             </div>
           </div>
 
           <div style="display: flex; gap: 1.25rem; font-size: 0.85rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
             <div>
               <div style="color: var(--text-muted); font-size: 0.75rem;">Last Test Score</div>
-              <div class="num" style="font-weight: 700; font-size: 1.05rem;">${lastScore || "—"}</div>
+              <div class="num" style="font-weight: 700; font-size: 1.05rem;">${esc(lastScore || "—")}</div>
             </div>
             <div>
               <div style="color: var(--text-muted); font-size: 0.75rem;">Needed per Test</div>
               <div class="num" style="font-weight: 700; font-size: 1.05rem;">
-                ${target && !achieved ? Math.max(0, target - avg).toFixed(1) + " more avg" : achieved ? "Done! 🎉" : "—"}
+                ${esc(target && !achieved ? Math.max(0, target - avg).toFixed(1) + " more avg" : achieved ? "Done! 🎉" : "—")}
               </div>
             </div>
             <div>
               <div style="color: var(--text-muted); font-size: 0.75rem;">Goal Set</div>
-              <div style="font-size: 0.85rem;">${goal.setAt ? new Date(goal.setAt).toLocaleDateString() : "—"}</div>
+              <div style="font-size: 0.85rem;">${esc(goal.setAt ? new Date(goal.setAt).toLocaleDateString() : "—")}</div>
             </div>
           </div>
         </div>
@@ -75,32 +76,32 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
       <!-- Set / Update Goal Form -->
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">${goal ? "Update Goal" : "Set a Goal"}</h3>
+          <h3 class="card-title">${esc(goal ? "Update Goal" : "Set a Goal")}</h3>
         </div>
         <div id="goal-feedback"></div>
         <form id="form-set-goal">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
             <div class="form-group">
-              <label class="form-label">Target Score (0–100)</label>
+              <label class="form-label" for="goal-target">Target Score (0–100)</label>
               <input
                 type="number" id="goal-target" class="form-control"
                 min="0" max="100" step="1"
                 placeholder="e.g. 85"
-                value="${goal ? goal.target : ""}"
+                value="${esc(goal ? goal.target : "")}"
                 required
               />
             </div>
             <div class="form-group">
-              <label class="form-label">Goal Description</label>
+              <label class="form-label" for="goal-desc">Goal Description</label>
               <input
                 type="text" id="goal-desc" class="form-control"
                 placeholder="e.g. Score 85+ by next topic test"
-                value="${goal ? goal.description || "" : ""}"
+                value="${esc(goal ? goal.description || "" : "")}"
               />
             </div>
           </div>
           <button type="submit" class="btn btn-primary" style="width: 100%;">
-            ${goal ? "Update Goal" : "Set Goal"}
+            ${esc(goal ? "Update Goal" : "Set Goal")}
           </button>
         </form>
       </div>
@@ -141,10 +142,10 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
           onRefresh();
         }, 1500);
       } else {
-        feedback.innerHTML = `<div class="alert alert-error">${res.error}</div>`;
+        feedback.innerHTML = `<div class="alert alert-error">${esc(res.error)}</div>`;
       }
     } catch (err) {
-      feedback.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+      feedback.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
     } finally {
       btn.disabled = false;
       btn.textContent = goal ? "Update Goal" : "Set Goal";

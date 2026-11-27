@@ -6,6 +6,8 @@
  */
 
 import { apiAddAnnouncement, apiDeleteAnnouncement, apiPinAnnouncement } from "../api.js";
+import { esc } from "../utils.js";
+import { newPill } from "../lastSeen.js";
 
 /**
  * @param {HTMLElement} container
@@ -13,7 +15,11 @@ import { apiAddAnnouncement, apiDeleteAnnouncement, apiPinAnnouncement } from ".
  * @param {Array} announcements  — sorted by pinned desc, timestamp desc
  * @param {Function} onRefresh
  */
-export function renderAnnouncementsPanel(container, user, announcements, onRefresh) {
+/**
+ * @param {object} [opts]
+ * @param {number} [opts.since] - last-seen time; newer posts by others get a "New" pill
+ */
+export function renderAnnouncementsPanel(container, user, announcements, onRefresh, opts = {}) {
   const canManage = user.role === "instructor" || user.role === "group_leader";
   const list = [...announcements].sort((a, b) => {
     if (a.pinned && !b.pinned) return -1;
@@ -31,11 +37,11 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
           <div id="ann-feedback"></div>
           <form id="form-add-announcement">
             <div class="form-group">
-              <label class="form-label">Title</label>
+              <label class="form-label" for="ann-title">Title</label>
               <input type="text" id="ann-title" class="form-control" placeholder="e.g. Quiz 3 rescheduled" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Message</label>
+              <label class="form-label" for="ann-body">Message</label>
               <textarea id="ann-body" class="form-control" rows="3" placeholder="Announcement details..." required></textarea>
             </div>
             <div style="display: flex; gap: 0.75rem; align-items: center;">
@@ -57,28 +63,28 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
             : list
                 .map(
                   (a) => `
-          <div class="announcement-item ${a.pinned ? "pinned" : ""}" data-ann-id="${a.id}">
+          <div class="announcement-item ${esc(a.pinned ? "pinned" : "")}" data-ann-id="${esc(a.id)}">
             <div class="ann-header">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 ${a.pinned ? `<span class="pin-badge">📌 Pinned</span>` : ""}
-                <strong style="font-size: 0.95rem;">${escHtml(a.title)}</strong>
+                <strong style="font-size: 0.95rem;">${esc(a.title)}</strong>${a.postedBy !== user.name ? newPill(a.timestamp, opts.since) : ""}
               </div>
               ${
                 canManage
                   ? `
                 <div style="display: flex; gap: 0.35rem;">
-                  <button class="btn btn-secondary btn-sm btn-pin-ann" data-id="${a.id}" data-pinned="${a.pinned}" title="${a.pinned ? "Unpin" : "Pin"}">
-                    ${a.pinned ? "Unpin" : "📌"}
+                  <button class="btn btn-secondary btn-sm btn-pin-ann" data-id="${esc(a.id)}" data-pinned="${esc(a.pinned)}" title="${esc(a.pinned ? "Unpin" : "Pin")}">
+                    ${esc(a.pinned ? "Unpin" : "📌")}
                   </button>
-                  <button class="btn btn-danger btn-sm btn-delete-ann" data-id="${a.id}" title="Delete">🗑️</button>
+                  <button class="btn btn-danger btn-sm btn-delete-ann" data-id="${esc(a.id)}" title="Delete">🗑️</button>
                 </div>
               `
                   : ""
               }
             </div>
-            <p class="ann-body">${escHtml(a.body)}</p>
+            <p class="ann-body">${esc(a.body)}</p>
             <div class="ann-meta">
-              Posted by <strong>${escHtml(a.postedBy)}</strong> · ${new Date(a.timestamp).toLocaleString()}
+              Posted by <strong>${esc(a.postedBy)}</strong> · ${esc(new Date(a.timestamp).toLocaleString())}
             </div>
           </div>
         `
@@ -114,10 +120,10 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
           setTimeout(() => (feedback.innerHTML = ""), 3000);
           onRefresh();
         } else {
-          feedback.innerHTML = `<div class="alert alert-error">${res.error}</div>`;
+          feedback.innerHTML = `<div class="alert alert-error">${esc(res.error)}</div>`;
         }
       } catch (err) {
-        feedback.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+        feedback.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
       } finally {
         btn.disabled = false;
         btn.textContent = "Post Announcement";
@@ -156,12 +162,4 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
       });
     });
   }
-}
-
-function escHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }

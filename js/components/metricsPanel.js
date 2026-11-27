@@ -2,6 +2,8 @@
  * EconomicsPortal — Metrics Panel & Scorecard Helpers (v2)
  */
 
+import { esc } from "../utils.js";
+
 export function getScoreBand(score) {
   const num = Number(score);
   if (isNaN(num)) return { label: "N/A", cls: "badge-attention" };
@@ -39,9 +41,9 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
   let deltaHTML = `<span class="delta-zero">—</span>`;
   if (improvementDelta !== null) {
     if (improvementDelta > 0) {
-      deltaHTML = `<span class="delta-pos">▲ +${improvementDelta}</span>`;
+      deltaHTML = `<span class="delta-pos">▲ +${esc(improvementDelta)}</span>`;
     } else if (improvementDelta < 0) {
-      deltaHTML = `<span class="delta-neg">▼ ${improvementDelta}</span>`;
+      deltaHTML = `<span class="delta-neg">▼ ${esc(improvementDelta)}</span>`;
     } else {
       deltaHTML = `<span class="delta-zero">0.0</span>`;
     }
@@ -54,7 +56,7 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
     mockDeltaHTML = `
       <div class="metric-box">
         <div class="metric-label">Mock 1 → Mock 2</div>
-        <div class="metric-value ${mockClass}">${sign}${mockDelta}</div>
+        <div class="metric-value ${esc(mockClass)}">${esc(sign)}${esc(mockDelta)}</div>
       </div>
     `;
   }
@@ -63,11 +65,11 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
     <div class="metrics-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
         <div style="font-weight: 700; font-size: 0.95rem;">
-          ${options.title || "Performance Overview"}
+          ${esc(options.title || "Performance Overview")}
           ${atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Needs attention</span>` : ""}
         </div>
         <div>
-          ${streak > 0 ? `<span class="badge badge-outstanding">🔥 ${streak}-test streak</span>` : `<span style="font-size: 0.75rem; color: var(--text-muted);">No current streak</span>`}
+          ${streak > 0 ? `<span class="badge badge-outstanding">🔥 ${esc(streak)}-test streak</span>` : `<span style="font-size: 0.75rem; color: var(--text-muted);">No current streak</span>`}
         </div>
       </div>
 
@@ -81,22 +83,22 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
 
         <div class="metric-box">
           <div class="metric-label">Peer Rating</div>
-          <div class="metric-value">${avgPeerRating !== null ? `${avgPeerRating} <span style="font-size: 0.75rem; color: var(--text-muted);">/ 5</span>` : "—"}</div>
+          <div class="metric-value">${avgPeerRating !== null ? `${esc(avgPeerRating)} <span style="font-size: 0.75rem; color: var(--text-muted);">/ 5</span>` : "—"}</div>
         </div>
 
         <div class="metric-box">
           <div class="metric-label">Doubts Raised</div>
-          <div class="metric-value">${doubtCount}</div>
+          <div class="metric-value">${esc(doubtCount)}</div>
         </div>
 
         <div class="metric-box" style="grid-column: span 2;">
           <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
             <span class="metric-label">Preview Completion</span>
-            <strong>${previewRate !== null ? previewRate + "%" : "—"}</strong>
+            <strong>${esc(previewRate !== null ? previewRate + "%" : "—")}</strong>
           </div>
           ${
             previewRate !== null
-              ? `<div class="progress-bar-wrap"><div class="progress-bar-fill ${getProgressFillClass(previewRate)}" style="width: ${previewRate}%;"></div></div>`
+              ? `<div class="progress-bar-wrap"><div class="progress-bar-fill ${esc(getProgressFillClass(previewRate))}" style="width: ${esc(previewRate)}%;"></div></div>`
               : ""
           }
         </div>
@@ -104,11 +106,11 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
         <div class="metric-box" style="grid-column: span 2;">
           <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
             <span class="metric-label">Punctuality Rate</span>
-            <strong>${punctualityRate !== null ? punctualityRate + "%" : "—"}</strong>
+            <strong>${esc(punctualityRate !== null ? punctualityRate + "%" : "—")}</strong>
           </div>
           ${
             punctualityRate !== null
-              ? `<div class="progress-bar-wrap"><div class="progress-bar-fill ${getProgressFillClass(punctualityRate)}" style="width: ${punctualityRate}%;"></div></div>`
+              ? `<div class="progress-bar-wrap"><div class="progress-bar-fill ${esc(getProgressFillClass(punctualityRate))}" style="width: ${esc(punctualityRate)}%;"></div></div>`
               : ""
           }
         </div>

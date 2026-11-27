@@ -4,6 +4,7 @@
  */
 
 import { getScoreBand } from "./metricsPanel.js";
+import { esc } from "../utils.js";
 
 /**
  * Open the printable report card modal for a student.
@@ -94,15 +95,15 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
         <div class="report-profile-grid">
           <div class="report-field">
             <span class="report-label">Student Name</span>
-            <span class="report-val name">${info.name}</span>
+            <span class="report-val name">${esc(info.name)}</span>
           </div>
           <div class="report-field">
             <span class="report-label">Cohort Team</span>
-            <span class="report-val">Team ${info.team}</span>
+            <span class="report-val">Team ${esc(info.team)}</span>
           </div>
           <div class="report-field">
             <span class="report-label">Class Standing</span>
-            <span class="report-val"><span class="badge ${band.cls}">${band.label}</span></span>
+            <span class="report-val"><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></span>
           </div>
           <div class="report-field">
             <span class="report-label">Status</span>
@@ -114,22 +115,22 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
         <div class="report-kpis">
           <div class="report-kpi">
             <span class="rk-label">Cumulative Average</span>
-            <span class="rk-val num" style="color: ${band.barColor};">${avg.toFixed(1)}</span>
+            <span class="rk-val num" style="color: ${esc(band.barColor)};">${esc(avg.toFixed(1))}</span>
             <span class="rk-sub">Scale: 0–100</span>
           </div>
           <div class="report-kpi">
             <span class="rk-label">Attendance Rate</span>
-            <span class="rk-val num">${attRate}</span>
+            <span class="rk-val num">${esc(attRate)}</span>
             <span class="rk-sub">Mock & lecture presence</span>
           </div>
           <div class="report-kpi">
             <span class="rk-label">Assessment Streak</span>
-            <span class="rk-val num">${streak > 0 ? "🔥 " + streak : "—"}</span>
+            <span class="rk-val num">${esc(streak > 0 ? "🔥 " + streak : "—")}</span>
             <span class="rk-sub">Consecutive passes</span>
           </div>
           <div class="report-kpi">
             <span class="rk-label">Peer Evaluation</span>
-            <span class="rk-val num">${peerRating}</span>
+            <span class="rk-val num">${esc(peerRating)}</span>
             <span class="rk-sub">Cohort rating</span>
           </div>
           <div class="report-kpi">
@@ -166,14 +167,14 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
                         const mBand = getScoreBand(m.quizScore);
                         return `
                       <tr>
-                        <td><strong>${m.cycle}</strong></td>
-                        <td>${m.mockNumber || "—"}</td>
-                        <td><strong class="num">${m.quizScore}</strong> / 100</td>
-                        <td>${m.submission || "Yes"}</td>
-                        <td>${m.attendance || "100%"}</td>
-                        <td>${m.previewDone || "Yes"}</td>
-                        <td>${m.punctual || "Yes"}</td>
-                        <td><span class="badge ${mBand.cls}">${mBand.label}</span></td>
+                        <td><strong>${esc(m.cycle)}</strong></td>
+                        <td>${esc(m.mockNumber || "—")}</td>
+                        <td><strong class="num">${esc(m.quizScore)}</strong> / 100</td>
+                        <td>${esc(m.submission || "Yes")}</td>
+                        <td>${esc(m.attendance || "100%")}</td>
+                        <td>${esc(m.previewDone || "Yes")}</td>
+                        <td>${esc(m.punctual || "Yes")}</td>
+                        <td><span class="badge ${esc(mBand.cls)}">${esc(mBand.label)}</span></td>
                       </tr>
                     `;
                       })
@@ -187,7 +188,7 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
         <div class="report-section">
           <h4 class="report-section-title">Faculty Assessment & Growth Roadmap</h4>
           <div class="report-remarks-box">
-            <p>${remarks}</p>
+            <p>${esc(remarks)}</p>
           </div>
         </div>
 

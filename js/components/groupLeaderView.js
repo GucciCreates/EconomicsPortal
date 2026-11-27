@@ -9,11 +9,11 @@ import {
   apiEditMark,
   apiDeleteMark,
   apiUpdateTaskStatus,
-  apiUpdateEscalationStatus,
   apiUpdatePin,
   apiGetUsers,
 } from '../api.js';
 import { getScoreBand } from './metricsPanel.js';
+import { esc, linkHtml } from '../utils.js';
 import { TEAM_ROSTER } from './teamLeaderView.js';
 import {
   renderTeamAveragesChart,
@@ -27,6 +27,10 @@ import { renderLeaderboard } from './leaderboard.js';
 import { renderExportToolbar } from './exportUtils.js';
 import { openReportCardModal } from './reportCardModal.js';
 import { renderMentorshipPanel } from './mentorshipPanel.js';
+import { renderActivityLog } from './activityLog.js';
+import { renderSubmissionTracker } from './submissionTracker.js';
+import { renderDoubtThreads, countDoubtUpdates } from './doubtThread.js';
+import { loadLastSeen, markSeen, isNewer } from '../lastSeen.js';
 
 export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -35,6 +39,9 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   const isAssistant = user.role === 'assistant';
   const isGroupLeader = user.role === 'group_leader';
   const canEdit = isInstructor || isGroupLeader || isAssistant;
+  // Matches the server: only the instructor and group leader manage tasks
+  // and resolve doubts (the assistant grades but does not assign work).
+  const canLead = isInstructor || isGroupLeader;
 
   const tasks = data.tasks || [];
   const marks = data.marks || [];
@@ -83,7 +90,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
         <div>
           <h2 style="font-size: 1.35rem; font-weight: 700;">
-            ${isInstructor ? 'Instructor Workspace — Dr. Numan' : isAssistant ? 'Teaching Assistant — ' + user.name : 'Group Leader — ' + user.name}
+            ${esc(isInstructor ? 'Instructor Workspace — Dr. Numan' : isAssistant ? 'Teaching Assistant — ' + user.name : 'Group Leader — ' + user.name)}
           </h2>
           <p style="color: var(--text-muted); font-size: 0.875rem;">
             ${
@@ -113,20 +120,20 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       <div class="dashboard-hero-row">
         <div class="dashboard-hero-copy">
           <h3>Today’s executive focus</h3>
-          <p>${atRiskMembers.length > 0 ? `${atRiskMembers.length} students need support attention today.` : 'Everything is tracking smoothly. Focus on momentum and review.'}</p>
+          <p>${atRiskMembers.length > 0 ? `${esc(atRiskMembers.length)} students need support attention today.` : 'Everything is tracking smoothly. Focus on momentum and review.'}</p>
         </div>
         <div class="dashboard-microstats">
           <div class="microstat-box">
             <span>Strongest</span>
-            <strong>${Object.keys(teamAverages).length ? Object.entries(teamAverages).sort((a, b) => b[1] - a[1])[0][0] : 'N/A'}</strong>
+            <strong>${esc(Object.keys(teamAverages).length ? Object.entries(teamAverages).sort((a, b) => b[1] - a[1])[0][0] : 'N/A')}</strong>
           </div>
           <div class="microstat-box">
             <span>Open</span>
-            <strong>${openTasks + openDoubts}</strong>
+            <strong>${esc(openTasks + openDoubts)}</strong>
           </div>
           <div class="microstat-box">
             <span>Completion</span>
-            <strong>${subRate}%</strong>
+            <strong>${esc(subRate)}%</strong>
           </div>
         </div>
       </div>
@@ -140,37 +147,38 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     <div class="kpi-grid">
       <div class="kpi-card">
         <span class="kpi-label">Class Avg Score</span>
-        <span class="kpi-val num" style="color: var(--teal);">${classAvg}</span>
-        <span class="kpi-sub">Across ${validScores.length} recorded tests</span>
+        <span class="kpi-val num" style="color: var(--teal);">${esc(classAvg)}</span>
+        <span class="kpi-sub">Across ${esc(validScores.length)} recorded tests</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">Submission Rate</span>
-        <span class="kpi-val num">${subRate}%</span>
-        <span class="kpi-sub">${subYesCount} on-time assignments</span>
+        <span class="kpi-val num">${esc(subRate)}%</span>
+        <span class="kpi-sub">${esc(subYesCount)} on-time assignments</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">Avg Attendance</span>
-        <span class="kpi-val num">${attRate}%</span>
+        <span class="kpi-val num">${esc(attRate)}%</span>
         <span class="kpi-sub">Mock & lecture presence</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">At-Risk Students</span>
-        <span class="kpi-val num" style="color: ${atRiskMembers.length > 0 ? 'var(--red)' : 'var(--teal);'}">${atRiskMembers.length}</span>
-        <span class="kpi-sub">${atRiskMembers.length > 0 ? 'Require intervention' : 'All on track'}</span>
+        <span class="kpi-val num" style="color: ${esc(atRiskMembers.length > 0 ? 'var(--red)' : 'var(--teal);')}">${esc(atRiskMembers.length)}</span>
+        <span class="kpi-sub">${esc(atRiskMembers.length > 0 ? 'Require intervention' : 'All on track')}</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">Open Tasks</span>
-        <span class="kpi-val num">${openTasks}</span>
+        <span class="kpi-val num">${esc(openTasks)}</span>
         <span class="kpi-sub">Pending completion</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">Pending Doubts</span>
-        <span class="kpi-val num" style="color: ${openDoubts > 0 ? 'var(--amber)' : 'var(--text-main);'}">${openDoubts}</span>
+        <span class="kpi-val num" style="color: ${esc(openDoubts > 0 ? 'var(--amber)' : 'var(--text-main);')}">${esc(openDoubts)}</span>
         <span class="kpi-sub">Awaiting instructor reply</span>
       </div>
     </div>
 
-    <!-- Tab Content Shell -->
+    <!-- Tab bar and content are separate so the tab bar sits below the KPI tiles. -->
+    <div id="gl-tab-nav"></div>
     <div id="gl-tab-content"></div>
   `;
 
@@ -198,28 +206,49 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       icon: '📢',
     },
     { id: 'tasks', label: `Tasks & Submissions (${tasks.length})`, icon: '📝' },
+    { id: 'tracker', label: 'Submission Tracker', icon: '📋' },
     { id: 'doubts', label: `Doubts & Escalations (${openDoubts})`, icon: '❓' },
     { id: 'export', label: 'Export CSV', icon: '📥' },
   ];
 
+  if (canLead) {
+    tabs.push({ id: 'activity', label: 'Activity Log', icon: '🧾' });
+  }
   if (isGroupLeader) {
     tabs.push({ id: 'pins', label: 'Member Access & PINs', icon: '🔑' });
   }
 
+  // "New since your last visit" badges
+  const seen = loadLastSeen(user, ['announcements', 'doubts']);
+  const badges = {
+    announcements: announcements.filter((a) => a.postedBy !== user.name && isNewer(a.timestamp, seen.announcements)).length,
+    doubts: countDoubtUpdates(escalations, seen.doubts, user),
+  };
+
   function switchTab(tabId) {
+    if (tabId in badges) {
+      markSeen(user, tabId);
+      tabNav.setBadge(tabId, 0);
+    }
     if (tabId === 'ledger') renderLedgerTab(contentShell);
     else if (tabId === 'mentorship') renderMentorshipTab(contentShell);
     else if (tabId === 'analytics') renderAnalyticsTab(contentShell);
     else if (tabId === 'quizzes') renderQuizzesTab(contentShell);
     else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
     else if (tabId === 'tasks') renderTasksTab(contentShell);
+    else if (tabId === 'tracker')
+      renderSubmissionTracker(contentShell, { tasks, submissions, roster: data.roster || [] });
     else if (tabId === 'doubts') renderDoubtsTab(contentShell);
     else if (tabId === 'export') renderExportTab(contentShell);
     else if (tabId === 'pins') renderPinsTab(contentShell);
+    else if (tabId === 'activity') renderActivityLog(contentShell);
   }
 
-  createTabNav(container.querySelector('.kpi-grid'), tabs, switchTab);
-  switchTab('ledger');
+  const tabNav = createTabNav(container.querySelector('#gl-tab-nav'), tabs, switchTab, {
+    storageKey: `economics_portal_tab:${user.name}`,
+  });
+  Object.entries(badges).forEach(([id, n]) => tabNav.setBadge(id, n));
+  switchTab(tabNav.initialTab);
 
   // ─────────────────────────────────────────────────────────────────────────
   // TAB 1: LEDGER & OVERVIEW
@@ -231,7 +260,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
         atRiskMembers.length > 0
           ? `
         <div class="at-risk-panel">
-          <div class="at-risk-title">⚠️ At-Risk Alert (${atRiskMembers.length} members require immediate support)</div>
+          <div class="at-risk-title">⚠️ At-Risk Alert (${esc(atRiskMembers.length)} members require immediate support)</div>
           <p style="font-size: 0.85rem; margin-bottom: 0.6rem;">
             These students scored below 50 or missed submissions in consecutive units. Click to highlight in ledger:
           </p>
@@ -240,8 +269,8 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               .map((m) => {
                 const name = m.member || m.name;
                 return `
-                <span class="badge badge-support" style="padding: 0.35rem 0.65rem; cursor: pointer;" data-followup="${name}">
-                  ${name} (Team ${m.team}) • Jump to entry ↗
+                <span class="badge badge-support" style="padding: 0.35rem 0.65rem; cursor: pointer;" data-followup="${esc(name)}">
+                  ${esc(name)} (Team ${esc(m.team)}) • Jump to entry ↗
                 </span>
               `;
               })
@@ -266,14 +295,14 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               const band = avg !== null ? getScoreBand(avg) : null;
               const count = (TEAM_ROSTER[t] || []).length;
               return `
-              <div class="stat-tile team-filter-card" data-team="${t}">
-                <div class="stat-title">Team ${t}</div>
-                <div class="stat-val num">${avg !== null ? avg : '—'}</div>
+              <div class="stat-tile team-filter-card" data-team="${esc(t)}">
+                <div class="stat-title">Team ${esc(t)}</div>
+                <div class="stat-val num">${esc(avg !== null ? avg : '—')}</div>
                 <div style="margin-top: 0.35rem;">
-                  ${band ? `<span class="badge ${band.cls}">${band.label}</span>` : `<span style="color: var(--text-muted); font-size: 0.75rem;">No scores</span>`}
+                  ${band ? `<span class="badge ${esc(band.cls)}">${esc(band.label)}</span>` : `<span style="color: var(--text-muted); font-size: 0.75rem;">No scores</span>`}
                 </div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem;">
-                  ${count} registered members
+                  ${esc(count)} registered members
                 </div>
               </div>
             `;
@@ -328,23 +357,23 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
         <div class="card" style="margin-bottom: 1.5rem;">
           <div class="card-header">
             <h3 class="card-title">Enter New Student Marks</h3>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">Logged under: ${user.name}</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Logged under: ${esc(user.name)}</span>
           </div>
           <div id="gl-mark-feedback"></div>
           <form id="form-gl-add-mark">
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Student</label>
+                <label class="form-label" for="gl-mark-member">Student</label>
                 <select id="gl-mark-member" class="form-control" required>
                   <option value="">-- Choose Member --</option>
                   ${Object.keys(TEAM_ROSTER)
                     .map(
                       (teamName) => `
-                    <optgroup label="Team ${teamName}">
+                    <optgroup label="Team ${esc(teamName)}">
                       ${TEAM_ROSTER[teamName]
                         .map(
                           (mem) =>
-                            `<option value="${mem}" data-team="${teamName}">${mem} (Team ${teamName})</option>`,
+                            `<option value="${esc(mem)}" data-team="${esc(teamName)}">${esc(mem)} (Team ${esc(teamName)})</option>`,
                         )
                         .join('')}
                     </optgroup>
@@ -354,33 +383,33 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Tested Topic / Unit</label>
+                <label class="form-label" for="gl-mark-cycle">Tested Topic / Unit</label>
                 <input type="text" id="gl-mark-cycle" class="form-control" placeholder="e.g. Unit 2: Monetary Policy" value="Unit 2: Monetary Policy" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Mock #</label>
+                <label class="form-label" for="gl-mark-mock">Mock #</label>
                 <input type="number" id="gl-mark-mock" class="form-control" placeholder="Optional" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Quiz Score (0-100)</label>
+                <label class="form-label" for="gl-mark-quiz">Quiz Score (0-100)</label>
                 <input type="number" id="gl-mark-quiz" class="form-control" min="0" max="100" placeholder="e.g. 88" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Submission</label>
+                <label class="form-label" for="gl-mark-sub">Submission</label>
                 <select id="gl-mark-sub" class="form-control">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Attendance</label>
+                <label class="form-label" for="gl-mark-att">Attendance</label>
                 <input type="text" id="gl-mark-att" class="form-control" value="100%" />
               </div>
               <div class="form-group">
-                <label class="form-label">Preview Done</label>
+                <label class="form-label" for="gl-mark-prev">Preview Done</label>
                 <select id="gl-mark-prev" class="form-control">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
@@ -390,18 +419,18 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Peer Rating (1-5)</label>
+                <label class="form-label" for="gl-mark-peer">Peer Rating (1-5)</label>
                 <input type="number" step="0.1" min="1" max="5" id="gl-mark-peer" class="form-control" placeholder="4.5" />
               </div>
               <div class="form-group">
-                <label class="form-label">Punctual</label>
+                <label class="form-label" for="gl-mark-punctual">Punctual</label>
                 <select id="gl-mark-punctual" class="form-control">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Performance Notes</label>
+                <label class="form-label" for="gl-mark-notes">Performance Notes</label>
                 <input type="text" id="gl-mark-notes" class="form-control" placeholder="Strengths, focus areas..." />
               </div>
             </div>
@@ -418,7 +447,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     wrap.querySelectorAll('[data-followup]').forEach((badge) => {
       badge.addEventListener('click', () => {
         const memName = badge.getAttribute('data-followup');
-        const targetRow = wrap.querySelector(`tr[data-member="${memName}"]`);
+        const targetRow = wrap.querySelector(`tr[data-member="${CSS.escape(memName)}"]`);
         if (targetRow) {
           targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
           targetRow.classList.add('row-updated');
@@ -547,7 +576,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
             });
 
             if (res.ok) {
-              feedback.innerHTML = `<div class="alert alert-success">Mark recorded for ${member}!</div>`;
+              feedback.innerHTML = `<div class="alert alert-success">Mark recorded for ${esc(member)}!</div>`;
               window.showEconomicsToast(
                 `Mark recorded for ${member}.`,
                 'success',
@@ -556,14 +585,14 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               setTimeout(() => (feedback.innerHTML = ''), 3000);
               onRefresh();
             } else {
-              feedback.innerHTML = `<div class="alert alert-error">${res.error || 'Failed to save mark.'}</div>`;
+              feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Failed to save mark.')}</div>`;
               window.showEconomicsToast(
                 res.error || 'Failed to save mark.',
                 'error',
               );
             }
           } catch (err) {
-            feedback.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
             window.showEconomicsToast(err.message, 'error');
           } finally {
             btn.disabled = false;
@@ -640,6 +669,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       user,
       announcements,
       onRefresh,
+      { since: seen.announcements },
     );
   }
 
@@ -649,7 +679,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   function renderTasksTab(wrap) {
     wrap.innerHTML = `
       ${
-        canEdit
+        canLead
           ? `
         <div class="card" style="margin-bottom: 1.25rem;">
           <div class="card-header"><h3 class="card-title">Assign New Class Task</h3></div>
@@ -657,11 +687,11 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
           <form id="form-gl-add-task">
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Task Title</label>
+                <label class="form-label" for="gl-task-title">Task Title</label>
                 <input type="text" id="gl-task-title" class="form-control" placeholder="e.g. Problem Set: Monetary Policy Transmission" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Assign To</label>
+                <label class="form-label" for="gl-task-team">Assign To</label>
                 <select id="gl-task-team" class="form-control" required>
                   <option value="ALL">All Teams (Class-wide)</option>
                   <option value="Shehroz">Team Shehroz</option>
@@ -671,18 +701,18 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Due Date</label>
+                <label class="form-label" for="gl-task-due">Due Date</label>
                 <input type="date" id="gl-task-due" class="form-control" required />
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Description / Instructions</label>
+              <label class="form-label" for="gl-task-desc">Description / Instructions</label>
               <textarea id="gl-task-desc" class="form-control" rows="2" placeholder="Task requirements, questions, and expectations..." required></textarea>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Google Drive Link (Resource)</label>
+              <label class="form-label" for="gl-task-file">Google Drive Link (Resource)</label>
               <input type="url" id="gl-task-file" class="form-control" placeholder="https://drive.google.com/..." />
             </div>
 
@@ -694,7 +724,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       }
 
       <div class="card" style="margin-bottom: 1.25rem;">
-        <div class="card-header"><h3 class="card-title">All Assigned Tasks (${tasks.length})</h3></div>
+        <div class="card-header"><h3 class="card-title">All Assigned Tasks (${esc(tasks.length)})</h3></div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
@@ -703,7 +733,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 <th>Team</th>
                 <th>Due</th>
                 <th>Status</th>
-                ${canEdit ? `<th>Actions</th>` : ''}
+                ${canLead ? `<th>Actions</th>` : ''}
               </tr>
             </thead>
             <tbody>
@@ -716,21 +746,21 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                         return `
                       <tr>
                         <td>
-                          <strong>${task.title}</strong>
-                          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">${task.description || ''}</p>
-                          ${task.fileUrl ? `<a href="${task.fileUrl}" target="_blank" style="font-size: 0.75rem;">Drive Link ↗</a>` : ''}
+                          <strong>${esc(task.title)}</strong>
+                          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">${esc(task.description || '')}</p>
+                          ${linkHtml(task.fileUrl, 'Drive Link ↗', 'style="font-size: 0.75rem;"')}
                         </td>
-                        <td><span class="badge" style="background-color: var(--bg-subtle);">${task.team}</span></td>
-                        <td style="font-size: 0.8rem; white-space: nowrap;">${task.dueDate || '—'}</td>
-                        <td><span class="badge ${isDone ? 'badge-done' : 'badge-open'}">${task.status}</span></td>
+                        <td><span class="badge" style="background-color: var(--bg-subtle);">${esc(task.team)}</span></td>
+                        <td style="font-size: 0.8rem; white-space: nowrap;">${esc(task.dueDate || '—')}</td>
+                        <td><span class="badge ${esc(isDone ? 'badge-done' : 'badge-open')}">${esc(task.status)}</span></td>
                         ${
-                          canEdit
+                          canLead
                             ? `
                           <td>
                             <div style="display: flex; gap: 0.35rem; align-items: center;">
-                              <button class="btn btn-secondary btn-sm btn-edit-task" data-id="${task.id}" title="Edit task">✏️</button>
-                              <button class="btn btn-secondary btn-sm btn-toggle-task" data-id="${task.id}" data-current="${task.status}">
-                                ${isDone ? 'Reopen' : 'Done'}
+                              <button class="btn btn-secondary btn-sm btn-edit-task" data-id="${esc(task.id)}" title="Edit task">✏️</button>
+                              <button class="btn btn-secondary btn-sm btn-toggle-task" data-id="${esc(task.id)}" data-current="${esc(task.status)}">
+                                ${esc(isDone ? 'Reopen' : 'Done')}
                               </button>
                             </div>
                           </td>
@@ -748,7 +778,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       </div>
 
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Student Submissions Log (${submissions.length})</h3></div>
+        <div class="card-header"><h3 class="card-title">Student Submissions Log (${esc(submissions.length)})</h3></div>
         <div class="table-responsive">
           <table class="data-table">
             <thead>
@@ -769,12 +799,12 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                       .map(
                         (s) => `
                     <tr>
-                      <td><strong>${s.member}</strong></td>
-                      <td><span class="badge" style="background-color: var(--bg-subtle);">${s.team}</span></td>
-                      <td style="font-size: 0.8rem; font-family: monospace;">${s.taskId}</td>
-                      <td>${s.content || 'Completed'}</td>
-                      <td>${s.fileUrl ? `<a href="${s.fileUrl}" target="_blank">Drive Link ↗</a>` : '—'}</td>
-                      <td style="font-size: 0.8rem; color: var(--text-muted);">${new Date(s.timestamp).toLocaleDateString()}</td>
+                      <td><strong>${esc(s.member)}</strong></td>
+                      <td><span class="badge" style="background-color: var(--bg-subtle);">${esc(s.team)}</span></td>
+                      <td style="font-size: 0.8rem; font-family: monospace;">${esc(s.taskId)}</td>
+                      <td>${esc(s.content || 'Completed')}</td>
+                      <td>${linkHtml(s.fileUrl, 'Drive Link ↗', '', '—')}</td>
+                      <td style="font-size: 0.8rem; color: var(--text-muted);">${esc(new Date(s.timestamp).toLocaleDateString())}</td>
                     </tr>
                   `,
                       )
@@ -787,7 +817,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     `;
 
     // Attach task handlers
-    if (canEdit) {
+    if (canLead) {
       const taskForm = wrap.querySelector('#form-gl-add-task');
       if (taskForm) {
         taskForm.addEventListener('submit', async (e) => {
@@ -824,14 +854,14 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               setTimeout(() => (feedback.innerHTML = ''), 3000);
               onRefresh();
             } else {
-              feedback.innerHTML = `<div class="alert alert-error">${res.error || 'Failed to create task.'}</div>`;
+              feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Failed to create task.')}</div>`;
               window.showEconomicsToast(
                 res.error || 'Failed to create task.',
                 'error',
               );
             }
           } catch (err) {
-            feedback.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">${esc(err.message)}</div>`;
             window.showEconomicsToast(err.message, 'error');
           } finally {
             btn.disabled = false;
@@ -899,81 +929,13 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   // TAB 6: DOUBTS & ESCALATIONS
   // ─────────────────────────────────────────────────────────────────────────
   function renderDoubtsTab(wrap) {
-    const sorted = [...escalations].sort((a, b) => {
-      if (a.severity === 'severe' && b.severity !== 'severe') return -1;
-      if (a.severity !== 'severe' && b.severity === 'severe') return 1;
-      if (a.status === 'open' && b.status === 'closed') return -1;
-      if (a.status === 'closed' && b.status === 'open') return 1;
-      return new Date(b.timestamp) - new Date(a.timestamp);
-    });
-
-    wrap.innerHTML = `
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Student Doubts & Escalations Log (${escalations.length})</h3>
-        </div>
-        <div>
-          ${
-            sorted.length === 0
-              ? `<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No questions or issues reported.</p>`
-              : sorted
-                  .map((esc) => {
-                    const isSevere = esc.severity === 'severe';
-                    const isClosed = esc.status === 'closed';
-                    return `
-                  <div class="escalation-item ${isSevere ? 'severe' : ''}" style="margin-bottom: 0.85rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-                      <h4 style="font-size: 0.95rem; font-weight: 700;">${esc.topic}</h4>
-                      <div style="display: flex; gap: 0.35rem; align-items: center;">
-                        ${isSevere ? `<span class="badge badge-atrisk">URGENT</span>` : ''}
-                        <span class="badge ${isClosed ? 'badge-closed' : 'badge-open'}">${esc.status}</span>
-                      </div>
-                    </div>
-                    <p style="font-size: 0.85rem; margin-bottom: 0.45rem;">${esc.details}</p>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted);">
-                      <span>From: <strong>${esc.raisedBy}</strong> (Team ${esc.team}) • ${new Date(esc.timestamp).toLocaleDateString()}</span>
-                      ${
-                        !isClosed && canEdit
-                          ? `
-                        <button class="btn btn-teal btn-sm btn-resolve-esc" data-id="${esc.id}">
-                          Mark Resolved ✓
-                        </button>
-                      `
-                          : ''
-                      }
-                    </div>
-                  </div>
-                `;
-                  })
-                  .join('')
-          }
-        </div>
-      </div>
-    `;
-
-    wrap.querySelectorAll('.btn-resolve-esc').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const escId = btn.getAttribute('data-id');
-        btn.disabled = true;
-        try {
-          const res = await apiUpdateEscalationStatus(
-            escId,
-            'closed',
-            user.role,
-          );
-          if (res.ok) {
-            window.showEconomicsToast(
-              'Escalation marked as resolved.',
-              'success',
-            );
-            onRefresh();
-          } else {
-            window.showEconomicsToast(res.error || 'Update failed.', 'error');
-          }
-        } catch (err) {
-          window.showEconomicsToast(err.message, 'error');
-        }
-      });
+    renderDoubtThreads(wrap, {
+      escalations,
+      user,
+      canReply: true,
+      canResolve: canLead,
+      since: seen.doubts,
+      onRefresh,
     });
   }
 
@@ -1012,17 +974,19 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       <div class="card">
         <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <h3 class="card-title">🔑 Member Access & Secret PIN Directory</h3>
-            <span style="font-size: 0.8rem; color: var(--text-muted);">Confidential • Group Leader Administrative Rights</span>
+            <h3 class="card-title">🔑 Member Access & PIN Resets</h3>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Group Leader administrative rights</span>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <input type="text" id="pins-search" class="form-control" placeholder="🔍 Search member..." style="width: 170px; padding: 0.35rem 0.65rem; font-size: 0.8rem;" />
-            <button class="btn btn-secondary btn-sm" id="btn-toggle-all-pins">👁️ Reveal All</button>
+            <label class="sr-only" for="pins-search">Search members</label>
+            <input type="search" id="pins-search" class="form-control" placeholder="🔍 Search member..." style="width: 170px; padding: 0.35rem 0.65rem; font-size: 0.8rem;" />
           </div>
         </div>
 
-        <div class="alert" style="background-color: var(--purple-soft); color: var(--purple); font-size: 0.85rem; margin-bottom: 1.25rem;">
-          🛡️ <strong>Private Security Policy:</strong> Member credentials are not public. Only you as Group Leader can view, grant, or reset individual 4-digit PINs.
+        <div class="alert alert-info" style="font-size: 0.85rem; margin-bottom: 1.25rem;">
+          🛡️ <strong>PINs are stored encrypted (hashed) and nobody — including you — can see them.</strong>
+          If someone forgets theirs, reset it here and tell them the new PIN in person. Resetting signs them out everywhere.
+          Everyone can also change their own PIN from the account menu.
         </div>
 
         <div id="pins-table-loading" style="text-align: center; padding: 2rem;">
@@ -1036,7 +1000,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 <th>Member Name</th>
                 <th>Role</th>
                 <th>Team</th>
-                <th>Private PIN</th>
+                <th>PIN</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -1045,17 +1009,15 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
         </div>
       </div>
 
-      <!-- PIN Change Modal Container -->
+      <!-- PIN Reset Modal Container -->
       <div id="pin-modal-shell"></div>
     `;
 
     let roster = data.users || [];
     if (!roster.length) {
       try {
-        const uRes = await apiGetUsers(user.role);
-        if (uRes.ok && uRes.users) {
-          roster = uRes.users;
-        }
+        const uRes = await apiGetUsers();
+        if (uRes.ok && uRes.users) roster = uRes.users;
       } catch (e) {
         console.warn('Could not fetch users list:', e);
       }
@@ -1065,45 +1027,34 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     const tableWrap = wrap.querySelector('#pins-table-wrap');
     const tbody = wrap.querySelector('#pins-tbody');
     const searchInput = wrap.querySelector('#pins-search');
-    const toggleAllBtn = wrap.querySelector('#btn-toggle-all-pins');
 
     loadingEl.style.display = 'none';
     tableWrap.style.display = 'block';
-
-    let revealAll = false;
 
     function renderRosterRows(list) {
       if (!list.length) {
         return `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No members found.</td></tr>`;
       }
       return list
-        .map((m) => {
-          const pinStr = String(
-            m.pin !== undefined && m.pin !== null ? m.pin : '0000',
-          ).padStart(4, '0');
-          return `
-          <tr data-member="${m.name}">
-            <td><strong>${m.name}</strong></td>
-            <td><span class="role-pill role-${m.role}">${m.role.replace('_', ' ')}</span></td>
-            <td><span class="badge" style="background-color: var(--bg-subtle);">${m.team}</span></td>
+        .map(
+          (m) => `
+          <tr data-member="${esc(m.name)}">
+            <td><strong>${esc(m.name)}</strong></td>
+            <td><span class="role-pill role-${esc(m.role)}">${esc(String(m.role).replace('_', ' '))}</span></td>
+            <td><span class="badge" style="background-color: var(--bg-subtle);">${esc(m.team)}</span></td>
+            <td>${
+              m.hasPin
+                ? `<span class="badge badge-done">Set ✓</span>`
+                : `<span class="badge badge-atrisk">Not set</span>`
+            }</td>
             <td>
-              <div style="display: flex; align-items: center; gap: 0.45rem;">
-                <span class="pin-display num" style="font-family: monospace; font-size: 0.95rem; font-weight: 700; min-width: 45px;">
-                  ${revealAll ? pinStr : '••••'}
-                </span>
-                <button type="button" class="btn btn-secondary btn-sm btn-peek-pin" data-pin="${pinStr}" style="padding: 0.15rem 0.45rem; font-size: 0.75rem;">
-                  👁️
-                </button>
-              </div>
-            </td>
-            <td>
-              <button class="btn btn-primary btn-sm btn-change-member-pin" data-name="${m.name}" data-team="${m.team}" data-current-pin="${pinStr}">
+              <button class="btn btn-primary btn-sm btn-change-member-pin" data-name="${esc(m.name)}" data-team="${esc(m.team)}">
                 🔑 Reset PIN
               </button>
             </td>
           </tr>
-        `;
-        })
+        `,
+        )
         .join('');
     }
 
@@ -1111,69 +1062,41 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
       const filtered = roster.filter(
         (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.team.toLowerCase().includes(q) ||
-          m.role.toLowerCase().includes(q),
+          String(m.name).toLowerCase().includes(q) ||
+          String(m.team).toLowerCase().includes(q) ||
+          String(m.role).toLowerCase().includes(q),
       );
       tbody.innerHTML = renderRosterRows(filtered);
-      attachPinActions();
+      tbody.querySelectorAll('.btn-change-member-pin').forEach((btn) => {
+        btn.addEventListener('click', () =>
+          openChangePinModal(btn.getAttribute('data-name'), btn.getAttribute('data-team')),
+        );
+      });
     }
 
     refreshRosterTable();
+    if (searchInput) searchInput.addEventListener('input', refreshRosterTable);
 
-    if (searchInput) {
-      searchInput.addEventListener('input', refreshRosterTable);
-    }
-
-    toggleAllBtn.addEventListener('click', () => {
-      revealAll = !revealAll;
-      toggleAllBtn.textContent = revealAll ? '🔒 Mask All' : '👁️ Reveal All';
-      refreshRosterTable();
-    });
-
-    function attachPinActions() {
-      wrap.querySelectorAll('.btn-peek-pin').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const span = btn.parentElement.querySelector('.pin-display');
-          const realPin = btn.getAttribute('data-pin');
-          if (span.textContent.trim() === '••••') {
-            span.textContent = realPin;
-          } else {
-            span.textContent = '••••';
-          }
-        });
-      });
-
-      wrap.querySelectorAll('.btn-change-member-pin').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const targetName = btn.getAttribute('data-name');
-          const targetTeam = btn.getAttribute('data-team');
-          const currentPin = btn.getAttribute('data-current-pin');
-          openChangePinModal(targetName, targetTeam, currentPin);
-        });
-      });
-    }
-
-    function openChangePinModal(targetName, targetTeam, currentPin) {
+    function openChangePinModal(targetName, targetTeam) {
       const modalShell = wrap.querySelector('#pin-modal-shell');
       modalShell.innerHTML = `
         <div class="modal-overlay" id="pin-modal-overlay">
-          <div class="modal-content" style="max-width: 420px;">
+          <div class="modal-content" style="max-width: 420px;" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
               <div>
-                <h3 style="font-size: 1.15rem; font-weight: 700;">Grant / Change PIN</h3>
+                <h3 id="pin-modal-title" style="font-size: 1.15rem; font-weight: 700;">Reset PIN</h3>
                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.15rem;">
-                  Updating credentials for <strong>${targetName}</strong> (${targetTeam})
+                  New PIN for <strong>${esc(targetName)}</strong> (${esc(targetTeam)})
                 </p>
               </div>
-              <button class="btn btn-secondary btn-sm" id="btn-close-pin-modal">✕</button>
+              <button class="btn btn-secondary btn-sm" id="btn-close-pin-modal" aria-label="Close">✕</button>
             </div>
 
             <div id="pin-modal-feedback"></div>
 
             <form id="form-update-pin">
               <div class="form-group">
-                <label class="form-label">New 4-Digit PIN</label>
+                <label class="form-label" for="input-new-pin">New 4-Digit PIN</label>
                 <div style="display: flex; gap: 0.5rem;">
                   <input
                     type="text"
@@ -1183,6 +1106,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                     maxlength="4"
                     pattern="[0-9]{4}"
                     inputmode="numeric"
+                    autocomplete="off"
                     style="font-family: monospace; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.2em; text-align: center;"
                     required
                   />
@@ -1191,13 +1115,13 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                   </button>
                 </div>
                 <p class="form-hint" style="margin-top: 0.35rem;">
-                  PIN must be exactly 4 numeric digits (0000–9999).
+                  Write it down now — it can't be shown again after you save.
                 </p>
               </div>
 
               <div style="display: flex; gap: 0.5rem; margin-top: 1.25rem;">
                 <button type="button" class="btn btn-secondary" id="btn-cancel-pin-modal" style="flex: 1;">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="btn-save-pin" style="flex: 2;">Save & Grant PIN</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-pin" style="flex: 2;">Save New PIN</button>
               </div>
             </form>
           </div>
@@ -1206,28 +1130,20 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
       const overlay = modalShell.querySelector('#pin-modal-overlay');
       const pinInput = modalShell.querySelector('#input-new-pin');
-      const genBtn = modalShell.querySelector('#btn-gen-random-pin');
       const saveBtn = modalShell.querySelector('#btn-save-pin');
       const feedback = modalShell.querySelector('#pin-modal-feedback');
       const form = modalShell.querySelector('#form-update-pin');
+      const closeModal = () => (modalShell.innerHTML = '');
 
-      const closeModal = () => {
-        modalShell.innerHTML = '';
-      };
-
-      modalShell
-        .querySelector('#btn-close-pin-modal')
-        .addEventListener('click', closeModal);
-      modalShell
-        .querySelector('#btn-cancel-pin-modal')
-        .addEventListener('click', closeModal);
+      modalShell.querySelector('#btn-close-pin-modal').addEventListener('click', closeModal);
+      modalShell.querySelector('#btn-cancel-pin-modal').addEventListener('click', closeModal);
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) closeModal();
       });
-
-      genBtn.addEventListener('click', () => {
-        const rand = String(Math.floor(1000 + Math.random() * 9000));
-        pinInput.value = rand;
+      modalShell.querySelector('#btn-gen-random-pin').addEventListener('click', () => {
+        const buf = new Uint32Array(1);
+        crypto.getRandomValues(buf);
+        pinInput.value = String(buf[0] % 10000).padStart(4, '0');
       });
 
       form.addEventListener('submit', async (e) => {
@@ -1237,35 +1153,25 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
           feedback.innerHTML = `<div class="alert alert-error">PIN must be exactly 4 digits.</div>`;
           return;
         }
-
         saveBtn.disabled = true;
-        saveBtn.textContent = 'Updating...';
-
+        saveBtn.textContent = 'Saving...';
         try {
-          const res = await apiUpdatePin({
-            role: user.role,
-            name: user.name,
-            targetMember: targetName,
-            newPin,
-          });
-
+          const res = await apiUpdatePin({ targetMember: targetName, newPin });
           if (res.ok) {
-            feedback.innerHTML = `<div class="alert alert-success">PIN updated successfully for ${targetName}!</div>`;
-            const found = roster.find(
-              (u) => u.name.toLowerCase() === targetName.toLowerCase(),
-            );
-            if (found) found.pin = newPin;
+            feedback.innerHTML = `<div class="alert alert-success">PIN reset for ${esc(targetName)}. Tell them the new PIN privately.</div>`;
+            const found = roster.find((u) => u.name.toLowerCase() === targetName.toLowerCase());
+            if (found) found.hasPin = true;
             refreshRosterTable();
-            setTimeout(closeModal, 1200);
+            setTimeout(closeModal, 1800);
           } else {
-            feedback.innerHTML = `<div class="alert alert-error">${res.error || 'Failed to update PIN.'}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Failed to update PIN.')}</div>`;
             saveBtn.disabled = false;
-            saveBtn.textContent = 'Save & Grant PIN';
+            saveBtn.textContent = 'Save New PIN';
           }
         } catch (err) {
-          feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+          feedback.innerHTML = `<div class="alert alert-error">Error: ${esc(err.message)}</div>`;
           saveBtn.disabled = false;
-          saveBtn.textContent = 'Save & Grant PIN';
+          saveBtn.textContent = 'Save New PIN';
         }
       });
 
@@ -1284,31 +1190,31 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       .map((m) => {
         const band = getScoreBand(m.quizScore);
         return `
-        <tr id="mark-row-${m.id}" data-member="${m.member}">
-          <td><strong>${m.member}</strong></td>
-          <td><span class="badge" style="background-color: var(--bg-subtle);">${m.team}</span></td>
-          <td>${m.cycle}</td>
-          <td><strong class="num" style="font-size: 0.95rem;">${m.quizScore}</strong></td>
-          <td>${m.submission || '—'}</td>
-          <td>${m.attendance || '—'}</td>
-          <td>${m.previewDone || '—'}</td>
-          <td>${m.peerRating || '—'}</td>
-          <td>${m.punctual || '—'}</td>
-          <td><span class="badge ${band.cls}">${band.label}</span></td>
+        <tr id="mark-row-${esc(m.id)}" data-member="${esc(m.member)}">
+          <td><strong>${esc(m.member)}</strong></td>
+          <td><span class="badge" style="background-color: var(--bg-subtle);">${esc(m.team)}</span></td>
+          <td>${esc(m.cycle)}</td>
+          <td><strong class="num" style="font-size: 0.95rem;">${esc(m.quizScore)}</strong></td>
+          <td>${esc(m.submission || '—')}</td>
+          <td>${esc(m.attendance || '—')}</td>
+          <td>${esc(m.previewDone || '—')}</td>
+          <td>${esc(m.peerRating || '—')}</td>
+          <td>${esc(m.punctual || '—')}</td>
+          <td><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></td>
           <td style="font-size: 0.8rem; color: var(--text-muted); max-width: 180px;">
-            ${m.notes || '—'}
-            ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Edited by: ${m.editedBy}</span>` : ''}
+            ${esc(m.notes || '—')}
+            ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Edited by: ${esc(m.editedBy)}</span>` : ''}
           </td>
           ${
             canEdit
               ? `
             <td>
               <div style="display: flex; gap: 0.35rem; align-items: center;">
-                <button class="btn btn-secondary btn-sm btn-report-card" data-member="${m.member}" data-team="${m.team}" title="Print student progress report card">📄</button>
-                <button class="btn btn-secondary btn-sm btn-edit-mark" data-id="${m.id}" title="Edit mark">✏️</button>
+                <button class="btn btn-secondary btn-sm btn-report-card" data-member="${esc(m.member)}" data-team="${esc(m.team)}" title="Print student progress report card">📄</button>
+                <button class="btn btn-secondary btn-sm btn-edit-mark" data-id="${esc(m.id)}" title="Edit mark">✏️</button>
                 ${
                   isInstructor
-                    ? `<button class="btn btn-danger btn-sm btn-delete-mark" data-id="${m.id}" data-member="${m.member}" title="Delete mark entry">🗑️</button>`
+                    ? `<button class="btn btn-danger btn-sm btn-delete-mark" data-id="${esc(m.id)}" data-member="${esc(m.member)}" title="Delete mark entry">🗑️</button>`
                     : ''
                 }
               </div>
