@@ -83,7 +83,7 @@ export function renderModernLogin(container, onSuccess, options = {}) {
             <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz <small>group leader</small></button>
             <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2001">Amina <small>team leader</small></button>
             <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha <small>team leader</small></button>
-            <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh <small>student</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Bilal" data-demo-pin="2002">Bilal <small>student</small></button>
           </div>
         </div>` : ''}
 

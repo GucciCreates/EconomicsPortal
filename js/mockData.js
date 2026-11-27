@@ -8,19 +8,19 @@ export const MOCK_USERS = [
   { name: "Shehroz", role: "group_leader", team: "Shehroz", pin: "1111" },
   { name: "Sajal", role: "assistant", team: "Shehroz", pin: "1112" },
   { name: "Amina", role: "team_leader", team: "Amina", pin: "2001" },
-  { name: "Ramesh", role: "member", team: "Amina", pin: "2002" },
-  { name: "Mamoon", role: "member", team: "Amina", pin: "2003" },
-  { name: "Tazneem", role: "member", team: "Amina", pin: "2004" },
+  { name: "Bilal", role: "member", team: "Amina", pin: "2002" },
+  { name: "Danish", role: "member", team: "Amina", pin: "2003" },
+  { name: "Fatima", role: "member", team: "Amina", pin: "2004" },
   { name: "Ayesha (Quetta)", role: "team_leader", team: "Ayesha", pin: "3001" },
-  { name: "Minal", role: "member", team: "Ayesha", pin: "3002" },
-  { name: "Anika", role: "member", team: "Ayesha", pin: "3003" },
-  { name: "Ahmed bin Nasir", role: "member", team: "Ayesha", pin: "3004" },
+  { name: "Hira", role: "member", team: "Ayesha", pin: "3002" },
+  { name: "Iqra", role: "member", team: "Ayesha", pin: "3003" },
+  { name: "Junaid Akhtar", role: "member", team: "Ayesha", pin: "3004" },
   { name: "Lareb", role: "team_leader", team: "Lareb", pin: "4001" },
-  { name: "Shaiman", role: "member", team: "Lareb", pin: "4002" },
-  { name: "Aisha Amjad", role: "member", team: "Lareb", pin: "4003" },
-  { name: "Haseeb", role: "member", team: "Lareb", pin: "4004" },
-  { name: "Gorsi", role: "member", team: "Shehroz", pin: "1113" },
-  { name: "Haris", role: "member", team: "Shehroz", pin: "1114" },
+  { name: "Kamran", role: "member", team: "Lareb", pin: "4002" },
+  { name: "Laiba Noor", role: "member", team: "Lareb", pin: "4003" },
+  { name: "Moiz", role: "member", team: "Lareb", pin: "4004" },
+  { name: "Nabeel", role: "member", team: "Shehroz", pin: "1113" },
+  { name: "Omar", role: "member", team: "Shehroz", pin: "1114" },
 ];
 
 export const MOCK_TASKS = [
@@ -72,36 +72,36 @@ export const MOCK_TASKS = [
 
 export const MOCK_MARKS = [
   // Unit 1: IS-LM Macro
-  { id: "mk-1", member: "Ramesh", team: "Amina", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Great grasp of Keynesian cross", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-2", member: "Mamoon", team: "Amina", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 48, submission: "No", attendance: "80%", previewDone: "No", peerRating: "3.0", punctual: "No", notes: "Missed submission deadline", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-3", member: "Tazneem", team: "Amina", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 92, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Outstanding analytical work", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-4", member: "Minal", team: "Ayesha", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 82, submission: "Yes", attendance: "90%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Well structured argument", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-5", member: "Anika", team: "Ayesha", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 45, submission: "No", attendance: "75%", previewDone: "No", peerRating: "3.2", punctual: "No", notes: "Needs focus on balance of payments", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-6", member: "Ahmed bin Nasir", team: "Ayesha", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 78, submission: "Yes", attendance: "88%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Solid overall effort", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-7", member: "Shaiman", team: "Lareb", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 85, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Clear diagrams and math", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-8", member: "Aisha Amjad", team: "Lareb", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 91, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Top paper in cohort", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-9", member: "Haseeb", team: "Lareb", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 72, submission: "Yes", attendance: "80%", previewDone: "Yes", peerRating: "3.8", punctual: "Yes", notes: "Revise liquidity preference", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-10", member: "Gorsi", team: "Shehroz", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 89, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.8", punctual: "Yes", notes: "Excellent consistency", editedBy: "", timestamp: "2026-10-10" },
-  { id: "mk-11", member: "Haris", team: "Shehroz", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 86, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Strong quantitative presentation", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-1", member: "Bilal", team: "Amina", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Great grasp of Keynesian cross", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-2", member: "Danish", team: "Amina", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 48, submission: "No", attendance: "80%", previewDone: "No", peerRating: "3.0", punctual: "No", notes: "Missed submission deadline", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-3", member: "Fatima", team: "Amina", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 92, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Outstanding analytical work", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-4", member: "Hira", team: "Ayesha", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 82, submission: "Yes", attendance: "90%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Well structured argument", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-5", member: "Iqra", team: "Ayesha", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 45, submission: "No", attendance: "75%", previewDone: "No", peerRating: "3.2", punctual: "No", notes: "Needs focus on balance of payments", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-6", member: "Junaid Akhtar", team: "Ayesha", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 78, submission: "Yes", attendance: "88%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Solid overall effort", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-7", member: "Kamran", team: "Lareb", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 85, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Clear diagrams and math", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-8", member: "Laiba Noor", team: "Lareb", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 91, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Top paper in cohort", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-9", member: "Moiz", team: "Lareb", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 72, submission: "Yes", attendance: "80%", previewDone: "Yes", peerRating: "3.8", punctual: "Yes", notes: "Revise liquidity preference", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-10", member: "Nabeel", team: "Shehroz", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 89, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.8", punctual: "Yes", notes: "Excellent consistency", editedBy: "", timestamp: "2026-10-10" },
+  { id: "mk-11", member: "Omar", team: "Shehroz", cycle: "Unit 1: IS-LM Macro", mockNumber: "", quizScore: 86, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Strong quantitative presentation", editedBy: "", timestamp: "2026-10-10" },
 
   // Unit 2: Monetary Policy (Recent - gives historical trend and delta)
-  { id: "mk-12", member: "Ramesh", team: "Amina", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 92, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.8", punctual: "Yes", notes: "+4 delta, mastered IS-LM shifts", editedBy: "Dr. Numan", timestamp: "2026-10-18" },
-  { id: "mk-13", member: "Mamoon", team: "Amina", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 46, submission: "No", attendance: "70%", previewDone: "No", peerRating: "2.8", punctual: "No", notes: "Support plan needed, second low assessment", editedBy: "Dr. Numan", timestamp: "2026-10-18" },
-  { id: "mk-14", member: "Tazneem", team: "Amina", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 95, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Consistent excellence", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-15", member: "Minal", team: "Ayesha", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Strong improvement (+6)", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-16", member: "Anika", team: "Ayesha", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 44, submission: "No", attendance: "65%", previewDone: "No", peerRating: "3.0", punctual: "No", notes: "At-risk; consult group leader", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-17", member: "Ahmed bin Nasir", team: "Ayesha", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 82, submission: "Yes", attendance: "90%", previewDone: "Yes", peerRating: "4.2", punctual: "Yes", notes: "Solid advance (+4)", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-18", member: "Shaiman", team: "Lareb", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "High accuracy", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-19", member: "Aisha Amjad", team: "Lareb", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 94, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Highest quiz score in cohort", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-20", member: "Haseeb", team: "Lareb", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 76, submission: "Yes", attendance: "85%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Good upward trend (+4)", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-21", member: "Gorsi", team: "Shehroz", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 91, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.9", punctual: "Yes", notes: "Steady performance", editedBy: "", timestamp: "2026-10-18" },
-  { id: "mk-22", member: "Haris", team: "Shehroz", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 89, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.6", punctual: "Yes", notes: "Very thorough analysis", editedBy: "", timestamp: "2026-10-18" }
+  { id: "mk-12", member: "Bilal", team: "Amina", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 92, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.8", punctual: "Yes", notes: "+4 delta, mastered IS-LM shifts", editedBy: "Dr. Numan", timestamp: "2026-10-18" },
+  { id: "mk-13", member: "Danish", team: "Amina", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 46, submission: "No", attendance: "70%", previewDone: "No", peerRating: "2.8", punctual: "No", notes: "Support plan needed, second low assessment", editedBy: "Dr. Numan", timestamp: "2026-10-18" },
+  { id: "mk-14", member: "Fatima", team: "Amina", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 95, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Consistent excellence", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-15", member: "Hira", team: "Ayesha", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "Strong improvement (+6)", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-16", member: "Iqra", team: "Ayesha", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 44, submission: "No", attendance: "65%", previewDone: "No", peerRating: "3.0", punctual: "No", notes: "At-risk; consult group leader", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-17", member: "Junaid Akhtar", team: "Ayesha", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 82, submission: "Yes", attendance: "90%", previewDone: "Yes", peerRating: "4.2", punctual: "Yes", notes: "Solid advance (+4)", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-18", member: "Kamran", team: "Lareb", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 88, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.5", punctual: "Yes", notes: "High accuracy", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-19", member: "Laiba Noor", team: "Lareb", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 94, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "5.0", punctual: "Yes", notes: "Highest quiz score in cohort", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-20", member: "Moiz", team: "Lareb", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 76, submission: "Yes", attendance: "85%", previewDone: "Yes", peerRating: "4.0", punctual: "Yes", notes: "Good upward trend (+4)", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-21", member: "Nabeel", team: "Shehroz", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 91, submission: "Yes", attendance: "100%", previewDone: "Yes", peerRating: "4.9", punctual: "Yes", notes: "Steady performance", editedBy: "", timestamp: "2026-10-18" },
+  { id: "mk-22", member: "Omar", team: "Shehroz", cycle: "Unit 2: Monetary Policy", mockNumber: "1", quizScore: 89, submission: "Yes", attendance: "95%", previewDone: "Yes", peerRating: "4.6", punctual: "Yes", notes: "Very thorough analysis", editedBy: "", timestamp: "2026-10-18" }
 ];
 
 export const MOCK_SUBMISSIONS = [
-  { id: "sub-1", taskId: "tsk-101", member: "Ramesh", team: "Amina", content: "Submitted summary notes on IS-LM model.", fileUrl: "https://drive.google.com", gradingRequested: true, requestedBy: "Amina", reviewNotes: "All questions complete and checked.", timestamp: "2026-10-21T18:00:00.000Z" },
-  { id: "sub-2", taskId: "tsk-101", member: "Minal", team: "Ayesha", content: "IS-LM shifts analyzed with 4 scenarios.", fileUrl: "", gradingRequested: false, requestedBy: "", reviewNotes: "", timestamp: "2026-10-22T08:30:00.000Z" },
-  { id: "sub-3", taskId: "tsk-101", member: "Gorsi", team: "Shehroz", content: "Completed and checked by team leader.", fileUrl: "https://drive.google.com", gradingRequested: true, requestedBy: "Shehroz", reviewNotes: "Ready for assistant audit.", timestamp: "2026-10-22T19:45:00.000Z" }
+  { id: "sub-1", taskId: "tsk-101", member: "Bilal", team: "Amina", content: "Submitted summary notes on IS-LM model.", fileUrl: "https://drive.google.com", gradingRequested: true, requestedBy: "Amina", reviewNotes: "All questions complete and checked.", timestamp: "2026-10-21T18:00:00.000Z" },
+  { id: "sub-2", taskId: "tsk-101", member: "Hira", team: "Ayesha", content: "IS-LM shifts analyzed with 4 scenarios.", fileUrl: "", gradingRequested: false, requestedBy: "", reviewNotes: "", timestamp: "2026-10-22T08:30:00.000Z" },
+  { id: "sub-3", taskId: "tsk-101", member: "Nabeel", team: "Shehroz", content: "Completed and checked by team leader.", fileUrl: "https://drive.google.com", gradingRequested: true, requestedBy: "Shehroz", reviewNotes: "Ready for assistant audit.", timestamp: "2026-10-22T19:45:00.000Z" }
 ];
 
 export const MOCK_TEAM_MESSAGES = [
@@ -116,7 +116,7 @@ export const MOCK_TEAM_MESSAGES = [
     id: "tm-2",
     team: "Ayesha",
     author: "Ayesha (Quetta)",
-    message: "Great effort on Cycle 2 everyone! Minal and Ahmed, please coordinate with Anika for our Friday practice session.",
+    message: "Great effort on Cycle 2 everyone! Hira and Junaid, please coordinate with Iqra for our Friday practice session.",
     timestamp: "2026-10-24T15:30:00.000Z"
   }
 ];
@@ -124,13 +124,13 @@ export const MOCK_TEAM_MESSAGES = [
 export const MOCK_MENTORSHIP = [
   {
     id: "mnt-1",
-    student: "Mamoon",
-    mentor: "Tazneem",
+    student: "Danish",
+    mentor: "Fatima",
     team: "Amina",
     status: "active",
     milestones: [
       "Weekly 30-min concept review on IS-LM model",
-      "Pre-check problem set with Tazneem before submission",
+      "Pre-check problem set with Fatima before submission",
       "Achieve score >= 65 in Cycle 3 mock"
     ],
     assignedBy: "Shehroz",
@@ -141,7 +141,7 @@ export const MOCK_MENTORSHIP = [
 export const MOCK_ESCALATIONS = [
   {
     id: "esc-1",
-    raisedBy: "Anika",
+    raisedBy: "Iqra",
     team: "Ayesha",
     topic: "Clarification on Quiz 2 Equation derivation",
     details: "Looking for guidance on whether the open economy exchange rate variable is exogenous or endogenous in Question 3.",
@@ -151,7 +151,7 @@ export const MOCK_ESCALATIONS = [
   },
   {
     id: "esc-2",
-    raisedBy: "Mamoon",
+    raisedBy: "Danish",
     team: "Amina",
     topic: "Midterm date conflict with lab session",
     details: "The announced presentation slot overlaps with the department econometrics software lab. Requesting team rescheduling.",
@@ -161,7 +161,7 @@ export const MOCK_ESCALATIONS = [
   },
   {
     id: "esc-3",
-    raisedBy: "Haseeb",
+    raisedBy: "Moiz",
     team: "Lareb",
     topic: "Solved: Assignment 1 PDF permission",
     details: "Google Drive folder was set to restricted; now accessible.",
@@ -211,14 +211,14 @@ export const MOCK_QUIZZES = [
 
 export const MOCK_GOALS = [
   {
-    name: "Ramesh",
+    name: "Bilal",
     team: "Amina",
     target: 95,
     description: "Maintain score above 90 and achieve 95 in Mock 3",
     setAt: "2026-10-20T12:00:00.000Z"
   },
   {
-    name: "Mamoon",
+    name: "Danish",
     team: "Amina",
     target: 70,
     description: "Recover from at-risk status and hit 70+ in Cycle 3",

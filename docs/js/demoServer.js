@@ -29,7 +29,7 @@ import { normalizeUserName } from './utils.js';
 
 export { normalizeUserName };
 
-const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v6';
+const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v7';
 const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
 const ROLES = ['instructor', 'group_leader', 'assistant', 'team_leader', 'member'];
 const LEADERS = ['group_leader', 'instructor'];
@@ -371,7 +371,7 @@ function actionLogin(store, p) {
   if (!user || String(user.pin) !== pin) {
     recordFailure(store, bucket, user ? user.name : name);
     throw apiError(
-      "That name and PIN don't match. (Demo PINs: Shehroz 1111, Dr. Numan 0000, Amina 2001, Ramesh 2002, Ayesha (Quetta) 3001)",
+      "That name and PIN don't match. (Demo PINs: Shehroz 1111, Dr. Numan 0000, Amina 2001, Bilal 2002, Ayesha (Quetta) 3001)",
       'LOGIN_FAILED',
     );
   }
