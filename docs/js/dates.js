@@ -62,6 +62,14 @@ export function timeHtml(value, { prefix = '' } = {}) {
   return `<time datetime="${escapeHtml(iso)}" title="${escapeHtml(formatFull(value))}">${escapeHtml(prefix + formatRelative(value))}</time>`;
 }
 
+/** <time> showing the full date (for when the relative time is already shown nearby). */
+export function dateHtml(value, { prefix = '' } = {}) {
+  const d = toDate(value);
+  if (!d) return '';
+  const iso = isDateOnly(value) ? value : d.toISOString();
+  return `<time datetime="${escapeHtml(iso)}">${escapeHtml(prefix + formatFull(value))}</time>`;
+}
+
 /** Short countdown like "2d 3h" or "45m" until a moment (negative → "now"). */
 export function countdown(value, now = Date.now()) {
   const d = toDate(value);

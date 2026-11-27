@@ -4,7 +4,7 @@
  */
 
 import { esc } from '../../utils.js';
-import { timeHtml, countdown } from '../../dates.js';
+import { timeHtml, dateHtml, countdown } from '../../dates.js';
 import { getScoreBand, renderMemberMetricsHTML } from '../metricsPanel.js';
 import { renderSparkline } from '../charts.js';
 import { openReportCardModal } from '../reportCardModal.js';
@@ -140,8 +140,8 @@ function deadlineStrip(tasks, quizzes, submittedIds, isOverdue) {
       </div>
       <div class="deadline-strip">
         ${overdue.map((t) => item('Task overdue', t.title, 'Overdue', `Was due ${timeHtml(String(t.dueDate).slice(0, 10))}. Submit it as soon as you can.`, 'overdue')).join('')}
-        ${dueSoon.map(({ t }) => item('Task', t.title, `in ${countdown(dueDeadline(t.dueDate))}`, `Due ${timeHtml(String(t.dueDate).slice(0, 10))}`)).join('')}
-        ${quizSoon.map(({ q }) => item('Quiz', q.title, `in ${countdown(q.scheduledAt)}`, timeHtml(q.scheduledAt))).join('')}
+        ${dueSoon.map(({ t }) => item('Task', t.title, `in ${countdown(dueDeadline(t.dueDate))}`, dateHtml(String(t.dueDate).slice(0, 10), { prefix: 'Due ' }))).join('')}
+        ${quizSoon.map(({ q }) => item('Quiz', q.title, `in ${countdown(q.scheduledAt)}`, dateHtml(q.scheduledAt))).join('')}
       </div>
     </section>`;
 }

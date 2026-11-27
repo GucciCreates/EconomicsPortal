@@ -117,3 +117,22 @@ test('F6: a student sees the top 5 and their own place, at phone width too', { t
     await browser.close();
   }
 });
+
+test('F13: deadline cards show the countdown once and the real date under it', { timeout: 60000 }, async () => {
+  const { browser, page, errors } = await openApp({ demo: true });
+  try {
+    await page.click('.quick-login-chip[data-demo-name="Bilal"]');
+    await page.waitForSelector('.deadline-item');
+    const items = await page.$$eval('.deadline-item', (els) =>
+      els.map((el) => ({ left: el.querySelector('.deadline-left').textContent.trim(), when: el.querySelector('.small').textContent.trim() })),
+    );
+    assert.ok(items.length > 0);
+    for (const { left, when } of items) {
+      assert.doesNotMatch(when, /\bin \d+ (day|hour|minute)|tomorrow|today/i, `"${when}" repeats "${left}"`);
+      assert.match(when, /\d{4}|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec/, `"${when}" names the date`);
+    }
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
