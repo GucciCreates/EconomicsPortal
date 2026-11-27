@@ -167,7 +167,7 @@ function renderHeader() {
 function renderFooter() {
   footerEl.innerHTML = `
     <div class="site-footer">
-      <p>Class portal for Dr. Numan's Economics class, built by Shehroz's team.</p>
+      <p>Class portal for Dr. Numan's Economics class. Built by Opsmith.</p>
       <p class="sync-status" id="sync-status" aria-live="off"></p>
     </div>
   `;
