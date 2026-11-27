@@ -271,7 +271,7 @@ function createBackend() {
 
   const code = fs.readFileSync(path.join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
   const exportsList =
-    'doGet, doPost, setup, migratePins, migrateSubmissions, setPinForUser, hashPin, normalizeName, installBackupTrigger, runBackup';
+    'doGet, doPost, setup, migratePins, migrateSubmissions, setPinForUser, hashPin, normalizeName, installBackupTrigger, runBackup, resetAllPins';
   const api = vm.runInContext(`${code}\n;({ ${exportsList} })`, context, {
     filename: 'Code.gs',
   });

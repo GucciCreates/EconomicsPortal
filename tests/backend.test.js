@@ -381,3 +381,14 @@ test('installBackupTrigger installs one weekly trigger and backups keep the newe
   const newest = Math.max(...folder.files.map((f) => f.getDateCreated().getTime()));
   assert.ok(kept.some((f) => f.getDateCreated().getTime() === newest));
 });
+
+test('resetAllPins gives everyone a new PIN, logs it once, and signs everyone out', () => {
+  const b = freshBackend();
+  const oldToken = b.tokenFor('Dr. Numan');
+  assert.equal(b.api.resetAllPins(), 17);
+  assert.equal(b.post({ action: 'dashboard', token: oldToken }).code, 'AUTH');
+  const line = b.logs.at(-1).split('\n').find((l) => l.startsWith('Dr. Numan → '));
+  const pin = line.split('→ ')[1].trim();
+  assert.match(pin, /^\d{4}$/);
+  assert.equal(b.login('Dr. Numan', pin).ok, true);
+});

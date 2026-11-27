@@ -19,6 +19,7 @@
  *   setup()               — create/upgrade all tabs, seed the roster (safe to re-run)
  *   migratePins()         — convert plaintext PINs to hashes (setup() runs it too)
  *   migrateSubmissions()  — repair rows written by the old addSubmission bug
+ *   resetAllPins()        — new random PIN for everyone (do this when upgrading)
  *   setPinForUser(name, pin) — set someone's PIN from the editor
  *   installBackupTrigger() — weekly spreadsheet backup to Drive (keeps 8)
  */
@@ -446,6 +447,24 @@ function migrateSubmissions() {
   });
   Logger.log("Repaired " + fixed + " submission rows.");
   return fixed;
+}
+
+/**
+ * Gives every person a new random PIN, prints the list once in the
+ * execution log, and signs everyone out. Run this when upgrading from v3:
+ * the old default PINs were published in the public README.
+ */
+function resetAllPins() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSchema(ss);
+  const lines = [];
+  readTable(ss, SHEET_NAMES.USERS).rows.forEach(u => {
+    const pin = randomPin();
+    writePin(ss, u.name, pin);
+    lines.push(u.name + " → " + pin);
+  });
+  Logger.log("New PINs (hand them out privately — they are not stored anywhere in plain text):\n" + lines.join("\n"));
+  return lines.length;
 }
 
 /** Set a PIN from the editor, e.g. setPinForUser("Shehroz", "4821"). */
