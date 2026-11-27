@@ -1,7 +1,8 @@
 /**
  * EconomicsPortal — Tab Navigation Component
  *
- * Renders a horizontal pill-style tab bar and manages active tab state.
+ * Renders a horizontal tab bar (text tabs on a ruled line) and manages
+ * active tab state.
  * Keyboard: Left/Right/Home/End move between tabs (WAI-ARIA tabs pattern).
  *
  *   const tabNav = createTabNav(container, tabs, onTabChange);
@@ -13,7 +14,7 @@ import { esc } from "../utils.js";
 
 /**
  * @param {HTMLElement} container - The element to prepend the nav into
- * @param {Array<{id:string, label:string, icon?:string, badge?:number}>} tabs
+ * @param {Array<{id:string, label:string, count?:number, icon?:string, badge?:number}>} tabs
  * @param {Function} onTabChange - callback(tabId)
  * @param {{ storageKey?: string }} [options] - remember the open tab across
  *   dashboard refreshes (sessionStorage) so actions don't jump back to tab 1
@@ -38,6 +39,7 @@ export function createTabNav(container, tabs, onTabChange, options = {}) {
     >
       ${t.icon ? `<span class="tab-icon" aria-hidden="true">${esc(t.icon)}</span>` : ""}
       <span>${esc(t.label)}</span>
+      ${t.count !== undefined && t.count !== null ? `<span class="tab-count">${esc(t.count)}</span>` : ""}
       <span class="tab-badge" data-badge-for="${esc(t.id)}" hidden></span>
     </button>
   `

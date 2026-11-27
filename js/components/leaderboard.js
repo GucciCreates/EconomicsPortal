@@ -8,7 +8,7 @@
 import { getScoreBand } from "./metricsPanel.js";
 import { esc } from "../utils.js";
 
-const MEDALS = ["🥇", "🥈", "🥉"];
+const MEDALS = []; // plain rank numbers
 
 /**
  * @param {HTMLElement} container
@@ -40,7 +40,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
       <!-- Team Leaderboard -->
       <div class="card" style="margin-bottom: 1.25rem;">
         <div class="card-header">
-          <h3 class="card-title">🏆 Team Leaderboard</h3>
+          <h3 class="card-title">Team Leaderboard</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Ranked by mean quiz score across all tested units</span>
         </div>
         <div class="leaderboard-list">
@@ -53,7 +53,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
                     const pct = Math.min(100, Math.round(t.avg));
                     return `
                   <div class="lb-row ${esc(i === 0 ? "lb-first" : "")}">
-                    <div class="lb-rank">${MEDALS[i] || `#${esc(i + 1)}`}</div>
+                    <div class="lb-rank">${MEDALS[i] || esc(i + 1)}</div>
                     <div class="lb-name">
                       <strong>Team ${esc(t.team)}</strong>
                       <span class="badge ${esc(band.cls)}" style="margin-left: 0.4rem;">${esc(band.label)}</span>
@@ -73,7 +73,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
       <!-- Individual Leaderboard -->
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">🎖️ Member Leaderboard</h3>
+          <h3 class="card-title">Member Leaderboard</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Individual average — all tested units</span>
         </div>
         <div class="table-responsive">
@@ -105,7 +105,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
                         const isMe = m.name === user.name;
                         return `
                       <tr ${isMe ? 'style="background: var(--primary-soft);"' : ""}>
-                        <td style="font-weight: 700; font-size: 1rem;">${MEDALS[i] || `#${esc(i + 1)}`}</td>
+                        <td style="font-weight: 700; font-size: 1rem;">${MEDALS[i] || esc(i + 1)}</td>
                         <td>
                           <strong>${esc(m.name)}</strong>
                           ${isMe ? `<span style="font-size: 0.7rem; color: var(--purple); margin-left: 0.3rem;">(You)</span>` : ""}
@@ -114,7 +114,7 @@ export function renderLeaderboard(container, memberMetrics, teamAverages, user) 
                         <td><span class="badge" style="background: var(--bg-subtle);">${esc(m.team)}</span></td>
                         <td><strong class="num">${esc(m.avg.toFixed(1))}</strong></td>
                         <td>
-                          ${m.streak > 0 ? `<span title="Consecutive passing units">🔥 ${esc(m.streak)}</span>` : `<span style="color: var(--text-muted);">—</span>`}
+                          ${m.streak > 0 ? `<span title="Consecutive passing units">${esc(m.streak)}</span>` : `<span style="color: var(--text-muted);">—</span>`}
                         </td>
                         <td>${trendIcon}</td>
                         <td><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></td>

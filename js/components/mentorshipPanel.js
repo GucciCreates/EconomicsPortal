@@ -35,7 +35,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
       <div class="card" style="margin-bottom: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
           <div>
-            <h3 class="card-title">🛡️ Academic Recovery & Peer Mentorship Program</h3>
+            <h3 class="card-title">Academic Recovery & Peer Mentorship Program</h3>
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.2rem;">
               Structured peer support system pairing struggling students with cohort top performers.
             </p>
@@ -57,7 +57,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
         atRiskMembers.length > 0
           ? `
         <div class="at-risk-panel" style="margin-bottom: 1.25rem;">
-          <div class="at-risk-title">⚠️ Students Requiring Recovery Action (${esc(atRiskMembers.length)})</div>
+          <div class="at-risk-title">Students needing support (${esc(atRiskMembers.length)})</div>
           <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
             The following students have failed recent benchmarks. A dedicated peer mentor should be assigned:
           </p>
@@ -68,7 +68,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                 const hasPlan = plans.some((p) => p.student.toLowerCase() === name.toLowerCase() && p.status !== "resolved");
                 return `
                 <span class="badge ${esc(hasPlan ? "badge-done" : "badge-atrisk")}" style="padding: 0.35rem 0.65rem;">
-                  ${esc(name)} (${esc(m.team)}) • ${esc(hasPlan ? "Plan Active ✓" : "Needs Mentor!")}
+                  ${esc(name)} (${esc(m.team)}) • ${esc(hasPlan ? "Plan active" : "Needs a mentor")}
                 </span>
               `;
               })
@@ -104,7 +104,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                     <div>
                       <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <span class="badge ${esc(isResolved ? "badge-closed" : "badge-support")}">
-                          ${esc(isResolved ? "✓ Recovered & Resolved" : "⚡ Active Recovery Plan")}
+                          ${esc(isResolved ? "Resolved" : "Active plan")}
                         </span>
                         <span style="font-size: 0.8rem; color: var(--text-muted);">Assigned by ${esc(plan.assignedBy)}</span>
                       </div>
@@ -113,7 +113,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                         <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">(Team ${esc(plan.team)})</span>
                       </h4>
                       <p style="font-size: 0.9rem; margin-top: 0.2rem;">
-                        Assigned Peer Mentor: <strong>${esc(plan.mentor)}</strong> 🌟
+                        Assigned Peer Mentor: <strong>${esc(plan.mentor)}</strong>
                         ${isMentee ? `<span class="badge badge-teal" style="margin-left: 0.4rem;">You are the Mentee</span>` : ""}
                         ${isMentor ? `<span class="badge badge-teal" style="margin-left: 0.4rem;">You are the Mentor</span>` : ""}
                       </p>
@@ -123,7 +123,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                       isLeader && !isResolved
                         ? `
                       <button class="btn btn-teal btn-sm btn-resolve-plan" data-id="${esc(plan.id)}">
-                        Verify Recovery & Resolve Plan ✓
+                        Mark plan as resolved
                       </button>
                     `
                         : ""

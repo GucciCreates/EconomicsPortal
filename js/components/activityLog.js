@@ -79,7 +79,7 @@ export async function renderActivityLog(container) {
     <div class="card">
       <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
         <div>
-          <h3 class="card-title">🧾 Activity Log</h3>
+          <h3 class="card-title">Activity Log</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Every change to marks, tasks, doubts and settings — who did it and when. Read-only.</span>
         </div>
         <button type="button" class="btn btn-secondary btn-sm" id="btn-reload-audit">↻ Reload</button>

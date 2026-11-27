@@ -1,6 +1,6 @@
 {
   "name": "economics-portal",
-  "version": "4.1.0",
+  "version": "5.0.0",
   "description": "Free static class portal for Dr. Numan's Economics class, powered by Google Apps Script and GitHub Pages.",
   "scripts": {
     "build": "node build.js",

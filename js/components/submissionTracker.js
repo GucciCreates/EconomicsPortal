@@ -64,7 +64,7 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
     <div class="card">
       <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
         <div>
-          <h3 class="card-title">📋 Submission Tracker</h3>
+          <h3 class="card-title">Submission Tracker</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Who has turned in each task, who was late, and who still needs a reminder.</span>
         </div>
         <div class="form-group" style="margin: 0; min-width: 240px;">
@@ -107,7 +107,7 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
           ${deadline ? `Due ${esc(deadline.toLocaleDateString())}${pastDue ? ' — deadline has passed' : ''}` : 'No due date set'}
         </span>
         <button type="button" class="btn btn-primary btn-sm" id="btn-copy-reminders" ${missing.length ? '' : 'disabled'} style="margin-left: auto;">
-          📋 Copy reminder list (${missing.length})
+          Copy reminder list (${missing.length})
         </button>
       </div>
       <div id="tracker-copy-fallback"></div>
@@ -148,7 +148,7 @@ export function renderSubmissionTracker(container, { tasks = [], submissions = [
       try {
         await navigator.clipboard.writeText(text);
         copyBtn.textContent = 'Copied ✓';
-        setTimeout(() => (copyBtn.textContent = `📋 Copy reminder list (${missing.length})`), 2000);
+        setTimeout(() => (copyBtn.textContent = `Copy reminder list (${missing.length})`), 2000);
       } catch (e) {
         const fb = body.querySelector('#tracker-copy-fallback');
         fb.innerHTML = `<label class="form-label" for="tracker-copy-text">Copy this reminder:</label><textarea id="tracker-copy-text" class="form-control" rows="3" readonly></textarea>`;

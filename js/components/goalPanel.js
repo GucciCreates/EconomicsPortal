@@ -29,8 +29,8 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
           ? `
         <div class="card" style="margin-bottom: 1rem;">
           <div class="card-header">
-            <h3 class="card-title">🎯 Your Current Goal</h3>
-            ${achieved ? `<span class="badge badge-done" style="font-size: 0.8rem;">✅ Achieved!</span>` : ""}
+            <h3 class="card-title">Your Current Goal</h3>
+            ${achieved ? `<span class="badge badge-done" style="font-size: 0.8rem;">Achieved</span>` : ""}
           </div>
 
           <div style="margin-bottom: 1rem;">
@@ -58,7 +58,7 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
             <div>
               <div style="color: var(--text-muted); font-size: 0.75rem;">Needed per Test</div>
               <div class="num" style="font-weight: 700; font-size: 1.05rem;">
-                ${esc(target && !achieved ? Math.max(0, target - avg).toFixed(1) + " more avg" : achieved ? "Done! 🎉" : "—")}
+                ${esc(target && !achieved ? Math.max(0, target - avg).toFixed(1) + " more avg" : achieved ? "Done" : "—")}
               </div>
             </div>
             <div>
@@ -108,13 +108,13 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
 
       <!-- Tips Panel -->
       <div class="card" style="margin-top: 1rem; background: var(--teal-soft); border: none;">
-        <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--teal);">💡 Tips to Hit Your Target</h4>
+        <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--teal);">Tips to hit your Target</h4>
         <ul style="font-size: 0.85rem; padding-left: 1.25rem; color: var(--text-main); line-height: 1.7;">
           <li>Complete all preview readings before each session.</li>
           <li>Submit all assignments on time — late = 0 for submission score.</li>
           <li>Ask questions via the escalation panel — don't struggle alone.</li>
           <li>Peer-rated high? Keep collaborating — it boosts your overall metric.</li>
-          <li>Attend every mock session to maintain your streak 🔥.</li>
+          <li>Attend every mock session to keep your streak going.</li>
         </ul>
       </div>
     </div>

@@ -33,7 +33,7 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
         canManage
           ? `
         <div class="card" style="margin-bottom: 1rem;">
-          <div class="card-header"><h3 class="card-title">📢 Post Announcement</h3></div>
+          <div class="card-header"><h3 class="card-title">Post Announcement</h3></div>
           <div id="ann-feedback"></div>
           <form id="form-add-announcement">
             <div class="form-group">
@@ -66,7 +66,7 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
           <div class="announcement-item ${esc(a.pinned ? "pinned" : "")}" data-ann-id="${esc(a.id)}">
             <div class="ann-header">
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                ${a.pinned ? `<span class="pin-badge">📌 Pinned</span>` : ""}
+                ${a.pinned ? `<span class="pin-badge">Pinned</span>` : ""}
                 <strong style="font-size: 0.95rem;">${esc(a.title)}</strong>${a.postedBy !== user.name ? newPill(a.timestamp, opts.since) : ""}
               </div>
               ${
@@ -74,9 +74,9 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
                   ? `
                 <div style="display: flex; gap: 0.35rem;">
                   <button class="btn btn-secondary btn-sm btn-pin-ann" data-id="${esc(a.id)}" data-pinned="${esc(a.pinned)}" title="${esc(a.pinned ? "Unpin" : "Pin")}">
-                    ${esc(a.pinned ? "Unpin" : "📌")}
+                    ${esc(a.pinned ? "Unpin" : "Pin")}
                   </button>
-                  <button class="btn btn-danger btn-sm btn-delete-ann" data-id="${esc(a.id)}" title="Delete">🗑️</button>
+                  <button class="btn btn-danger btn-sm btn-delete-ann" data-id="${esc(a.id)}" title="Delete" aria-label="Delete announcement">Delete</button>
                 </div>
               `
                   : ""

@@ -85,93 +85,51 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   const openTasks = tasks.filter((t) => t.status === 'open').length;
 
   container.innerHTML = `
-    <!-- Top Header Banner -->
-    <div class="card" style="margin-bottom: 1.25rem;">
-      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
-        <div>
-          <h2 style="font-size: 1.35rem; font-weight: 700;">
-            ${esc(isInstructor ? 'Instructor Workspace — Dr. Numan' : isAssistant ? 'Teaching Assistant — ' + user.name : 'Group Leader — ' + user.name)}
-          </h2>
-          <p style="color: var(--text-muted); font-size: 0.875rem;">
-            ${
-              isInstructor
-                ? 'Academic Oversight & Verification • Audit and Direct Edit Rights Enabled'
-                : isAssistant
-                  ? 'Teaching Assistant Workspace — Test Evaluation & Score Editing Rights Enabled'
-                  : 'Full Class Operations • 17 Members • 4 Teams'
-            }
-          </p>
-        </div>
-        <div style="display: flex; align-items: center; gap: 0.75rem;">
-          ${
-            isInstructor
-              ? `<span class="badge" style="background-color: var(--purple-soft); color: var(--purple); font-weight: 600;">Instructor View</span>`
-              : isAssistant
-                ? `<span class="badge" style="background-color: var(--teal-soft); color: var(--teal); font-weight: 600;">Assistant Grading Mode</span>`
-                : ''
-          }
-          <button class="btn btn-secondary btn-sm" id="btn-refresh-gl">↻ Refresh Data</button>
-        </div>
+    <div class="page-head">
+      <div>
+        <p class="page-kicker">${esc(isInstructor ? 'Instructor' : isAssistant ? 'Teaching assistant' : 'Group leader')}</p>
+        <h1 class="page-title">${esc(user.name)}</h1>
+        <p class="page-sub">${
+          isInstructor
+            ? 'The whole class: 17 students in 4 teams. You can edit and delete any mark.'
+            : isAssistant
+              ? 'The whole class: 17 students in 4 teams. You can enter and edit marks.'
+              : 'The whole class: 17 students in 4 teams.'
+        }${atRiskMembers.length > 0 ? ` <strong style="color: var(--red);">${esc(atRiskMembers.length)} ${atRiskMembers.length === 1 ? 'student needs' : 'students need'} support.</strong>` : ''}</p>
       </div>
-    </div>
-
-    <!-- Executive Summary KPI Tiles -->
-    <div class="dashboard-hero">
-      <div class="dashboard-hero-row">
-        <div class="dashboard-hero-copy">
-          <h3>Today’s executive focus</h3>
-          <p>${atRiskMembers.length > 0 ? `${esc(atRiskMembers.length)} students need support attention today.` : 'Everything is tracking smoothly. Focus on momentum and review.'}</p>
-        </div>
-        <div class="dashboard-microstats">
-          <div class="microstat-box">
-            <span>Strongest</span>
-            <strong>${esc(Object.keys(teamAverages).length ? Object.entries(teamAverages).sort((a, b) => b[1] - a[1])[0][0] : 'N/A')}</strong>
-          </div>
-          <div class="microstat-box">
-            <span>Open</span>
-            <strong>${esc(openTasks + openDoubts)}</strong>
-          </div>
-          <div class="microstat-box">
-            <span>Completion</span>
-            <strong>${esc(subRate)}%</strong>
-          </div>
-        </div>
-      </div>
-      <div class="quick-action-row">
-        <span class="quick-action-chip"><strong>⚡</strong> Review at-risk list</span>
-        <span class="quick-action-chip"><strong>📝</strong> Check pending tasks</span>
-        <span class="quick-action-chip"><strong>📤</strong> Export current ledger</span>
+      <div class="page-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-refresh-gl">Refresh</button>
       </div>
     </div>
 
     <div class="kpi-grid">
       <div class="kpi-card">
-        <span class="kpi-label">Class Avg Score</span>
+        <span class="kpi-label">Class average</span>
         <span class="kpi-val num" style="color: var(--teal);">${esc(classAvg)}</span>
         <span class="kpi-sub">Across ${esc(validScores.length)} recorded tests</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">Submission Rate</span>
+        <span class="kpi-label">Submission rate</span>
         <span class="kpi-val num">${esc(subRate)}%</span>
         <span class="kpi-sub">${esc(subYesCount)} on-time assignments</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">Avg Attendance</span>
+        <span class="kpi-label">Attendance</span>
         <span class="kpi-val num">${esc(attRate)}%</span>
         <span class="kpi-sub">Mock & lecture presence</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">At-Risk Students</span>
+        <span class="kpi-label">Students needing support</span>
         <span class="kpi-val num" style="color: ${esc(atRiskMembers.length > 0 ? 'var(--red)' : 'var(--teal);')}">${esc(atRiskMembers.length)}</span>
         <span class="kpi-sub">${esc(atRiskMembers.length > 0 ? 'Require intervention' : 'All on track')}</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">Open Tasks</span>
+        <span class="kpi-label">Open tasks</span>
         <span class="kpi-val num">${esc(openTasks)}</span>
         <span class="kpi-sub">Pending completion</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">Pending Doubts</span>
+        <span class="kpi-label">Open doubts</span>
         <span class="kpi-val num" style="color: ${esc(openDoubts > 0 ? 'var(--amber)' : 'var(--text-main);')}">${esc(openDoubts)}</span>
         <span class="kpi-sub">Awaiting instructor reply</span>
       </div>
@@ -188,34 +146,22 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
   // Define tabs
   const tabs = [
-    { id: 'ledger', label: 'Ledger & Scores', icon: '📊' },
-    {
-      id: 'mentorship',
-      label: `Recovery & Mentorship (${atRiskMembers.length})`,
-      icon: '🛡️',
-    },
-    { id: 'analytics', label: 'Analytics & Leaderboard', icon: '🏆' },
-    {
-      id: 'quizzes',
-      label: `Quizzes & Scheduler (${quizzes.length})`,
-      icon: '⏱️',
-    },
-    {
-      id: 'announcements',
-      label: `Announcements (${announcements.length})`,
-      icon: '📢',
-    },
-    { id: 'tasks', label: `Tasks & Submissions (${tasks.length})`, icon: '📝' },
-    { id: 'tracker', label: 'Submission Tracker', icon: '📋' },
-    { id: 'doubts', label: `Doubts & Escalations (${openDoubts})`, icon: '❓' },
-    { id: 'export', label: 'Export CSV', icon: '📥' },
+    { id: 'ledger', label: 'Scores' },
+    { id: 'mentorship', label: 'Support', count: atRiskMembers.length },
+    { id: 'analytics', label: 'Analytics' },
+    { id: 'quizzes', label: 'Quizzes', count: quizzes.length },
+    { id: 'announcements', label: 'Announcements', count: announcements.length },
+    { id: 'tasks', label: 'Tasks', count: tasks.length },
+    { id: 'tracker', label: 'Tracker' },
+    { id: 'doubts', label: 'Doubts', count: openDoubts },
+    { id: 'export', label: 'Export' },
   ];
 
   if (canLead) {
-    tabs.push({ id: 'activity', label: 'Activity Log', icon: '🧾' });
+    tabs.push({ id: 'activity', label: 'Activity log' });
   }
   if (isGroupLeader) {
-    tabs.push({ id: 'pins', label: 'Member Access & PINs', icon: '🔑' });
+    tabs.push({ id: 'pins', label: 'PINs' });
   }
 
   // "New since your last visit" badges
@@ -260,7 +206,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
         atRiskMembers.length > 0
           ? `
         <div class="at-risk-panel">
-          <div class="at-risk-title">⚠️ At-Risk Alert (${esc(atRiskMembers.length)} members require immediate support)</div>
+          <div class="at-risk-title">${esc(atRiskMembers.length)} ${atRiskMembers.length === 1 ? "student needs" : "students need"} support</div>
           <p style="font-size: 0.85rem; margin-bottom: 0.6rem;">
             These students scored below 50 or missed submissions in consecutive units. Click to highlight in ledger:
           </p>
@@ -321,7 +267,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
               <button type="button" class="filter-chip" id="btn-filter-cycle-1" style="font-size: 0.75rem;">Unit 1</button>
               <button type="button" class="filter-chip" id="btn-filter-cycle-2" style="font-size: 0.75rem;">Unit 2</button>
             </div>
-            <input type="text" id="gl-search-member" class="form-control" placeholder="🔍 Search student / topic..." style="width: 170px; padding: 0.3rem 0.6rem; font-size: 0.8rem; min-height: 32px;" />
+            <input type="text" id="gl-search-member" class="form-control" placeholder="Search student or topic" style="width: 170px; padding: 0.3rem 0.6rem; font-size: 0.8rem; min-height: 32px;" />
             <button class="btn btn-secondary btn-sm" id="btn-show-all-marks">Show All Teams</button>
           </div>
         </div>
@@ -974,17 +920,17 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       <div class="card">
         <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <h3 class="card-title">🔑 Member Access & PIN Resets</h3>
+            <h3 class="card-title">Member Access & PIN Resets</h3>
             <span style="font-size: 0.8rem; color: var(--text-muted);">Group Leader administrative rights</span>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <label class="sr-only" for="pins-search">Search members</label>
-            <input type="search" id="pins-search" class="form-control" placeholder="🔍 Search member..." style="width: 170px; padding: 0.35rem 0.65rem; font-size: 0.8rem;" />
+            <input type="search" id="pins-search" class="form-control" placeholder="Search by name" style="width: 170px; padding: 0.35rem 0.65rem; font-size: 0.8rem;" />
           </div>
         </div>
 
         <div class="alert alert-info" style="font-size: 0.85rem; margin-bottom: 1.25rem;">
-          🛡️ <strong>PINs are stored encrypted (hashed) and nobody — including you — can see them.</strong>
+          <strong>PINs are stored encrypted (hashed) and nobody — including you — can see them.</strong>
           If someone forgets theirs, reset it here and tell them the new PIN in person. Resetting signs them out everywhere.
           Everyone can also change their own PIN from the account menu.
         </div>
@@ -1049,7 +995,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
             }</td>
             <td>
               <button class="btn btn-primary btn-sm btn-change-member-pin" data-name="${esc(m.name)}" data-team="${esc(m.team)}">
-                🔑 Reset PIN
+                Reset PIN
               </button>
             </td>
           </tr>
@@ -1111,7 +1057,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                     required
                   />
                   <button type="button" class="btn btn-secondary" id="btn-gen-random-pin" title="Generate random PIN">
-                    🎲 Random
+                    Random
                   </button>
                 </div>
                 <p class="form-hint" style="margin-top: 0.35rem;">

@@ -18,23 +18,29 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
 
   container.innerHTML = `
     <div class="auth-wrapper">
+      <section class="auth-intro" aria-labelledby="auth-title">
+        <h1 class="auth-title" id="auth-title">Marks, tasks and deadlines in one place.</h1>
+        <p class="auth-subtitle">The class portal for Dr. Numan's Economics class: four teams, seventeen students, every quiz and submission on the record.</p>
+        <figure class="auth-figure" aria-hidden="true">
+          <svg viewBox="0 0 440 280" role="presentation">
+            <path class="axis" d="M40 16 V244 H428" />
+            <path class="guide" d="M40 136 H214 V244" />
+            <path class="curve-s draw" d="M64 228 C130 190, 230 110, 392 36" />
+            <path class="curve-d draw" d="M64 40 C140 80, 270 170, 392 228" />
+            <circle class="eq-dot" cx="214" cy="136" r="9" />
+            <text class="label-s" x="398" y="34">S</text>
+            <text class="label-d" x="398" y="234">D</text>
+            <path class="guide" d="M214 58 V124" />
+            <text class="label-eq" x="214" y="48" text-anchor="middle">Effort meets the deadline</text>
+            <text x="44" y="268">Week</text>
+            <text x="8" y="22">Marks</text>
+          </svg>
+        </figure>
+      </section>
+
       <div class="auth-card">
-        <!-- Auth Header -->
-        <div class="auth-header">
-          <div class="auth-logo-badge">📈</div>
-          <h1 class="auth-title">EconomicsPortal</h1>
-          <p class="auth-subtitle">Dr. Numan's Economics Class • Executive Operations</p>
-          <div style="margin-top: 0.65rem;">
-            <span class="badge" style="background-color: var(--primary-soft); color: var(--purple); font-size: 0.75rem; border: 1px solid var(--purple-border); font-weight: 700;">
-              ✨ Premium Academic Command Layer • v4.1
-            </span>
-          </div>
-          <div style="margin-top: 0.4rem;">
-            <span class="badge" style="background-color: var(--bg-subtle); color: var(--text-muted); font-size: 0.72rem;">
-              🔒 Private Access • Confidential PIN Protection
-            </span>
-          </div>
-        </div>
+        <h2 class="auth-card-title">Sign in</h2>
+        <p class="auth-card-sub">Use your full name and the 4-digit PIN your group leader gave you.</p>
 
         <div id="login-error-box">${
           options.notice
@@ -42,90 +48,54 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
             : ''
         }</div>
 
-        <div class="auth-hero-box" aria-label="Portal summary">
-          <div class="auth-hero-row">
-            <div>
-              <span class="eyebrow-text">Academic operations</span>
-              <h2>Command center for grades, tasks, and recovery workflows.</h2>
-            </div>
-            <div class="mini-metric">
-              <span>Secure</span>
-              <strong>17 / 4</strong>
-            </div>
-          </div>
-          <div class="session-grid">
-            <div class="session-pill">
-              <span class="session-label">Roster</span>
-              <strong>17 members</strong>
-            </div>
-            <div class="session-pill">
-              <span class="session-label">Teams</span>
-              <strong>4 squads</strong>
-            </div>
-            <div class="session-pill">
-              <span class="session-label">Mode</span>
-              <strong>Secure</strong>
-            </div>
-          </div>
-        </div>
-
-        ${isDemoMode() ? `<div class="quick-login-panel" aria-label="Quick login demo accounts">
-          <p class="quick-login-title">Quick access workspace</p>
+        ${isDemoMode() ? `<div class="quick-login-panel" aria-label="Demo accounts">
+          <p class="quick-login-title">Demo mode: sign in as</p>
           <div class="quick-login-grid">
-            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan</button>
-            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz</button>
-            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2001">Amina</button>
-            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha</button>
-            <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh</button>
+            <button type="button" class="quick-login-chip" data-demo-name="Dr. Numan" data-demo-pin="0000">Dr. Numan <small>instructor</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Shehroz" data-demo-pin="1111">Shehroz <small>group leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Amina" data-demo-pin="2001">Amina <small>team leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Ayesha (Quetta)" data-demo-pin="3001">Ayesha <small>team leader</small></button>
+            <button type="button" class="quick-login-chip" data-demo-name="Ramesh" data-demo-pin="2002">Ramesh <small>student</small></button>
           </div>
         </div>` : ''}
 
-        <!-- Secure Login Form -->
         <form id="form-login" class="auth-form">
           <div class="form-group">
-            <label class="form-label" for="login-name">Full Name</label>
-            <div class="input-icon-wrap">
-              <span class="input-icon">👤</span>
-              <input
-                type="text"
-                id="login-name"
-                class="form-control auth-input"
-                placeholder="e.g. Shehroz, Sajal, or Ramesh"
-                value="${escapeHtml(rememberedName)}"
-                autocomplete="name"
-                required
-              />
-            </div>
+            <label class="form-label" for="login-name">Full name</label>
+            <input
+              type="text"
+              id="login-name"
+              class="form-control auth-input"
+              placeholder="As on the class list, e.g. Ayesha (Quetta)"
+              value="${escapeHtml(rememberedName)}"
+              autocomplete="name"
+              required
+            />
           </div>
 
           <div class="form-group">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-              <label class="form-label" for="login-pin" style="margin-bottom: 0;">4-Digit PIN</label>
+            <div class="pin-row">
+              <label class="form-label" for="login-pin">PIN</label>
               <button type="button" class="btn-text-toggle" id="btn-toggle-pin-visibility">Show PIN</button>
             </div>
-            
-            <div class="input-icon-wrap">
-              <span class="input-icon">🔒</span>
-              <input
-                type="password"
-                id="login-pin"
-                class="form-control auth-input pin-input"
-                placeholder="••••"
-                maxlength="4"
-                pattern="[0-9]{4}"
-                inputmode="numeric"
-                autocomplete="current-password"
-                required
-              />
-            </div>
-
-            <!-- PIN Digit Dots Indicator -->
-            <div class="pin-dots-display" id="pin-dots">
+            <input
+              type="password"
+              id="login-pin"
+              class="form-control auth-input pin-input"
+              maxlength="4"
+              pattern="[0-9]{4}"
+              inputmode="numeric"
+              autocomplete="current-password"
+              aria-describedby="pin-dots-hint"
+              required
+            />
+            <div class="pin-dots-display" id="pin-dots" aria-hidden="true">
               <span class="pin-dot"></span>
               <span class="pin-dot"></span>
               <span class="pin-dot"></span>
               <span class="pin-dot"></span>
             </div>
+            <span class="sr-only" id="pin-dots-hint">4 digits</span>
           </div>
 
           <div class="form-group auth-remember-row">
@@ -135,17 +105,12 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
             </label>
           </div>
 
-          <button type="submit" class="btn btn-primary auth-submit-btn" id="btn-submit-login">
-            <span>Log In to Portal</span>
-            <span class="btn-arrow">→</span>
-          </button>
+          <button type="submit" class="btn btn-primary auth-submit-btn" id="btn-submit-login">Sign in</button>
         </form>
 
-        <div class="auth-footer-help">
-          <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
-            Need your PIN or locked out? Contact Group Leader <strong>Shehroz</strong> to reset or issue your private PIN.
-          </p>
-        </div>
+        <p class="auth-footer-help">
+          Forgot your PIN, or locked out? Ask Shehroz (group leader) to reset it.
+        </p>
       </div>
     </div>
   `;
@@ -219,7 +184,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
     }
 
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="auth-spinner"></span> Authenticating...`;
+    submitBtn.innerHTML = `<span class="auth-spinner" aria-hidden="true"></span> Signing in…`;
     errorBox.innerHTML = '';
 
     try {
@@ -232,18 +197,18 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
         onSuccess();
       } else {
         triggerError(
-          res.error || 'Invalid name or PIN. Please verify with Group Leader.',
+          res.error || 'That name and PIN don\'t match. Check the spelling of your name, or ask your group leader to reset your PIN.',
         );
       }
     } catch (err) {
       errorBox.innerHTML = `
         <div class="alert alert-error auth-error-alert">
-          <strong>Connection error: ${esc(err.message)}</strong>
-          <p style="font-size: 0.8rem; margin: 0.35rem 0;">
-            Could not reach Google Apps Script. You can continue in offline demo mode.
+          <strong>Couldn't reach the class server (${esc(err.message)}).</strong>
+          <p style="font-size: 0.85rem; margin: 0.35rem 0;">
+            Check your connection and try again, or explore the portal with sample data.
           </p>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-force-demo-login" style="width: 100%; margin-top: 0.5rem; background: #fff; font-weight: 600;">
-            ⚡ Continue in Demo Mode
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-force-demo-login" style="width: 100%; margin-top: 0.5rem;">
+            Continue in Demo Mode
           </button>
         </div>
       `;
@@ -257,7 +222,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
       }
     } finally {
       submitBtn.disabled = false;
-      submitBtn.innerHTML = `<span>Log In to Portal</span><span class="btn-arrow">→</span>`;
+      submitBtn.textContent = 'Sign in';
     }
   });
 
