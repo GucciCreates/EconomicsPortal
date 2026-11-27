@@ -13,7 +13,8 @@
       name="description"
       content="Academic class portal and gradebook ledger for Dr. Numan's Economics class, built by Shehroz's team."
     />
-    <meta name="theme-color" content="#534AB7" />
+    <meta name="theme-color" content="#edf1f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1c1a" media="(prefers-color-scheme: dark)" />
 
     <!-- Installable app (PWA) -->
     <link rel="manifest" href="./manifest.webmanifest" />
@@ -27,11 +28,11 @@
       href="./icons/icon.svg" type="image/svg+xml"
     />
 
-    <!-- Google Font: Public Sans -->
+    <!-- Google Fonts: Bricolage Grotesque (headings) + Instrument Sans (text) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
 
@@ -47,7 +48,7 @@
     <meta http-equiv="Expires" content="0" />
 
     <!-- Main Ledger Stylesheet (Cache Busted) -->
-    <link rel="stylesheet" href="./css/style.css?v=4.1.0" />
+    <link rel="stylesheet" href="./css/style.css?v=5.0.0" />
   </head>
   <body>
     <!-- Demo / Fallback Mode Indicator Banner -->
@@ -59,7 +60,7 @@
     <!-- Dynamic Main Content (Login or Role Dashboards) -->
     <main class="main-wrapper" id="main-content">
       <div style="text-align: center; padding: 3rem">
-        <p style="color: var(--text-muted)">Initializing EconomicsPortal...</p>
+        <p style="color: var(--text-muted)">Loading EconomicsPortal…</p>
       </div>
     </main>
 
@@ -67,6 +68,6 @@
     <footer id="site-footer"></footer>
 
     <!-- Application Script (Cache Busted) -->
-    <script type="module" src="./js/app.js?v=4.1.0"></script>
+    <script type="module" src="./js/app.js?v=5.0.0"></script>
   </body>
 </html>

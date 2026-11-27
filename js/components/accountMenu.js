@@ -15,13 +15,14 @@ export function renderAccountMenu(host, user, onLogout) {
   host.innerHTML = `
     <div class="account-menu">
       <button type="button" class="user-badge account-menu-trigger" id="btn-account-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu-list">
+        <span class="user-initial" aria-hidden="true">${esc(String(user.name || '?').trim().charAt(0).toUpperCase())}</span>
         <span>${esc(user.name)}</span>
         <span class="role-pill role-${esc(user.role)}">${esc(String(user.role).replace('_', ' '))}</span>
         <span aria-hidden="true">▾</span>
       </button>
       <div class="account-menu-list" id="account-menu-list" role="menu" hidden>
-        <button type="button" role="menuitem" class="account-menu-item" id="btn-change-my-pin">🔑 Change my PIN</button>
-        <button type="button" role="menuitem" class="account-menu-item" id="btn-logout">↩ Log out</button>
+        <button type="button" role="menuitem" class="account-menu-item" id="btn-change-my-pin">Change my PIN</button>
+        <button type="button" role="menuitem" class="account-menu-item" id="btn-logout">Log out</button>
       </div>
     </div>
   `;

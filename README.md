@@ -49,6 +49,7 @@ PINs are private. Each person gets theirs from the group leader, and can change 
 - **Change my PIN** for everyone; **Reset PIN** for the group leader.
 - **Installable app (PWA):** add it to your home screen; the app shell opens offline. Student data is never cached.
 - **Weekly backups** of the spreadsheet to Google Drive (keeps the last 8).
+- **Graph-paper design:** light "graph paper" and dark "chalkboard" themes (Auto follows your device), Bricolage Grotesque + Instrument Sans type.
 - **Accessible:** labelled forms, WCAG AA contrast in light and dark themes, keyboard-friendly tabs, menus and dialogs.
 
 ---

@@ -66,11 +66,11 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
       <div class="report-toolbar no-print">
         <div style="display: flex; align-items: center; gap: 0.5rem;">
           <button class="btn btn-primary btn-sm" id="btn-print-report">
-            🖨️ Print / Save as PDF
+            Print or save as PDF
           </button>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Format: Standard A4</span>
         </div>
-        <button class="btn btn-secondary btn-sm" id="btn-close-report">✕ Close</button>
+        <button class="btn btn-secondary btn-sm" id="btn-close-report">Close</button>
       </div>
 
       <!-- Printable Report Sheet -->
@@ -125,7 +125,7 @@ export function openReportCardModal(studentInfo, studentMarks = [], studentMetri
           </div>
           <div class="report-kpi">
             <span class="rk-label">Assessment Streak</span>
-            <span class="rk-val num">${esc(streak > 0 ? "🔥 " + streak : "—")}</span>
+            <span class="rk-val num">${esc(streak > 0 ? streak : "—")}</span>
             <span class="rk-sub">Consecutive passes</span>
           </div>
           <div class="report-kpi">

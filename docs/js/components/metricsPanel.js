@@ -6,11 +6,11 @@ import { esc } from "../utils.js";
 
 export function getScoreBand(score) {
   const num = Number(score);
-  if (isNaN(num)) return { label: "N/A", cls: "badge-attention" };
-  if (num >= 85) return { label: "Outstanding", cls: "badge-outstanding" };
-  if (num >= 70) return { label: "Strong", cls: "badge-strong" };
-  if (num >= 60) return { label: "Needs attention", cls: "badge-attention" };
-  return { label: "Support plan", cls: "badge-support" };
+  if (isNaN(num)) return { label: "N/A", cls: "badge-attention", barColor: "var(--amber)" };
+  if (num >= 85) return { label: "Outstanding", cls: "badge-outstanding", barColor: "var(--teal)" };
+  if (num >= 70) return { label: "Strong", cls: "badge-strong", barColor: "var(--purple)" };
+  if (num >= 60) return { label: "Needs attention", cls: "badge-attention", barColor: "var(--amber)" };
+  return { label: "Support plan", cls: "badge-support", barColor: "var(--red)" };
 }
 
 function getProgressFillClass(val) {
@@ -69,7 +69,7 @@ export function renderMemberMetricsHTML(metrics, options = {}) {
           ${atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Needs attention</span>` : ""}
         </div>
         <div>
-          ${streak > 0 ? `<span class="badge badge-outstanding">🔥 ${esc(streak)}-test streak</span>` : `<span style="font-size: 0.75rem; color: var(--text-muted);">No current streak</span>`}
+          ${streak > 0 ? `<span class="badge badge-outstanding">${esc(streak)}-test streak</span>` : `<span style="font-size: 0.75rem; color: var(--text-muted);">No current streak</span>`}
         </div>
       </div>
 

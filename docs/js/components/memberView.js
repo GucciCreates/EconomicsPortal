@@ -42,26 +42,19 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   );
 
   container.innerHTML = `
-    <!-- Header Banner -->
-    <div class="card" style="margin-bottom: 1.25rem;">
-      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
-        <div>
-          <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">${esc(user.name)}</h2>
-          <p style="color: var(--text-muted); font-size: 0.875rem;">
-            Student Workspace • Team <strong>${esc(user.team)}</strong>
-            ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Requires attention</span>` : ''}
-          </p>
+    <div class="page-head">
+      <div>
+        <p class="page-kicker">Team ${esc(user.team)}</p>
+        <h1 class="page-title">${esc(user.name)}</h1>
+        ${myMetrics && myMetrics.atRisk ? `<p class="page-sub"><span class="badge badge-atrisk">Needs support</span> Your recent scores are below 50 or work is missing. Talk to your team leader.</p>` : ''}
+      </div>
+      <div class="page-actions">
+        <div class="page-stat">
+          <div class="page-stat-label">Team average</div>
+          <div class="page-stat-val num">${esc(teamAverage !== null ? teamAverage : '—')}</div>
+          ${avgBand ? `<span class="badge ${esc(avgBand.cls)}">${esc(avgBand.label)}</span>` : ''}
         </div>
-        <div style="display: flex; gap: 1.5rem; align-items: center;">
-          <div style="text-align: right;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
-            <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
-              ${esc(teamAverage !== null ? teamAverage : '—')}
-            </div>
-            ${avgBand ? `<span class="badge ${esc(avgBand.cls)}">${esc(avgBand.label)}</span>` : ''}
-          </div>
-          <button class="btn btn-secondary btn-sm" id="btn-refresh-mem">↻ Refresh</button>
-        </div>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh-mem">Refresh</button>
       </div>
     </div>
 
@@ -74,17 +67,13 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   const contentShell = container.querySelector('#mem-tab-content');
 
   const tabs = [
-    { id: 'overview', label: 'My Scorecard & Metrics', icon: '📊' },
-    { id: 'goals', label: 'My Goal & Progress', icon: '🎯' },
-    { id: 'tasks', label: `Tasks & Submit (${tasks.length})`, icon: '📝' },
-    { id: 'quizzes', label: `Quizzes & Tests (${quizzes.length})`, icon: '⏱️' },
-    { id: 'leaderboard', label: 'Class Leaderboard', icon: '🏆' },
-    { id: 'doubts', label: 'Ask a Doubt & Replies', icon: '❓' },
-    {
-      id: 'announcements',
-      label: `Announcements (${announcements.length})`,
-      icon: '📢',
-    },
+    { id: 'overview', label: 'My scores' },
+    { id: 'goals', label: 'Goal' },
+    { id: 'tasks', label: 'Tasks', count: tasks.length },
+    { id: 'quizzes', label: 'Quizzes', count: quizzes.length },
+    { id: 'leaderboard', label: 'Leaderboard' },
+    { id: 'doubts', label: 'Doubts' },
+    { id: 'announcements', label: 'Announcements', count: announcements.length },
   ];
 
   // "New since your last visit": snapshot taken once per render so items keep
@@ -152,7 +141,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
       .filter(({ when }) => when >= now && when <= weekAhead)
       .sort((a, b) => a.when - b.when);
     if (!overdue.length && !dueSoon.length && !quizSoon.length) {
-      return `<div class="card" style="margin-bottom: 1.25rem;"><h3 class="card-title" style="margin-bottom: 0.25rem;">🗓️ This week</h3><p style="color: var(--text-muted); font-size: 0.85rem;">Nothing due in the next 7 days. 🎉</p></div>`;
+      return `<div class="card" style="margin-bottom: 1.25rem;"><h3 class="card-title" style="margin-bottom: 0.25rem;">This week</h3><p style="color: var(--text-muted); font-size: 0.85rem;">Nothing due in the next 7 days. 🎉</p></div>`;
     }
     const item = (kind, title, left, extra, cls = '') => `
       <div class="deadline-item ${cls}">
@@ -164,13 +153,13 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     return `
       <div class="card" style="margin-bottom: 1.25rem;" aria-labelledby="deadline-strip-title">
         <div class="card-header" style="margin-bottom: 0.6rem;">
-          <h3 class="card-title" id="deadline-strip-title">🗓️ This week</h3>
+          <h3 class="card-title" id="deadline-strip-title">This week</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Tasks you still need to submit and quizzes in the next 7 days</span>
         </div>
         <div class="deadline-strip">
-          ${overdue.map((t) => item('⚠️ Overdue task', t.title, 'Overdue', `Was due ${dueDeadline(t.dueDate).toLocaleDateString()} — submit as soon as you can`, 'overdue')).join('')}
-          ${dueSoon.map(({ t, when }) => item('📝 Task due', t.title, timeLeft(when), `Due ${when.toLocaleDateString()}`)).join('')}
-          ${quizSoon.map(({ q, when }) => item('⏱️ Quiz', q.title, timeLeft(when), when.toLocaleString())).join('')}
+          ${overdue.map((t) => item('Overdue task', t.title, 'Overdue', `Was due ${dueDeadline(t.dueDate).toLocaleDateString()} — submit as soon as you can`, 'overdue')).join('')}
+          ${dueSoon.map(({ t, when }) => item('Task due', t.title, timeLeft(when), `Due ${when.toLocaleDateString()}`)).join('')}
+          ${quizSoon.map(({ q, when }) => item('Quiz', q.title, timeLeft(when), when.toLocaleString())).join('')}
         </div>
       </div>`;
   }
@@ -187,7 +176,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           ? `
         <div class="card" style="border-left: 4px solid var(--teal); background-color: var(--teal-soft); margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
-            <strong style="color: var(--teal-text, var(--teal)); font-size: 0.95rem;">💬 Notice from Team Leader (${esc(teamMessages[0].author)})${noticeIsNew ? '<span class="new-pill">New</span>' : ''}</strong>
+            <strong style="color: var(--teal-text, var(--teal)); font-size: 0.95rem;">Notice from your team leader (${esc(teamMessages[0].author)})${noticeIsNew ? '<span class="new-pill">New</span>' : ''}</strong>
             <span style="font-size: 0.75rem; color: var(--text-muted);">${esc(new Date(teamMessages[0].timestamp).toLocaleDateString())}</span>
           </div>
           <p style="font-size: 0.9rem; color: var(--text-main); line-height: 1.45;">${esc(teamMessages[0].message)}</p>
@@ -203,7 +192,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
         <div class="card" style="border-left: 4px solid var(--purple); margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
             <h4 style="font-size: 1rem; font-weight: 700; color: var(--purple);">
-              🛡️ Active Academic Recovery & Peer Mentorship
+              Your support plan
             </h4>
             <span class="badge ${esc(myMentorship.status === 'resolved' ? 'badge-closed' : 'badge-support')}">${esc(myMentorship.status)}</span>
           </div>
@@ -240,7 +229,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                 : ''
             }
             <button class="btn btn-primary btn-sm" id="btn-print-my-report">
-              📄 View / Print Official Report Card
+              View report card
             </button>
           </div>
         </div>

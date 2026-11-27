@@ -87,18 +87,18 @@ export function renderExportToolbar(container, data) {
   container.innerHTML = `
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title">📥 Export Data</h3>
+        <h3 class="card-title">Export Data</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted);">Downloads a CSV file directly to your device</span>
       </div>
       <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.25rem 0;">
         <button class="btn btn-secondary" id="btn-export-marks">
-          📋 Export Marks Ledger
+          Download marks (CSV)
         </button>
         <button class="btn btn-secondary" id="btn-export-subs">
-          📤 Export Submissions Log
+          Download submissions (CSV)
         </button>
         <button class="btn btn-secondary" id="btn-export-metrics">
-          📊 Export Member Metrics
+          Download student metrics (CSV)
         </button>
       </div>
       <p class="form-hint" style="margin-top: 0.5rem;">

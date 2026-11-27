@@ -33,7 +33,7 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
         canManage
           ? `
         <div class="card" style="margin-bottom: 1rem;">
-          <div class="card-header"><h3 class="card-title">🗓️ Schedule a Quiz / Test</h3></div>
+          <div class="card-header"><h3 class="card-title">Schedule a Quiz / Test</h3></div>
           <div id="quiz-feedback"></div>
           <form id="form-add-quiz">
             <div class="form-group">

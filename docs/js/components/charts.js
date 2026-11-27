@@ -1,20 +1,41 @@
 /**
- * EconomicsPortal — Chart.js Visualizations (v3)
- * Modern Eye-Pleasing Palette:
- *   --teal: #0D9488 (Emerald Teal)
- *   --mint: #10B981 (Fresh Mint)
- *   --purple: #4F46E5 (Royal Indigo)
- *   --amber: #D97706 (Honey Amber)
- *   --red: #E11D48 (Coral Rose)
+ * EconomicsPortal — Chart.js charts.
+ * Colours come from the page's CSS tokens so charts match the current theme
+ * (graph paper or chalkboard): --teal outstanding, --purple strong,
+ * --amber needs attention, --red support plan.
  */
 
+function token(name, fallback) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function palette() {
+  return {
+    outstanding: token("--teal", "#0b6b4b"),
+    strong: token("--purple", "#2346b8"),
+    attention: token("--amber", "#8a5300"),
+    support: token("--red", "#b42318"),
+    text: token("--text-muted", "#4a586c"),
+    grid: token("--border-subtle", "#e4e9f0"),
+    surface: token("--bg-surface", "#ffffff"),
+  };
+}
+
+const FONT = "'Instrument Sans', sans-serif";
+
 export function getBandColor(score) {
+  const p = palette();
   const num = Number(score);
-  if (isNaN(num)) return "#D97706";
-  if (num >= 85) return "#0D9488"; // Emerald Teal
-  if (num >= 70) return "#10B981"; // Fresh Mint
-  if (num >= 60) return "#D97706"; // Warm Honey Amber
-  return "#E11D48";               // Coral Rose
+  if (isNaN(num)) return p.attention;
+  if (num >= 85) return p.outstanding;
+  if (num >= 70) return p.strong;
+  if (num >= 60) return p.attention;
+  return p.support;
 }
 
 /**
@@ -40,8 +61,8 @@ export function renderTeamAveragesChart(canvasId, teamAverages) {
         {
           data: data,
           backgroundColor: colors,
-          borderRadius: 6,
-          barThickness: 20,
+          borderRadius: 3,
+          barThickness: 18,
         },
       ],
     },
@@ -61,12 +82,12 @@ export function renderTeamAveragesChart(canvasId, teamAverages) {
         x: {
           min: 0,
           max: 100,
-          grid: { color: "rgba(0,0,0,0.06)" },
-          ticks: { font: { family: "Public Sans, sans-serif" } },
+          grid: { color: palette().grid },
+          ticks: { color: palette().text, font: { family: FONT } },
         },
         y: {
           grid: { display: false },
-          ticks: { font: { family: "Public Sans, sans-serif", weight: "600" } },
+          ticks: { color: palette().text, font: { family: FONT, weight: "600" } },
         },
       },
     },
@@ -113,9 +134,9 @@ export function renderBandDistributionChart(canvasId, memberMetrics, marks) {
       datasets: [
         {
           data: [outstanding, strong, attention, support],
-          backgroundColor: ["#0D9488", "#10B981", "#D97706", "#E11D48"],
+          backgroundColor: [palette().outstanding, palette().strong, palette().attention, palette().support],
           borderWidth: 2,
-          borderColor: "#ffffff",
+          borderColor: palette().surface,
         },
       ],
     },
@@ -127,7 +148,8 @@ export function renderBandDistributionChart(canvasId, memberMetrics, marks) {
           position: "bottom",
           labels: {
             boxWidth: 12,
-            font: { family: "Public Sans, sans-serif", size: 11 },
+            color: palette().text,
+            font: { family: FONT, size: 12 },
           },
         },
       },

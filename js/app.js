@@ -23,7 +23,7 @@ const footerEl = document.getElementById('site-footer');
 // THEME SETUP
 // ─────────────────────────────────────────────────────────────────────────────
 function initTheme() {
-  const savedTheme = localStorage.getItem('economics_portal_theme') || 'dark';
+  const savedTheme = localStorage.getItem('economics_portal_theme') || 'auto';
   applyTheme(savedTheme);
 }
 
@@ -54,15 +54,15 @@ function renderBanner() {
     bannerEl.innerHTML = `
       <div class="demo-banner">
         <span>
-          ⚡ <strong>Demo / Offline Mode Active</strong> — Running with interactive sample data.
+          <strong>Demo mode.</strong> You're using sample data stored in this browser; nothing is saved to the class sheet.
         </span>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
           ${
             localStorage.getItem('economics_portal_force_demo') === 'true'
-              ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Try Live API</button>`
-              : `<a href="https://github.com/GucciCreates/EconomicsPortal/blob/main/SETUP_GUIDE.md" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">Connect the live backend ↗</a>`
+              ? `<button id="btn-retry-live" class="btn btn-secondary btn-sm" >Try the live portal</button>`
+              : `<a href="https://github.com/GucciCreates/EconomicsPortal/blob/main/SETUP_GUIDE.md" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">How to connect the live portal</a>`
           }
-          <button id="btn-reset-demo" class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;">Reset Demo Data</button>
+          <button id="btn-reset-demo" class="btn btn-secondary btn-sm" >Reset sample data</button>
         </div>
       </div>
     `;
@@ -93,22 +93,28 @@ function renderBanner() {
 
 function renderHeader() {
   const user = getCurrentUser();
-  const theme = localStorage.getItem('economics_portal_theme') || 'dark';
-  const themeIcons = { auto: '🌓', light: '☀️', dark: '🌙' };
+  const theme = localStorage.getItem('economics_portal_theme') || 'auto';
+  const themeNames = { auto: 'Auto', light: 'Light', dark: 'Dark' };
 
   headerEl.innerHTML = `
     <div class="header-container">
       <a href="#" class="brand-wrapper" id="brand-link">
-        <div class="brand-mark">E</div>
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M4 5 C9 14, 14 18, 22 21" />
+            <path d="M4 21 C10 18, 15 12, 22 5" />
+            <circle cx="13" cy="14.6" r="2.6" fill="var(--marker)" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </div>
         <div class="brand-copy">
           <span>EconomicsPortal</span>
-          <small>Academic Ops</small>
+          <small>Dr. Numan's Economics class</small>
         </div>
       </a>
 
       <div class="header-actions">
-        <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Switch Theme (Current: ${esc(theme)})">
-          ${themeIcons[theme] || '🌓'}
+        <button class="btn btn-secondary btn-sm theme-toggle" id="btn-theme-toggle" title="Change theme" aria-label="Theme: ${esc(themeNames[theme] || 'Auto')}. Click to change.">
+          ${esc(themeNames[theme] || 'Auto')}
         </button>
 
         ${user ? `<div id="account-menu-host"></div>` : ''}
