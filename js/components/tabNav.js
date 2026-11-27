@@ -7,6 +7,8 @@
  *   tabNav.setActive("tabId");
  */
 
+import { esc } from "../utils.js";
+
 /**
  * @param {HTMLElement} container - The element to prepend the nav into
  * @param {Array<{id:string, label:string, icon?:string}>} tabs
@@ -24,11 +26,11 @@ export function createTabNav(container, tabs, onTabChange) {
     <button
       class="tab-btn"
       role="tab"
-      data-tab="${t.id}"
+      data-tab="${esc(t.id)}"
       aria-selected="false"
     >
-      ${t.icon ? `<span class="tab-icon">${t.icon}</span>` : ""}
-      <span>${t.label}</span>
+      ${t.icon ? `<span class="tab-icon">${esc(t.icon)}</span>` : ""}
+      <span>${esc(t.label)}</span>
     </button>
   `
     )

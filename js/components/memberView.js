@@ -11,6 +11,7 @@ import { renderQuizScheduler, cleanupQuizCountdowns } from './quizScheduler.js';
 import { renderLeaderboard } from './leaderboard.js';
 import { renderAnnouncementsPanel } from './announcementsPanel.js';
 import { openReportCardModal } from './reportCardModal.js';
+import { esc, linkHtml } from '../utils.js';
 
 export function renderMemberDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -41,9 +42,9 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
     <div class="card" style="margin-bottom: 1.25rem;">
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
         <div>
-          <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">${user.name}</h2>
+          <h2 style="font-size: 1.35rem; font-weight: 700; color: var(--text-main);">${esc(user.name)}</h2>
           <p style="color: var(--text-muted); font-size: 0.875rem;">
-            Student Workspace • Team <strong>${user.team}</strong>
+            Student Workspace • Team <strong>${esc(user.team)}</strong>
             ${myMetrics && myMetrics.atRisk ? `<span class="badge badge-atrisk" style="margin-left: 0.5rem;">Requires attention</span>` : ''}
           </p>
         </div>
@@ -51,9 +52,9 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           <div style="text-align: right;">
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
-              ${teamAverage !== null ? teamAverage : '—'}
+              ${esc(teamAverage !== null ? teamAverage : '—')}
             </div>
-            ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ''}
+            ${avgBand ? `<span class="badge ${esc(avgBand.cls)}">${esc(avgBand.label)}</span>` : ''}
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-refresh-mem">↻ Refresh</button>
         </div>
@@ -106,10 +107,10 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
           ? `
         <div class="card" style="border-left: 4px solid var(--teal); background-color: var(--teal-soft); margin-bottom: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.35rem;">
-            <strong style="color: var(--teal); font-size: 0.95rem;">💬 Notice from Team Leader (${teamMessages[0].author})</strong>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">${new Date(teamMessages[0].timestamp).toLocaleDateString()}</span>
+            <strong style="color: var(--teal); font-size: 0.95rem;">💬 Notice from Team Leader (${esc(teamMessages[0].author)})</strong>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">${esc(new Date(teamMessages[0].timestamp).toLocaleDateString())}</span>
           </div>
-          <p style="font-size: 0.9rem; color: var(--text-main); line-height: 1.45;">${teamMessages[0].message}</p>
+          <p style="font-size: 0.9rem; color: var(--text-main); line-height: 1.45;">${esc(teamMessages[0].message)}</p>
         </div>
       `
           : ''
@@ -124,19 +125,19 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
             <h4 style="font-size: 1rem; font-weight: 700; color: var(--purple);">
               🛡️ Active Academic Recovery & Peer Mentorship
             </h4>
-            <span class="badge ${myMentorship.status === 'resolved' ? 'badge-closed' : 'badge-support'}">${myMentorship.status}</span>
+            <span class="badge ${esc(myMentorship.status === 'resolved' ? 'badge-closed' : 'badge-support')}">${esc(myMentorship.status)}</span>
           </div>
           <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
             ${
               myMentorship.student.toLowerCase() === user.name.toLowerCase()
-                ? `You have been paired with peer mentor <strong>${myMentorship.mentor}</strong> to help you achieve your recovery goals.`
-                : `You are the assigned peer mentor supporting <strong>${myMentorship.student}</strong>.`
+                ? `You have been paired with peer mentor <strong>${esc(myMentorship.mentor)}</strong> to help you achieve your recovery goals.`
+                : `You are the assigned peer mentor supporting <strong>${esc(myMentorship.student)}</strong>.`
             }
           </p>
           <div style="background-color: var(--bg-subtle); padding: 0.65rem 0.85rem; border-radius: var(--radius); font-size: 0.8rem;">
             <strong>Target Milestones:</strong>
             <ul style="margin: 0.35rem 0 0 1rem; padding: 0; line-height: 1.6;">
-              ${(myMentorship.milestones || ['Weekly concept review', 'Pre-check problem sets', 'Score 65+ in Mock 3']).map((m) => `<li>${m}</li>`).join('')}
+              ${(myMentorship.milestones || ['Weekly concept review', 'Pre-check problem sets', 'Score 65+ in Mock 3']).map((m) => `<li>${esc(m)}</li>`).join('')}
             </ul>
           </div>
         </div>
@@ -193,18 +194,18 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                         const band = getScoreBand(m.quizScore);
                         return `
                       <tr>
-                        <td><strong>${m.cycle}</strong></td>
-                        <td>${m.mockNumber || '—'}</td>
-                        <td><strong class="num" style="font-size: 1.05rem;">${m.quizScore}</strong></td>
-                        <td>${m.submission || '—'}</td>
-                        <td>${m.attendance || '—'}</td>
-                        <td>${m.previewDone || '—'}</td>
-                        <td>${m.peerRating || '—'}</td>
-                        <td>${m.punctual || '—'}</td>
-                        <td><span class="badge ${band.cls}">${band.label}</span></td>
+                        <td><strong>${esc(m.cycle)}</strong></td>
+                        <td>${esc(m.mockNumber || '—')}</td>
+                        <td><strong class="num" style="font-size: 1.05rem;">${esc(m.quizScore)}</strong></td>
+                        <td>${esc(m.submission || '—')}</td>
+                        <td>${esc(m.attendance || '—')}</td>
+                        <td>${esc(m.previewDone || '—')}</td>
+                        <td>${esc(m.peerRating || '—')}</td>
+                        <td>${esc(m.punctual || '—')}</td>
+                        <td><span class="badge ${esc(band.cls)}">${esc(band.label)}</span></td>
                         <td style="font-size: 0.8rem; color: var(--text-muted);">
-                          ${m.notes || '—'}
-                          ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Verified by: ${m.editedBy}</span>` : ''}
+                          ${esc(m.notes || '—')}
+                          ${m.editedBy ? `<br/><span style="font-size: 0.7rem; color: var(--purple);">Verified by: ${esc(m.editedBy)}</span>` : ''}
                         </td>
                       </tr>
                     `;
@@ -259,7 +260,7 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
   function renderTasksTab(wrap) {
     wrap.innerHTML = `
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Assigned Tasks (${tasks.length})</h3></div>
+        <div class="card-header"><h3 class="card-title">Assigned Tasks (${esc(tasks.length)})</h3></div>
         <div id="tasks-list">
           ${
             tasks.length === 0
@@ -273,19 +274,19 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                     const isDone = task.status === 'done';
 
                     return `
-                    <div class="task-item ${isDone ? 'done' : ''}">
+                    <div class="task-item ${esc(isDone ? 'done' : '')}">
                       <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.4rem;">
-                        <h4 style="font-size: 0.95rem; font-weight: 700;">${task.title}</h4>
-                        <span class="badge ${isDone ? 'badge-done' : 'badge-open'}">${task.status}</span>
+                        <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(task.title)}</h4>
+                        <span class="badge ${esc(isDone ? 'badge-done' : 'badge-open')}">${esc(task.status)}</span>
                       </div>
                       <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.6rem;">
-                        ${task.description || 'No description provided.'}
+                        ${esc(task.description || 'No description provided.')}
                       </p>
                       
                       <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.65rem;">
-                        <span>Due: <strong>${task.dueDate || 'Not set'}</strong></span>
-                        <span>Scope: <strong>${task.team === 'ALL' ? 'All Teams' : 'Team ' + task.team}</strong></span>
-                        ${task.fileUrl ? `<a href="${task.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Attachment ↗</a>` : ''}
+                        <span>Due: <strong>${esc(task.dueDate || 'Not set')}</strong></span>
+                        <span>Scope: <strong>${esc(task.team === 'ALL' ? 'All Teams' : 'Team ' + task.team)}</strong></span>
+                        ${linkHtml(task.fileUrl, 'View Attachment ↗', 'style="font-weight: 600;"')}
                       </div>
 
                       <div style="border-top: 1px dashed var(--border-color); padding-top: 0.6rem; margin-top: 0.5rem;">
@@ -293,12 +294,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                           isSubmitted
                             ? `
                           <div style="font-size: 0.85rem; color: var(--teal); display: flex; justify-content: space-between; align-items: center;">
-                            <span>✓ <strong>Submitted:</strong> ${submission.content || 'Uploaded'}</span>
-                            ${submission.fileUrl ? `<a href="${submission.fileUrl}" target="_blank" style="font-size: 0.8rem; font-weight: 600;">View File ↗</a>` : ''}
+                            <span>✓ <strong>Submitted:</strong> ${esc(submission.content || 'Uploaded')}</span>
+                            ${linkHtml(submission.fileUrl, 'View File ↗', 'style="font-size: 0.8rem; font-weight: 600;"')}
                           </div>
                         `
                             : `
-                          <form class="form-submit-task" data-task-id="${task.id}">
+                          <form class="form-submit-task" data-task-id="${esc(task.id)}">
                             <div class="form-group" style="margin-bottom: 0.5rem;">
                               <label class="form-label" style="font-size: 0.8rem;">Submission Notes / Answer summary</label>
                               <input type="text" class="form-control form-control-sm sub-content" placeholder="e.g. Completed IS-LM problem set questions 1 to 5" required />
@@ -463,14 +464,14 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
               onRefresh();
             }, 2500);
           } else {
-            feedback.innerHTML = `<div class="alert alert-error">${res.error || 'Failed to submit.'}</div>`;
+            feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Failed to submit.')}</div>`;
             window.showEconomicsToast(
               res.error || 'Failed to submit your question.',
               'error',
             );
           }
         } catch (err) {
-          feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+          feedback.innerHTML = `<div class="alert alert-error">Error: ${esc(err.message)}</div>`;
           window.showEconomicsToast('Error: ' + err.message, 'error');
         } finally {
           submitBtn.disabled = false;

@@ -10,7 +10,7 @@
 import { apiLogin } from '../api.js';
 import { setCurrentUser } from '../auth.js';
 import { isDemoMode } from '../config.js';
-import { escapeHtml } from '../utils.js';
+import { esc, escapeHtml } from '../utils.js';
 
 export function renderModernLogin(container, onSuccess, onForceDemo, options = {}) {
   const rememberedName =
@@ -235,7 +235,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
     } catch (err) {
       errorBox.innerHTML = `
         <div class="alert alert-error auth-error-alert">
-          <strong>Connection error: ${err.message}</strong>
+          <strong>Connection error: ${esc(err.message)}</strong>
           <p style="font-size: 0.8rem; margin: 0.35rem 0;">
             Could not reach Google Apps Script. You can continue in offline demo mode.
           </p>
@@ -259,7 +259,7 @@ export function renderModernLogin(container, onSuccess, onForceDemo, options = {
   });
 
   function triggerError(msg) {
-    errorBox.innerHTML = `<div class="alert alert-error auth-error-alert">${msg}</div>`;
+    errorBox.innerHTML = `<div class="alert alert-error auth-error-alert">${esc(msg)}</div>`;
     const card = container.querySelector('.auth-card');
     card.classList.remove('shake');
     void card.offsetWidth;

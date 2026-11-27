@@ -58,18 +58,18 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     <div class="card" style="margin-bottom: 1.25rem;">
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
         <div>
-          <h2 style="font-size: 1.35rem; font-weight: 700;">Team Leader Command — ${user.name}</h2>
+          <h2 style="font-size: 1.35rem; font-weight: 700;">Team Leader Command — ${esc(user.name)}</h2>
           <p style="color: var(--text-muted); font-size: 0.875rem;">
-            Squad Leader: <strong>Team ${user.team}</strong> • ${teamMembers.length} active students
+            Squad Leader: <strong>Team ${esc(user.team)}</strong> • ${esc(teamMembers.length)} active students
           </p>
         </div>
         <div style="display: flex; gap: 1.5rem; align-items: center;">
           <div style="text-align: right;">
             <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Team Average</div>
             <div style="font-size: 1.75rem; font-weight: 800; color: var(--teal);" class="num">
-              ${teamAverage !== null ? teamAverage : '—'}
+              ${esc(teamAverage !== null ? teamAverage : '—')}
             </div>
-            ${avgBand ? `<span class="badge ${avgBand.cls}">${avgBand.label}</span>` : ''}
+            ${avgBand ? `<span class="badge ${esc(avgBand.cls)}">${esc(avgBand.label)}</span>` : ''}
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-refresh-tl">↻ Refresh</button>
         </div>
@@ -80,22 +80,22 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     <div class="kpi-grid">
       <div class="kpi-card">
         <span class="kpi-label">Team Members</span>
-        <span class="kpi-val num">${teamMembers.length}</span>
+        <span class="kpi-val num">${esc(teamMembers.length)}</span>
         <span class="kpi-sub">Students under guidance</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">Submission Activity</span>
-        <span class="kpi-val num">${teamSubmissions.length}</span>
-        <span class="kpi-sub">${completedRate}% completion rate</span>
+        <span class="kpi-val num">${esc(teamSubmissions.length)}</span>
+        <span class="kpi-sub">${esc(completedRate)}% completion rate</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">At-Risk Alerts</span>
-        <span class="kpi-val num" style="color: ${atRiskMembers.length > 0 ? 'var(--red)' : 'var(--teal)'};">${atRiskMembers.length}</span>
-        <span class="kpi-sub">${atRiskMembers.length > 0 ? 'Requires team support' : 'All passing'}</span>
+        <span class="kpi-val num" style="color: ${esc(atRiskMembers.length > 0 ? 'var(--red)' : 'var(--teal)')};">${esc(atRiskMembers.length)}</span>
+        <span class="kpi-sub">${esc(atRiskMembers.length > 0 ? 'Requires team support' : 'All passing')}</span>
       </div>
       <div class="kpi-card">
         <span class="kpi-label">Pending Grading</span>
-        <span class="kpi-val num" style="color: var(--purple);">${teamSubmissions.filter((s) => !s.gradingRequested).length}</span>
+        <span class="kpi-val num" style="color: var(--purple);">${esc(teamSubmissions.filter((s) => !s.gradingRequested).length)}</span>
         <span class="kpi-sub">Submissions ready to forward</span>
       </div>
     </div>
@@ -105,7 +105,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
       atRiskMembers.length > 0
         ? `
       <div class="at-risk-panel" style="margin-bottom: 1.25rem;">
-        <div class="at-risk-title">⚠️ At-Risk Team Members (${atRiskMembers.length})</div>
+        <div class="at-risk-title">⚠️ At-Risk Team Members (${esc(atRiskMembers.length)})</div>
         <p style="font-size: 0.85rem; margin-bottom: 0.5rem;">
           These members need guidance on upcoming problem sets and mock reviews:
         </p>
@@ -113,7 +113,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
           ${atRiskMembers
             .map((m) => {
               const name = m.member || m.name;
-              return `<span class="badge badge-support" style="padding: 0.35rem 0.65rem;">${name} (Follow up)</span>`;
+              return `<span class="badge badge-support" style="padding: 0.35rem 0.65rem;">${esc(name)} (Follow up)</span>`;
             })
             .join(' ')}
         </div>
@@ -172,7 +172,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     wrap.innerHTML = `
       <div class="card" style="margin-bottom: 1.25rem;">
         <div class="card-header">
-          <h3 class="card-title">Team ${user.team} Member Roster</h3>
+          <h3 class="card-title">Team ${esc(user.team)} Member Roster</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted);">Click "Report Card" to view or print official summaries</span>
         </div>
         <div style="display: flex; flex-direction: column; gap: 1rem;">
@@ -186,15 +186,15 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
               <div style="border: 1px solid var(--border-color); border-radius: var(--radius); padding: 1rem; background-color: var(--bg-surface);">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
                   <div>
-                    <h4 style="font-size: 1.05rem; font-weight: 700;">${memberName}</h4>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">Team ${user.team}</span>
+                    <h4 style="font-size: 1.05rem; font-weight: 700;">${esc(memberName)}</h4>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Team ${esc(user.team)}</span>
                   </div>
                   <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
-                    ${memMarks.length > 1 ? `<canvas id="sparkline-${memberName.replace(/\s+/g, '_')}" width="120" height="32"></canvas>` : ''}
-                    <button class="btn btn-secondary btn-sm btn-view-report" data-name="${memberName}">
+                    ${memMarks.length > 1 ? `<canvas id="sparkline-${slug(memberName)}" width="120" height="32"></canvas>` : ''}
+                    <button class="btn btn-secondary btn-sm btn-view-report" data-name="${esc(memberName)}">
                       📄 Report Card
                     </button>
-                    <button class="btn btn-secondary btn-sm btn-nudge-member" data-name="${memberName}" title="Copy check-in reminder">
+                    <button class="btn btn-secondary btn-sm btn-nudge-member" data-name="${esc(memberName)}" title="Copy check-in reminder">
                       🔔 Nudge
                     </button>
                   </div>
@@ -217,7 +217,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
           const scores = memMarks
             .map((m) => Number(m.quizScore))
             .filter((s) => !isNaN(s));
-          const canvasId = `sparkline-${memberName.replace(/\s+/g, '_')}`;
+          const canvasId = `sparkline-${slug(memberName)}`;
           renderSparkline(canvasId, scores);
         }
       });
@@ -270,7 +270,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
       <div class="card">
         <div class="card-header" style="flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <h3 class="card-title">Team ${user.team} Submissions & Test Review</h3>
+            <h3 class="card-title">Team ${esc(user.team)} Submissions & Test Review</h3>
             <span style="font-size: 0.8rem; color: var(--text-muted);">
               Inspect submitted work and request official evaluation from Group Leader Shehroz or Sajal.
             </span>
@@ -297,27 +297,28 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
             <tbody>
               ${
                 teamSubmissions.length === 0
-                  ? `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No submissions turned in yet by Team ${user.team}.</td></tr>`
+                  ? `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No submissions turned in yet by Team ${esc(user.team)}.</td></tr>`
                   : teamSubmissions
                       .map((s) => {
                         const isRequested = Boolean(s.gradingRequested);
                         return `
                       <tr>
-                        <td><strong>${s.member}</strong></td>
-                        <td style="font-family: monospace; font-size: 0.8rem;">${s.taskId}</td>
-                        <td style="font-size: 0.85rem;">${s.content || 'Completed assignment'}</td>
+                        <td><strong>${esc(s.member)}</strong></td>
+                        <td style="font-family: monospace; font-size: 0.8rem;">${esc(s.taskId)}</td>
+                        <td style="font-size: 0.85rem;">${esc(s.content || 'Completed assignment')}</td>
                         <td>
-                          ${
-                            s.fileUrl
-                              ? `<a href="${s.fileUrl}" target="_blank" rel="noopener noreferrer" style="font-weight: 600;">View Drive File ↗</a>`
-                              : `<span style="color: var(--text-muted); font-size: 0.8rem;">Text only</span>`
-                          }
+                          ${linkHtml(
+                            s.fileUrl,
+                            'View Drive File ↗',
+                            'style="font-weight: 600;"',
+                            `<span style="color: var(--text-muted); font-size: 0.8rem;">Text only</span>`,
+                          )}
                         </td>
-                        <td style="font-size: 0.8rem; color: var(--text-muted);">${new Date(s.timestamp).toLocaleDateString()}</td>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">${esc(new Date(s.timestamp).toLocaleDateString())}</td>
                         <td>
                           ${
                             isRequested
-                              ? `<span class="badge badge-done" title="${s.reviewNotes || 'Forwarded by leader'}">⏳ Forwarded to Sajal</span>`
+                              ? `<span class="badge badge-done" title="${esc(s.reviewNotes || 'Forwarded by leader')}">⏳ Forwarded to Sajal</span>`
                               : `<span class="badge badge-open">Pending Leader Review</span>`
                           }
                         </td>
@@ -325,7 +326,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
                           ${
                             !isRequested
                               ? `
-                            <button class="btn btn-primary btn-sm btn-request-grading" data-id="${s.id}" data-member="${s.member}">
+                            <button class="btn btn-primary btn-sm btn-request-grading" data-id="${esc(s.id)}" data-member="${esc(s.member)}">
                               Forward for Grading ↗
                             </button>
                           `
@@ -358,7 +359,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
                 <div>
                   <h3 style="font-size: 1.15rem; font-weight: 700;">Request Official Grading</h3>
                   <p style="font-size: 0.85rem; color: var(--text-muted);">
-                    Forwarding submission by <strong>${member}</strong> to Group Leader & Sajal
+                    Forwarding submission by <strong>${esc(member)}</strong> to Group Leader & Sajal
                   </p>
                 </div>
                 <button class="btn btn-secondary btn-sm" id="btn-close-req-modal">✕</button>
@@ -440,22 +441,22 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
       <div class="card" style="margin-bottom: 1.25rem;">
         <div class="card-header"><h3 class="card-title">💬 Post Team Announcement</h3></div>
         <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
-          Messages posted here are displayed directly to members of <strong>Team ${user.team}</strong> on their dashboard.
+          Messages posted here are displayed directly to members of <strong>Team ${esc(user.team)}</strong> on their dashboard.
         </p>
 
         <div id="tm-feedback"></div>
 
         <form id="form-add-team-msg">
           <div class="form-group">
-            <label class="form-label">Message for Team ${user.team}</label>
+            <label class="form-label">Message for Team ${esc(user.team)}</label>
             <textarea id="tm-body" class="form-control" rows="3" placeholder="e.g. Reminder: Group review call on Thursday at 5 PM. Bring questions on IS-LM model!" required></textarea>
           </div>
-          <button type="submit" class="btn btn-primary" id="btn-post-team-msg">Send to Team ${user.team}</button>
+          <button type="submit" class="btn btn-primary" id="btn-post-team-msg">Send to Team ${esc(user.team)}</button>
         </form>
       </div>
 
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Active Team Noticeboard (${teamMessages.length})</h3></div>
+        <div class="card-header"><h3 class="card-title">Active Team Noticeboard (${esc(teamMessages.length)})</h3></div>
         <div>
           ${
             teamMessages.length === 0
@@ -465,11 +466,11 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
                     (msg) => `
                 <div class="announcement-item" style="margin-bottom: 0.75rem; border-left: 4px solid var(--teal);">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-                    <strong style="font-size: 0.95rem;">Notice from ${msg.author}</strong>
-                    <button class="btn btn-danger btn-sm btn-delete-tm" data-id="${msg.id}" title="Remove notice">🗑️</button>
+                    <strong style="font-size: 0.95rem;">Notice from ${esc(msg.author)}</strong>
+                    <button class="btn btn-danger btn-sm btn-delete-tm" data-id="${esc(msg.id)}" title="Remove notice">🗑️</button>
                   </div>
-                  <p class="ann-body">${msg.message}</p>
-                  <div class="ann-meta">${new Date(msg.timestamp).toLocaleString()}</div>
+                  <p class="ann-body">${esc(msg.message)}</p>
+                  <div class="ann-meta">${esc(new Date(msg.timestamp).toLocaleString())}</div>
                 </div>
               `,
                   )
@@ -497,7 +498,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
         });
 
         if (res.ok) {
-          feedback.innerHTML = `<div class="alert alert-success">Notice posted to Team ${user.team}!</div>`;
+          feedback.innerHTML = `<div class="alert alert-success">Notice posted to Team ${esc(user.team)}!</div>`;
           window.showEconomicsToast(
             'Team notice posted successfully.',
             'success',
@@ -508,14 +509,14 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
             onRefresh();
           }, 1500);
         } else {
-          feedback.innerHTML = `<div class="alert alert-error">${res.error || 'Failed to post message.'}</div>`;
+          feedback.innerHTML = `<div class="alert alert-error">${esc(res.error || 'Failed to post message.')}</div>`;
           window.showEconomicsToast(
             res.error || 'Failed to post message.',
             'error',
           );
         }
       } catch (err) {
-        feedback.innerHTML = `<div class="alert alert-error">Error: ${err.message}</div>`;
+        feedback.innerHTML = `<div class="alert alert-error">Error: ${esc(err.message)}</div>`;
         window.showEconomicsToast('Error: ' + err.message, 'error');
       } finally {
         submitBtn.disabled = false;
@@ -555,7 +556,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
   function renderTasksTab(wrap) {
     wrap.innerHTML = `
       <div class="card">
-        <div class="card-header"><h3 class="card-title">Team Tasks (${tasks.length})</h3></div>
+        <div class="card-header"><h3 class="card-title">Team Tasks (${esc(tasks.length)})</h3></div>
         <div id="tl-tasks-list">
           ${
             tasks.length === 0
@@ -564,16 +565,16 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
                   .map((task) => {
                     const isDone = task.status === 'done';
                     return `
-                  <div class="task-item ${isDone ? 'done' : ''}">
+                  <div class="task-item ${esc(isDone ? 'done' : '')}">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.35rem;">
-                      <h4 style="font-size: 0.95rem; font-weight: 700;">${task.title}</h4>
-                      <span class="badge ${isDone ? 'badge-done' : 'badge-open'}">${task.status}</span>
+                      <h4 style="font-size: 0.95rem; font-weight: 700;">${esc(task.title)}</h4>
+                      <span class="badge ${esc(isDone ? 'badge-done' : 'badge-open')}">${esc(task.status)}</span>
                     </div>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.45rem;">
-                      ${task.description || 'No description provided.'}
+                      ${esc(task.description || 'No description provided.')}
                     </p>
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem;">
-                      <span>Due: <strong>${task.dueDate || 'Not set'}</strong></span>
+                      <span>Due: <strong>${esc(task.dueDate || 'Not set')}</strong></span>
                       <div>
                         ${
                           isDone

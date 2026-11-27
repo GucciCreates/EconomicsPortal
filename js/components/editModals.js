@@ -2,6 +2,8 @@
  * EconomicsPortal — Modal Form Handlers for Edit Mark & Edit Task (v2)
  */
 
+import { esc } from "../utils.js";
+
 export function openEditMarkModal(mark, onSave) {
   const existing = document.getElementById("edit-mark-modal");
   if (existing) existing.remove();
@@ -12,20 +14,20 @@ export function openEditMarkModal(mark, onSave) {
   modal.innerHTML = `
     <div class="modal-content">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-        <h3 style="font-size: 1.1rem; font-weight: 700;">Edit Mark — ${mark.member} (${mark.cycle})</h3>
+        <h3 style="font-size: 1.1rem; font-weight: 700;">Edit Mark — ${esc(mark.member)} (${esc(mark.cycle)})</h3>
         <button type="button" class="btn btn-secondary btn-sm" id="btn-close-edit-mark">✕</button>
       </div>
 
       <form id="form-edit-mark">
         <div class="form-group">
           <label class="form-label">Tested Topic / Unit</label>
-          <input type="text" id="edit-mark-cycle" class="form-control" value="${mark.cycle || ""}" required />
+          <input type="text" id="edit-mark-cycle" class="form-control" value="${esc(mark.cycle || "")}" required />
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
           <div class="form-group">
             <label class="form-label">Quiz Score (0-100)</label>
-            <input type="number" id="edit-mark-quiz" class="form-control" min="0" max="100" value="${mark.quizScore}" required />
+            <input type="number" id="edit-mark-quiz" class="form-control" min="0" max="100" value="${esc(mark.quizScore)}" required />
           </div>
           <div class="form-group">
             <label class="form-label">Submission</label>
@@ -39,7 +41,7 @@ export function openEditMarkModal(mark, onSave) {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
           <div class="form-group">
             <label class="form-label">Attendance Rate</label>
-            <input type="text" id="edit-mark-att" class="form-control" value="${mark.attendance || "100%"}" />
+            <input type="text" id="edit-mark-att" class="form-control" value="${esc(mark.attendance || "100%")}" />
           </div>
           <div class="form-group">
             <label class="form-label">Preview Completed</label>
@@ -54,7 +56,7 @@ export function openEditMarkModal(mark, onSave) {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
           <div class="form-group">
             <label class="form-label">Peer Rating (1-5)</label>
-            <input type="number" step="0.1" min="1" max="5" id="edit-mark-peer" class="form-control" value="${mark.peerRating || ""}" placeholder="e.g. 4.5" />
+            <input type="number" step="0.1" min="1" max="5" id="edit-mark-peer" class="form-control" value="${esc(mark.peerRating || "")}" placeholder="e.g. 4.5" />
           </div>
           <div class="form-group">
             <label class="form-label">Punctual</label>
@@ -68,7 +70,7 @@ export function openEditMarkModal(mark, onSave) {
 
         <div class="form-group">
           <label class="form-label">Performance Notes / Re-mark reason</label>
-          <input type="text" id="edit-mark-notes" class="form-control" value="${mark.notes || ""}" placeholder="Notes..." />
+          <input type="text" id="edit-mark-notes" class="form-control" value="${esc(mark.notes || "")}" placeholder="Notes..." />
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">
@@ -129,12 +131,12 @@ export function openEditTaskModal(task, onSave) {
       <form id="form-edit-task">
         <div class="form-group">
           <label class="form-label">Task Title</label>
-          <input type="text" id="edit-task-title" class="form-control" value="${task.title}" required />
+          <input type="text" id="edit-task-title" class="form-control" value="${esc(task.title)}" required />
         </div>
 
         <div class="form-group">
           <label class="form-label">Description / Instructions</label>
-          <textarea id="edit-task-desc" class="form-control" rows="2" required>${task.description || ""}</textarea>
+          <textarea id="edit-task-desc" class="form-control" rows="2" required>${esc(task.description || "")}</textarea>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
@@ -150,13 +152,13 @@ export function openEditTaskModal(task, onSave) {
           </div>
           <div class="form-group">
             <label class="form-label">Due Date</label>
-            <input type="date" id="edit-task-due" class="form-control" value="${task.dueDate || ""}" required />
+            <input type="date" id="edit-task-due" class="form-control" value="${esc(task.dueDate || "")}" required />
           </div>
         </div>
 
         <div class="form-group">
           <label class="form-label">Google Drive Link</label>
-          <input type="url" id="edit-task-file" class="form-control" value="${task.fileUrl || ""}" />
+          <input type="url" id="edit-task-file" class="form-control" value="${esc(task.fileUrl || "")}" />
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem;">

@@ -9,6 +9,7 @@ import { renderMemberDashboard } from './components/memberView.js';
 import { renderTeamLeaderDashboard } from './components/teamLeaderView.js';
 import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
 import { renderModernLogin } from './components/loginView.js';
+import { esc } from './utils.js';
 
 // DOM Root Elements
 const headerEl = document.getElementById('site-header');
@@ -104,7 +105,7 @@ function renderHeader() {
       </a>
 
       <div class="header-actions">
-        <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Switch Theme (Current: ${theme})">
+        <button class="btn btn-secondary btn-sm" id="btn-theme-toggle" title="Switch Theme (Current: ${esc(theme)})">
           ${themeIcons[theme] || '🌓'}
         </button>
 
@@ -112,8 +113,8 @@ function renderHeader() {
           user
             ? `
           <div class="user-badge">
-            <span>${user.name}</span>
-            <span class="role-pill role-${user.role}">${user.role.replace('_', ' ')}</span>
+            <span>${esc(user.name)}</span>
+            <span class="role-pill role-${esc(user.role)}">${esc(user.role.replace('_', ' '))}</span>
           </div>
           <button class="btn btn-secondary btn-sm" id="btn-logout" title="Log out">
             Log out
@@ -194,7 +195,7 @@ async function loadDashboard() {
       <div class="card skeleton-tile" style="padding: 1.5rem; text-align: center;">
         <div class="auth-spinner" style="border: 3px solid rgba(83, 74, 183, 0.2); border-top-color: var(--purple); width: 32px; height: 32px; margin: 1rem auto;"></div>
         <h3 style="font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.25rem;">Loading Economics Ledger</h3>
-        <p style="color: var(--text-muted); font-size: 0.85rem;">Authenticating session for <strong>${user.name}</strong>...</p>
+        <p style="color: var(--text-muted); font-size: 0.85rem;">Authenticating session for <strong>${esc(user.name)}</strong>...</p>
       </div>
     </div>
   `;
@@ -205,7 +206,7 @@ async function loadDashboard() {
     if (!res.ok) {
       mainEl.innerHTML = `
         <div class="alert alert-error" style="max-width: 600px; margin: 2rem auto;">
-          Failed to load dashboard: ${res.error}
+          Failed to load dashboard: ${esc(res.error)}
           <div style="margin-top: 0.75rem;">
             <button class="btn btn-secondary btn-sm" id="btn-retry-load">Retry</button>
           </div>
@@ -234,7 +235,7 @@ async function loadDashboard() {
   } catch (err) {
     mainEl.innerHTML = `
       <div class="alert alert-error" style="max-width: 600px; margin: 2rem auto;">
-        Error connecting to API: ${err.message}
+        Error connecting to API: ${esc(err.message)}
         <div style="margin-top: 0.75rem;">
           <button class="btn btn-secondary btn-sm" id="btn-retry-load">Retry</button>
         </div>
@@ -279,7 +280,7 @@ window.showEconomicsToast = function showEconomicsToast(
 ) {
   const host = ensureToastHost();
   const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
+  toast.className = `toast toast-${esc(type)}`;
   toast.textContent = message;
   host.appendChild(toast);
 
