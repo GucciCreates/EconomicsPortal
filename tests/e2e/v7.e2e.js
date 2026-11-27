@@ -83,7 +83,8 @@ test('F7: the instructor can reset a PIN from Admin (Demo Mode, same rule as the
     await page.click('#pins-tbody [data-action="reset"][data-name="Bilal"]');
     await page.fill('#input-new-pin', '5317');
     await page.click('#btn-save-pin');
-    await page.waitForSelector('#pin-modal-feedback .alert-success');
+    await page.waitForSelector('.pin-reveal');
+    await page.click('.modal-overlay [data-action="done"]');
     await page.waitForSelector('.modal-overlay', { state: 'detached' });
     await page.click('#btn-account-menu');
     await page.click('#btn-logout');
@@ -182,6 +183,72 @@ test('F17: the Demo Mode bar is inside a named landmark (screen readers can find
       return false;
     });
     assert.equal(inLandmark, true);
+  } finally {
+    await browser.close();
+  }
+});
+
+// ── PIN reset (reported not working: old server code + 2-second dialog) ──
+
+test('PIN reset: the new PIN stays on screen with Copy until Done, and works', { timeout: 60000 }, async () => {
+  const { createBackend } = require('../gasFakes');
+  const backend = createBackend();
+  backend.api.setup();
+  backend.api.setPinForUser('Shehroz', '246810');
+  const { browser, page, errors } = await openApp({ demo: false, backend });
+  try {
+    await page.fill('#login-name', 'Shehroz');
+    await page.fill('#login-pin', '246810');
+    await page.click('#btn-submit-login');
+    await page.click('.tab-btn[data-tab="admin"]');
+    await page.click('#pins-tbody [data-action="reset"][data-name="Ramesh"]');
+    await page.click('.modal-overlay [data-action="random"]');
+    await page.click('#btn-save-pin');
+    await page.waitForSelector('.pin-reset-done .pin-reveal');
+    const shown = (await page.textContent('.pin-reveal')).replace(/\s/g, '');
+    assert.match(shown, /^\d{6}$/);
+    await page.waitForTimeout(3000);
+    assert.ok(await page.isVisible('.pin-reveal'), 'still shown after 3 s: nothing disappears on its own');
+    assert.ok(await page.isVisible('.modal-overlay [data-action="copy-pin"]'));
+    await page.click('.modal-overlay [data-action="done"]');
+    await page.waitForSelector('.modal-overlay', { state: 'detached' });
+    assert.equal(backend.post({ action: 'login', name: 'Ramesh', pin: shown }).ok, true, 'the shown PIN signs in');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('PIN reset: leaders are told when the class server runs old code, and why a reset failed', { timeout: 60000 }, async () => {
+  const { createBackend } = require('../gasFakes');
+  const backend = createBackend();
+  backend.api.setup();
+  backend.api.setPinForUser('Shehroz', '246810');
+  // Behave like the pre-v6 server: no version in replies, only 4-digit PINs.
+  const old = (body) => {
+    if (body.action === 'updatePin' && !/^\d{4}$/.test(String(body.newPin))) {
+      return { ok: false, code: 'VALIDATION', error: 'PIN must be exactly 4 numeric digits.' };
+    }
+    const res = backend.post(body);
+    if (res && res.data) delete res.data.serverVersion;
+    return res;
+  };
+  const { browser, page } = await openApp({
+    demo: false,
+    apiHandler: (route, body) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(old(body)) }),
+  });
+  try {
+    await page.fill('#login-name', 'Shehroz');
+    await page.fill('#login-pin', '246810');
+    await page.click('#btn-submit-login');
+    await page.waitForSelector('.server-outdated');
+    assert.match(await page.textContent('.server-outdated'), /old version|out of date/i);
+    await page.click('.tab-btn[data-tab="admin"]');
+    await page.click('#pins-tbody [data-action="reset"][data-name="Ramesh"]');
+    await page.click('.modal-overlay [data-action="random"]');
+    await page.click('#btn-save-pin');
+    await page.waitForSelector('#pin-modal-feedback .alert-error');
+    assert.match(await page.textContent('#pin-modal-feedback'), /Code\.gs|server.*old|update/i);
   } finally {
     await browser.close();
   }

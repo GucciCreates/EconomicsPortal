@@ -1,6 +1,6 @@
 /**
  * Leaders' "Admin" tab: data export, the activity log (instructor and group
- * leader) and PIN resets (group leader). The assistant sees only export.
+ * leader) and PIN resets (instructor and group leader). The assistant sees only export.
  */
 
 import { apiUpdatePin, apiGetUsers } from '../../api.js';
@@ -8,9 +8,17 @@ import { esc } from '../../utils.js';
 import { renderExportToolbar } from '../exportUtils.js';
 import { renderActivityLog } from '../activityLog.js';
 import { openModal } from '../modal.js';
-import { bindActions, runAction, alertHtml, emptyState, teamChip, sameName } from '../ui.js';
+import { bindActions, runAction, alertHtml, emptyState, teamChip, sameName, copyText, toast } from '../ui.js';
 
 const LONG_PIN_ROLES = ['instructor', 'group_leader', 'assistant'];
+
+/** The pre-v6 server only knew 4-digit PINs; say what's really wrong. */
+function explainResetError(message) {
+  if (/exactly 4/i.test(message)) {
+    return 'The class server is running old code that only accepts 4-digit PINs. The sheet owner needs to paste the new backend/Code.gs into Apps Script and deploy a new version. Until then, type a 4-digit PIN for students.';
+  }
+  return message;
+}
 
 export function renderAdminTab(panel, ctx) {
   const { data, canLead, isGroupLeader, isInstructor } = ctx;
@@ -104,8 +112,32 @@ async function renderPins(shell, data) {
     });
     const input = dialog.querySelector('#input-new-pin');
     const feedback = dialog.querySelector('#pin-modal-feedback');
+
+    // After saving, the new PIN stays on screen until "Done", so a Random PIN
+    // can't vanish before it's written down. It is never shown again after that.
+    function showDone(pin) {
+      const body = dialog.querySelector('#form-update-pin');
+      feedback.innerHTML = '';
+      body.outerHTML = `
+        <div class="pin-reset-done" role="status">
+          <p>${esc(person.name)}'s new PIN:</p>
+          <output class="pin-reveal num" aria-label="New PIN ${esc(pin.split('').join(' '))}">${esc(pin)}</output>
+          <p class="form-hint">Give it to ${esc(person.name)} in person. They are signed out everywhere and can choose their own PIN under their name → Change my PIN.</p>
+          <div class="modal-btn-row">
+            <button type="button" class="btn btn-secondary" data-action="copy-pin">Copy PIN</button>
+            <button type="button" class="btn btn-primary" data-action="done">Done</button>
+          </div>
+        </div>`;
+      dialog.querySelector('[data-action="done"]').focus();
+    }
+
     bindActions(dialog, {
       click: {
+        'copy-pin': async () => {
+          const pin = dialog.querySelector('.pin-reveal').textContent.trim();
+          if (await copyText(pin, 'Copy the new PIN:')) toast('PIN copied.', 'success');
+        },
+        done: () => close(),
         random: () => {
           const buf = new Uint32Array(1);
           crypto.getRandomValues(buf);
@@ -123,10 +155,9 @@ async function renderPins(shell, data) {
             onDone: () => {
               person.hasPin = true;
               draw(shell.querySelector('#pins-search').value);
-              feedback.innerHTML = alertHtml(`PIN reset for ${person.name}. Tell them the new PIN in person.`, 'success');
-              setTimeout(close, 2200);
+              showDone(pin);
             },
-            onError: (m) => (feedback.innerHTML = alertHtml(m)),
+            onError: (m) => (feedback.innerHTML = alertHtml(explainResetError(m))),
           });
         },
       },

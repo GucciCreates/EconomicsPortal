@@ -959,7 +959,12 @@ function actionDashboard(ss, session) {
   return { ok: true, data: buildDashboard(ss, session) };
 }
 
+/** Every dashboard says which server version built it, so the site can warn leaders about old code. */
 function buildDashboard(ss, session) {
+  return Object.assign(buildDashboardFor(ss, session), { serverVersion: SCHEMA_VERSION });
+}
+
+function buildDashboardFor(ss, session) {
   const role = session.role;
   const team = session.team;
   const me = normalizeName(session.name);

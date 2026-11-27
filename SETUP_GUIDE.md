@@ -184,6 +184,7 @@ To stop backups: in Apps Script open **Triggers** (the clock icon) and delete th
 | Symptom | Fix |
 | :--- | :--- |
 | "Your session expired, please sign in again" right after the v4 upgrade | Expected: sign in again. (The v6 upgrade signs nobody out.) |
+| Reset PIN fails with "PIN must be exactly 4 numeric digits", or leaders see "The class server is out of date" | The live Apps Script is still running old code. Paste the new `backend/Code.gs`, then **Deploy → Manage deployments → Edit → New version**, and run `setup()`. Until then, typing a 4-digit PIN works for students. |
 | A change made directly in the spreadsheet doesn't show | Run `clearCache()`, or wait up to 30 minutes. |
 | No reminder or summary emails | Check `INSTRUCTOR_EMAIL` is set, run `installEmailTriggers()`, and look at **Executions** in Apps Script. Free accounts can send about 100 emails a day. |
 | Login says "Invalid name or PIN" for everyone | Did you run `resetAllPins()`? Use the new PINs. Type full names as listed, e.g. `Ayesha (Quetta)`; capitals and extra spaces don't matter. |

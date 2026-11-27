@@ -7,7 +7,7 @@
  *   3. a fresh request, behind a loading skeleton.
  */
 
-import { isDemoMode, exitDemo } from './config.js';
+import { isDemoMode, exitDemo, REQUIRED_SERVER_VERSION } from './config.js';
 import { getCurrentUser, clearCurrentUser } from './auth.js';
 import {
   apiGetDashboard,
@@ -267,10 +267,31 @@ async function renderDashboard(user, data) {
   const scrollY = window.scrollY;
   lastRenderedJson = JSON.stringify(data);
   render(mainEl, user, data, loadDashboard);
+  showServerOutdated(user, data);
   if (pinUpgradeOffer) showPinUpgradeOffer(user);
   else if (googleOffer) showGoogleOffer(user);
   window.scrollTo(0, scrollY);
   updateSyncStatus();
+}
+
+/**
+ * Leaders are told when the Apps Script server runs older code than this
+ * site needs; otherwise things like PIN resets fail with confusing errors.
+ */
+const LEADER_ROLES = ['instructor', 'group_leader', 'assistant'];
+function showServerOutdated(user, data) {
+  if (!LEADER_ROLES.includes(user.role)) return;
+  const version = Number(data && data.serverVersion);
+  if (version >= REQUIRED_SERVER_VERSION) return;
+  const box = document.createElement('div');
+  box.className = 'alert alert-warning server-outdated';
+  box.setAttribute('role', 'status');
+  box.innerHTML = `
+    <strong>The class server is out of date${version ? ` (version ${esc(version)})` : ''}.</strong>
+    The website was updated but the Apps Script code wasn't, so some actions, such as resetting PINs, will fail.
+    The sheet owner needs to paste the new <code>backend/Code.gs</code> into Apps Script and deploy a new version
+    (SETUP_GUIDE.md, "Upgrading to v7").`;
+  mainEl.prepend(box);
 }
 
 /**

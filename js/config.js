@@ -7,6 +7,9 @@
  * `?demo=1`, and it lasts for this browser tab only (sessionStorage), so the
  * live portal is never silently swapped for the demo.
  */
+/** The site needs backend/Code.gs at least this new (its SCHEMA_VERSION). */
+export const REQUIRED_SERVER_VERSION = 7;
+
 export const API_URL = "https://script.google.com/macros/s/AKfycbzvSmJSbA03qG2fL5wGR0AVJyTAnHJsVWEcqEwOrFKqFAv6glbgMjfEtVK-K1iTupsp/exec";
 
 const DEMO_KEY = "economics_portal_demo";

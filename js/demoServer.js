@@ -33,6 +33,7 @@ export { normalizeUserName };
 const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v7';
 const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
 const LEADERBOARD_TOP = 5;
+const SERVER_VERSION = '7'; // same as Code.gs SCHEMA_VERSION
 const ROLES = ['instructor', 'group_leader', 'assistant', 'team_leader', 'member'];
 const LEADERS = ['group_leader', 'instructor'];
 const MARK_EDITORS = ['group_leader', 'instructor', 'assistant'];
@@ -399,6 +400,10 @@ function myPrefs(store, session) {
 }
 
 function buildDashboard(store, session) {
+  return { ...buildDashboardFor(store, session), serverVersion: SERVER_VERSION };
+}
+
+function buildDashboardFor(store, session) {
   const { role, team } = session;
   const me = normalizeUserName(session.name);
   const isMe = (v) => normalizeUserName(v) === me;
@@ -914,7 +919,7 @@ export async function handleDemoRequest(params) {
   try {
     const store = getStore();
     const action = String(params.action || '');
-    if (action === 'health' || action === 'ping') return { ok: true, version: '6', time: nowIso(), demo: true };
+    if (action === 'health' || action === 'ping') return { ok: true, version: SERVER_VERSION, time: nowIso(), demo: true };
     if (action === 'login') {
       const who = findUser(store, params.name);
       if (who && (isPublishedPin(who.name, String(params.pin || '').trim()))) {

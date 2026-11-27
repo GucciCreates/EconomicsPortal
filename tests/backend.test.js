@@ -856,3 +856,17 @@ test('F8 createMentorshipPlan / updateMentorshipStatus: real students only, no s
   assert.equal(b.post({ action: 'updateMentorshipStatus', token: gl, id, status: 'resolved' }).ok, true);
   assert.equal(plan('Mamoon').status, 'resolved');
 });
+
+test('every dashboard says which server version built it, and Demo Mode claims the same version', () => {
+  const b = freshBackend();
+  const gs = require('fs').readFileSync(require('path').join(__dirname, '..', 'backend', 'Code.gs'), 'utf8');
+  const demo = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'demoServer.js'), 'utf8');
+  const cfg = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'config.js'), 'utf8');
+  const version = /const SCHEMA_VERSION = "(\d+)"/.exec(gs)[1];
+  assert.equal(/const SERVER_VERSION = '(\d+)'/.exec(demo)[1], version);
+  assert.ok(Number(/REQUIRED_SERVER_VERSION = (\d+)/.exec(cfg)[1]) <= Number(version), 'the site never requires a newer server than Code.gs');
+  for (const who of ['Shehroz', 'Amina', 'Ramesh']) {
+    assert.equal(b.post({ action: 'dashboard', token: b.tokenFor(who) }).data.serverVersion, version, who);
+  }
+  assert.equal(b.login('Shehroz').data.serverVersion, version, 'sign-in dashboard too');
+});
