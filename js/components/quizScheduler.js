@@ -37,16 +37,16 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
           <div id="quiz-feedback"></div>
           <form id="form-add-quiz">
             <div class="form-group">
-              <label class="form-label">Quiz / Test Title</label>
+              <label class="form-label" for="quiz-title">Quiz / Test Title</label>
               <input type="text" id="quiz-title" class="form-control" placeholder="e.g. Mock 3 — Macroeconomics" required />
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Date & Time</label>
+                <label class="form-label" for="quiz-datetime">Date & Time</label>
                 <input type="datetime-local" id="quiz-datetime" class="form-control" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Scope</label>
+                <label class="form-label" for="quiz-scope">Scope</label>
                 <select id="quiz-scope" class="form-control">
                   <option value="ALL">All Teams (Class-wide)</option>
                   <option value="Shehroz">Team Shehroz</option>
@@ -57,7 +57,7 @@ export function renderQuizScheduler(container, user, quizzes, onRefresh) {
               </div>
             </div>
             <div class="form-group">
-              <label class="form-label">Topics / Notes</label>
+              <label class="form-label" for="quiz-notes">Topics / Notes</label>
               <input type="text" id="quiz-notes" class="form-control" placeholder="Chapters covered, format, duration..." />
             </div>
             <button type="submit" class="btn btn-primary" style="width: 100%;">Schedule Quiz</button>

@@ -257,16 +257,11 @@ td {
   gap: 0.4rem;
   padding: 0.42rem 0.7rem;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(79, 70, 229, 0.16);
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.8),
-    rgba(238, 242, 255, 0.9)
-  );
+  border: 1px solid var(--secondary-border);
+  background: var(--secondary-surface);
   color: var(--text-main);
   font-size: 0.76rem;
   font-weight: 700;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .quick-action-chip strong {
@@ -281,7 +276,7 @@ td {
 }
 
 .microstat-box {
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--secondary-surface);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: var(--radius);
   padding: 0.7rem 0.8rem;
@@ -388,7 +383,7 @@ a:hover {
 .brand-mark {
   width: 38px;
   height: 38px;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--cyan-500) 100%);
+  background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent-strong-2) 100%);
   color: #ffffff;
   border-radius: 12px;
   display: flex;
@@ -597,7 +592,7 @@ a:hover {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--purple) 0%, var(--cyan-500) 100%);
+  background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent-strong-2) 100%);
   color: #ffffff;
   box-shadow: 0 8px 20px rgba(79, 70, 229, 0.22);
 }
@@ -610,38 +605,30 @@ a:hover {
 }
 
 .btn-secondary {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(241, 245, 249, 0.96)
-  );
-  border-color: rgba(148, 163, 184, 0.35);
+  background: var(--secondary-surface);
+  border-color: var(--secondary-border);
   color: var(--text-main);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 1),
-    rgba(226, 232, 240, 0.96)
-  );
-  border-color: rgba(148, 163, 184, 0.5);
+  background: var(--secondary-surface-hover);
+  border-color: var(--secondary-border-hover);
   color: var(--text-main);
 }
 
 .btn-teal {
-  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-hover) 100%);
+  background: linear-gradient(135deg, var(--teal-strong) 0%, var(--teal-strong-2) 100%);
   color: #ffffff;
 }
 .btn-teal:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--teal-hover) 0%, #042f2e 100%);
+  background: linear-gradient(135deg, var(--teal-strong-2) 0%, #042f2e 100%);
 }
 
 .btn-danger {
-  background: linear-gradient(135deg, var(--red) 0%, var(--red-hover) 100%);
+  background: linear-gradient(135deg, var(--red-strong) 0%, var(--red-strong-2) 100%);
   color: #ffffff;
 }
 .btn-danger:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--red-hover) 0%, #881337 100%);
+  background: linear-gradient(135deg, var(--red-strong-2) 0%, #881337 100%);
 }
 
 .btn-sm {
@@ -1358,8 +1345,8 @@ a:hover {
 .tab-btn.active {
   background: linear-gradient(
     135deg,
-    var(--purple) 0%,
-    var(--purple-hover) 100%
+    var(--accent-strong) 0%,
+    var(--accent-strong-2) 100%
   );
   color: #ffffff;
   box-shadow: 0 3px 8px rgba(79, 70, 229, 0.32);
@@ -2580,7 +2567,7 @@ a:hover {
 .tab-badge {
   padding: 0.05rem 0.45rem;
   border-radius: var(--radius-full);
-  background: var(--red);
+  background: var(--red-strong);
   color: #fff;
   font-size: 0.68rem;
   font-weight: 800;
@@ -2688,4 +2675,100 @@ a:hover {
 .task-item.overdue {
   border-left: 4px solid var(--red);
   background: var(--red-soft);
+}
+
+/* ==========================================================================
+   Accessibility: colour contrast (WCAG 2.1 AA) & focus
+   --x-strong tokens are backgrounds that carry white text (≥ 4.5:1).
+   Plain accent tokens (--purple, --teal, ...) are used for text, so the
+   dark theme gets lighter shades and the light theme darker ones.
+   ========================================================================== */
+:root {
+  --accent-strong: #4f46e5;
+  --accent-strong-2: #0369a1;
+  --teal-strong: #0f766e;
+  --teal-strong-2: #115e59;
+  --red-strong: #be123c;
+  --red-strong-2: #9f1239;
+
+  --purple: #a39bff;
+  --purple-hover: #8f85ff;
+  --red: #fb7185;
+  --red-hover: #f43f5e;
+
+  --secondary-surface: linear-gradient(180deg, #1f2a3f, #182235);
+  --secondary-surface-hover: linear-gradient(180deg, #27354d, #1f2a3f);
+  --secondary-border: rgba(148, 163, 184, 0.32);
+  --secondary-border-hover: rgba(148, 163, 184, 0.5);
+
+  --focus-ring: #fbbf24;
+}
+
+[data-theme='light'] {
+  --purple: #4338ca;
+  --purple-hover: #3730a3;
+  --teal: #115e59;
+  --teal-hover: #134e4a;
+  --red: #9f1239;
+  --red-hover: #881337;
+  --amber: #92400e;
+  --amber-hover: #78350f;
+  --text-muted: #4b5a70;
+  --text-subtle: #5b6779;
+
+  --secondary-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.96));
+  --secondary-surface-hover: linear-gradient(180deg, #ffffff, rgba(226, 232, 240, 0.96));
+  --secondary-border: rgba(100, 116, 139, 0.4);
+  --secondary-border-hover: rgba(100, 116, 139, 0.6);
+
+  --focus-ring: #4f46e5;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --purple: #4338ca;
+    --purple-hover: #3730a3;
+    --teal: #115e59;
+    --teal-hover: #134e4a;
+    --red: #9f1239;
+    --red-hover: #881337;
+    --amber: #92400e;
+    --amber-hover: #78350f;
+    --text-muted: #4b5a70;
+    --text-subtle: #5b6779;
+
+    --secondary-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.96));
+    --secondary-surface-hover: linear-gradient(180deg, #ffffff, rgba(226, 232, 240, 0.96));
+    --secondary-border: rgba(100, 116, 139, 0.4);
+    --secondary-border-hover: rgba(100, 116, 139, 0.6);
+
+    --focus-ring: #4f46e5;
+  }
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.form-control:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+.tab-btn:focus-visible,
+.btn:focus-visible,
+.quick-login-chip:focus-visible,
+.account-menu-trigger:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

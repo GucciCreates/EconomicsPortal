@@ -37,11 +37,11 @@ export function renderAnnouncementsPanel(container, user, announcements, onRefre
           <div id="ann-feedback"></div>
           <form id="form-add-announcement">
             <div class="form-group">
-              <label class="form-label">Title</label>
+              <label class="form-label" for="ann-title">Title</label>
               <input type="text" id="ann-title" class="form-control" placeholder="e.g. Quiz 3 rescheduled" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Message</label>
+              <label class="form-label" for="ann-body">Message</label>
               <textarea id="ann-body" class="form-control" rows="3" placeholder="Announcement details..." required></textarea>
             </div>
             <div style="display: flex; gap: 0.75rem; align-items: center;">

@@ -11,7 +11,7 @@ import { renderQuizScheduler, cleanupQuizCountdowns } from './quizScheduler.js';
 import { renderLeaderboard } from './leaderboard.js';
 import { renderAnnouncementsPanel } from './announcementsPanel.js';
 import { openReportCardModal } from './reportCardModal.js';
-import { esc, linkHtml } from '../utils.js';
+import { esc, linkHtml, slug } from '../utils.js';
 import { renderDoubtThreads, countDoubtUpdates } from './doubtThread.js';
 import { loadLastSeen, markSeen, isNewer, newPill } from '../lastSeen.js';
 import { dueDeadline } from './submissionTracker.js';
@@ -382,12 +382,12 @@ export function renderMemberDashboard(container, user, data, onRefresh) {
                             : `
                           <form class="form-submit-task" data-task-id="${esc(task.id)}">
                             <div class="form-group" style="margin-bottom: 0.5rem;">
-                              <label class="form-label" style="font-size: 0.8rem;">Submission Notes / Answer summary</label>
-                              <input type="text" class="form-control form-control-sm sub-content" placeholder="e.g. Completed IS-LM problem set questions 1 to 5" required />
+                              <label class="form-label" style="font-size: 0.8rem;" for="sub-content-${slug(task.id)}">Submission Notes / Answer summary</label>
+                              <input type="text" id="sub-content-${slug(task.id)}" class="form-control form-control-sm sub-content" maxlength="5000" placeholder="e.g. Completed IS-LM problem set questions 1 to 5" required />
                             </div>
                             <div class="form-group" style="margin-bottom: 0.65rem;">
-                              <label class="form-label" style="font-size: 0.8rem;">Google Drive Link</label>
-                              <input type="url" class="form-control form-control-sm sub-file" placeholder="https://drive.google.com/file/..." />
+                              <label class="form-label" style="font-size: 0.8rem;" for="sub-file-${slug(task.id)}">Google Drive Link</label>
+                              <input type="url" id="sub-file-${slug(task.id)}" class="form-control form-control-sm sub-file" placeholder="https://drive.google.com/file/..." />
                             </div>
                             <button type="submit" class="btn btn-primary btn-sm">Turn In Assignment</button>
                           </form>

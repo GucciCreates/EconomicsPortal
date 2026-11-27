@@ -364,7 +364,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
           <form id="form-gl-add-mark">
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Student</label>
+                <label class="form-label" for="gl-mark-member">Student</label>
                 <select id="gl-mark-member" class="form-control" required>
                   <option value="">-- Choose Member --</option>
                   ${Object.keys(TEAM_ROSTER)
@@ -384,33 +384,33 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Tested Topic / Unit</label>
+                <label class="form-label" for="gl-mark-cycle">Tested Topic / Unit</label>
                 <input type="text" id="gl-mark-cycle" class="form-control" placeholder="e.g. Unit 2: Monetary Policy" value="Unit 2: Monetary Policy" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Mock #</label>
+                <label class="form-label" for="gl-mark-mock">Mock #</label>
                 <input type="number" id="gl-mark-mock" class="form-control" placeholder="Optional" />
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Quiz Score (0-100)</label>
+                <label class="form-label" for="gl-mark-quiz">Quiz Score (0-100)</label>
                 <input type="number" id="gl-mark-quiz" class="form-control" min="0" max="100" placeholder="e.g. 88" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Submission</label>
+                <label class="form-label" for="gl-mark-sub">Submission</label>
                 <select id="gl-mark-sub" class="form-control">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Attendance</label>
+                <label class="form-label" for="gl-mark-att">Attendance</label>
                 <input type="text" id="gl-mark-att" class="form-control" value="100%" />
               </div>
               <div class="form-group">
-                <label class="form-label">Preview Done</label>
+                <label class="form-label" for="gl-mark-prev">Preview Done</label>
                 <select id="gl-mark-prev" class="form-control">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
@@ -420,18 +420,18 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
 
             <div style="display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Peer Rating (1-5)</label>
+                <label class="form-label" for="gl-mark-peer">Peer Rating (1-5)</label>
                 <input type="number" step="0.1" min="1" max="5" id="gl-mark-peer" class="form-control" placeholder="4.5" />
               </div>
               <div class="form-group">
-                <label class="form-label">Punctual</label>
+                <label class="form-label" for="gl-mark-punctual">Punctual</label>
                 <select id="gl-mark-punctual" class="form-control">
                   <option value="Yes">Yes</option>
                   <option value="No">No</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Performance Notes</label>
+                <label class="form-label" for="gl-mark-notes">Performance Notes</label>
                 <input type="text" id="gl-mark-notes" class="form-control" placeholder="Strengths, focus areas..." />
               </div>
             </div>
@@ -688,11 +688,11 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
           <form id="form-gl-add-task">
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0.75rem;">
               <div class="form-group">
-                <label class="form-label">Task Title</label>
+                <label class="form-label" for="gl-task-title">Task Title</label>
                 <input type="text" id="gl-task-title" class="form-control" placeholder="e.g. Problem Set: Monetary Policy Transmission" required />
               </div>
               <div class="form-group">
-                <label class="form-label">Assign To</label>
+                <label class="form-label" for="gl-task-team">Assign To</label>
                 <select id="gl-task-team" class="form-control" required>
                   <option value="ALL">All Teams (Class-wide)</option>
                   <option value="Shehroz">Team Shehroz</option>
@@ -702,18 +702,18 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Due Date</label>
+                <label class="form-label" for="gl-task-due">Due Date</label>
                 <input type="date" id="gl-task-due" class="form-control" required />
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Description / Instructions</label>
+              <label class="form-label" for="gl-task-desc">Description / Instructions</label>
               <textarea id="gl-task-desc" class="form-control" rows="2" placeholder="Task requirements, questions, and expectations..." required></textarea>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Google Drive Link (Resource)</label>
+              <label class="form-label" for="gl-task-file">Google Drive Link (Resource)</label>
               <input type="url" id="gl-task-file" class="form-control" placeholder="https://drive.google.com/..." />
             </div>
 

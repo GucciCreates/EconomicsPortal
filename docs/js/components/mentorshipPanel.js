@@ -191,7 +191,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
 
               <form id="form-create-plan">
                 <div class="form-group">
-                  <label class="form-label">Student (Mentee)</label>
+                  <label class="form-label" for="plan-student">Student (Mentee)</label>
                   <select id="plan-student" class="form-control" required>
                     <option value="">-- Select At-Risk Student --</option>
                     ${atRiskMembers
@@ -204,7 +204,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Select Peer Mentor (Top Performer)</label>
+                  <label class="form-label" for="plan-mentor">Select Peer Mentor (Top Performer)</label>
                   <select id="plan-mentor" class="form-control" required>
                     <option value="">-- Select Candidate Mentor --</option>
                     ${candidateMentors
@@ -214,7 +214,7 @@ export function renderMentorshipPanel(container, user, plans = [], atRiskMembers
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Target Milestones & Recovery Goals</label>
+                  <label class="form-label" for="plan-goals">Target Milestones & Recovery Goals</label>
                   <textarea id="plan-goals" class="form-control" rows="3" placeholder="1. Weekly 30-min concept review&#10;2. Pre-check problem sets&#10;3. Pass next mock with 65+" required>1. Weekly 30-min concept review
 2. Pre-check problem sets before submission
 3. Pass next mock assessment with 65+</textarea>

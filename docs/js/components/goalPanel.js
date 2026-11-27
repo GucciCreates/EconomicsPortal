@@ -82,7 +82,7 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
         <form id="form-set-goal">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
             <div class="form-group">
-              <label class="form-label">Target Score (0–100)</label>
+              <label class="form-label" for="goal-target">Target Score (0–100)</label>
               <input
                 type="number" id="goal-target" class="form-control"
                 min="0" max="100" step="1"
@@ -92,7 +92,7 @@ export function renderGoalPanel(container, user, goal, myMetrics, onRefresh) {
               />
             </div>
             <div class="form-group">
-              <label class="form-label">Goal Description</label>
+              <label class="form-label" for="goal-desc">Goal Description</label>
               <input
                 type="text" id="goal-desc" class="form-control"
                 placeholder="e.g. Score 85+ by next topic test"

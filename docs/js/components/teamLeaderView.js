@@ -400,7 +400,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
 
               <form id="form-confirm-grading">
                 <div class="form-group">
-                  <label class="form-label">Team Leader Review Notes (Optional)</label>
+                  <label class="form-label" for="req-grading-notes">Team Leader Review Notes (Optional)</label>
                   <textarea id="req-grading-notes" class="form-control" rows="3" placeholder="e.g. Checked problem set, questions 1-4 completed with good diagrams. Ready for score entry."></textarea>
                 </div>
                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
@@ -481,7 +481,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
 
         <form id="form-add-team-msg">
           <div class="form-group">
-            <label class="form-label">Message for Team ${esc(user.team)}</label>
+            <label class="form-label" for="tm-body">Message for Team ${esc(user.team)}</label>
             <textarea id="tm-body" class="form-control" rows="3" placeholder="e.g. Reminder: Group review call on Thursday at 5 PM. Bring questions on IS-LM model!" required></textarea>
           </div>
           <button type="submit" class="btn btn-primary" id="btn-post-team-msg">Send to Team ${esc(user.team)}</button>

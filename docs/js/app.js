@@ -11,6 +11,7 @@ import { renderGroupLeaderDashboard } from './components/groupLeaderView.js';
 import { renderModernLogin } from './components/loginView.js';
 import { esc } from './utils.js';
 import { renderAccountMenu } from './components/accountMenu.js';
+import { enhanceModal } from './components/modal.js';
 
 // DOM Root Elements
 const headerEl = document.getElementById('site-header');
@@ -262,6 +263,9 @@ function ensureToastHost() {
     host = document.createElement('div');
     host.id = 'economics-toast-host';
     host.className = 'toast-stack';
+    host.setAttribute('role', 'status');
+    host.setAttribute('aria-live', 'polite');
+    host.setAttribute('aria-atomic', 'false');
     document.body.appendChild(host);
   }
   return host;
@@ -297,6 +301,24 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
     navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('Service worker not registered:', err));
   });
 }
+
+// Accessibility: every modal on the page (including ones built by older
+// components) gets dialog semantics, a focus trap, Esc to close and focus
+// restore; icon-only "✕" buttons get an accessible name.
+new MutationObserver((mutations) => {
+  for (const m of mutations) {
+    m.addedNodes.forEach((node) => {
+      if (node.nodeType !== 1) return;
+      const overlays = node.matches('.modal-overlay') ? [node] : [...node.querySelectorAll('.modal-overlay')];
+      overlays.forEach((overlay) => {
+        overlay.querySelectorAll('button').forEach((b) => {
+          if (b.textContent.trim() === '✕' && !b.hasAttribute('aria-label')) b.setAttribute('aria-label', 'Close');
+        });
+        enhanceModal(overlay);
+      });
+    });
+  }
+}).observe(document.body, { childList: true, subtree: true });
 
 // Run on page load
 initTheme();
