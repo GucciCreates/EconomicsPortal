@@ -37,7 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────────────────
-const SCHEMA_VERSION = "7";
+const SCHEMA_VERSION = "8";
 const TEAMS = ["Shehroz", "Amina", "Ayesha", "Lareb"];
 const LEADERBOARD_TOP = 5; // students see this many classmates on the leaderboard, plus themselves
 const ROLES = ["instructor", "group_leader", "assistant", "team_leader", "member"];
@@ -99,7 +99,7 @@ const SHEET_NAMES = {
 };
 
 const HEADERS = {
-  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders", "googleEmail"],
+  Users:             ["name", "role", "team", "pinHash", "salt", "email", "reminders", "googleEmail", "issuedPin"],
   Marks:             ["id", "member", "team", "cycle", "mockNumber", "quizScore", "submission", "attendance", "previewDone", "peerRating", "punctual", "notes", "editedBy", "timestamp"],
   Tasks:             ["id", "title", "description", "team", "dueDate", "fileUrl", "createdBy", "status", "timestamp"],
   Submissions:       ["id", "taskId", "member", "team", "content", "fileUrl", "gradingRequested", "requestedBy", "reviewNotes", "timestamp"],
@@ -150,6 +150,7 @@ const ACTIONS = {
   setGoal:                { fn: actionSetGoal, write: true },
 
   updatePin:              { fn: actionUpdatePin, write: true, roles: ["group_leader", "instructor"] },
+  issuedPins:             { fn: actionIssuedPins, write: true, roles: ["group_leader", "instructor"] },
   changeMyPin:            { fn: actionChangeMyPin, write: true },
   setReminders:           { fn: actionSetReminders, write: true },
   linkGoogle:             { fn: actionLinkGoogle, write: true },
@@ -582,6 +583,44 @@ function verifyPin(user, pin) {
   return safeEqual(hashPin(pin, user.salt), String(user.pinHash));
 }
 
+// ── Issued PINs ─────────────────────────────────────────────────────────
+// A PIN that a leader sets (Reset PIN, setup(), resetAllPins, setPinForUser)
+// is also kept in `issuedPin`, encrypted with TOKEN_SECRET (Script
+// Properties, never in the sheet), so the group leader and instructor can
+// look it up later. A PIN the person chooses themselves is never kept: any
+// other PIN change clears `issuedPin`, and the copy is bound to the current
+// pinHash, so a stale copy can never be read.
+function issuedKeystream(nonce) {
+  return Utilities.computeHmacSha256Signature("issued-pin-key:" + nonce, getSecret());
+}
+
+function issuedTag(name, pinHash, nonce, body) {
+  return sign("issued-pin-tag:" + normalizeName(name) + "|" + pinHash + "|" + nonce + "|" + body).slice(0, 22);
+}
+
+function sealIssuedPin(name, pinHash, pin) {
+  const nonce = Utilities.getUuid().replace(/-/g, "");
+  const ks = issuedKeystream(nonce);
+  const digits = String(pin);
+  const bytes = [];
+  for (let i = 0; i < digits.length; i++) bytes.push(((digits.charCodeAt(i) ^ ks[i]) << 24) >> 24);
+  const body = Utilities.base64EncodeWebSafe(bytes);
+  return "e1$" + nonce + "$" + body + "$" + issuedTag(name, pinHash, nonce, body);
+}
+
+/** The issued PIN, or "" if there is none, it was replaced, or it was tampered with. */
+function openIssuedPin(user) {
+  const parts = String(user.issuedPin || "").split("$");
+  if (parts.length !== 4 || parts[0] !== "e1" || !user.pinHash) return "";
+  const nonce = parts[1], body = parts[2];
+  if (!safeEqual(issuedTag(user.name, String(user.pinHash), nonce, body), parts[3])) return "";
+  const ks = issuedKeystream(nonce);
+  const bytes = Utilities.base64DecodeWebSafe(body);
+  let pin = "";
+  for (let i = 0; i < bytes.length && i < ks.length; i++) pin += String.fromCharCode((bytes[i] ^ ks[i]) & 0xff);
+  return /^\d{4,8}$/.test(pin) && verifyPin(user, pin) ? pin : "";
+}
+
 function safeEqual(a, b) {
   a = String(a);
   b = String(b);
@@ -669,10 +708,11 @@ function setup() {
     PEOPLE.forEach(p => {
       const pin = randomPin();
       const salt = newSalt();
-      appendObject(usersSheet, { name: p[0], role: p[1], team: p[2], pinHash: hashPin(pin, salt), salt: salt });
+      const pinHash = hashPin(pin, salt);
+      appendObject(usersSheet, { name: p[0], role: p[1], team: p[2], pinHash: pinHash, salt: salt, issuedPin: sealIssuedPin(p[0], pinHash, pin) });
       lines.push(p[0] + " → " + pin);
     });
-    Logger.log("Users created. Hand out these PINs privately — they are not stored anywhere in plain text:\n" + lines.join("\n"));
+    Logger.log("Users created. Hand out these PINs privately. The group leader and instructor can also see them under Admin → Show PINs until each person picks their own:\n" + lines.join("\n"));
   }
   Logger.log("Setup v" + SCHEMA_VERSION + " complete.");
 }
@@ -780,11 +820,11 @@ function resetAllPins() {
   const lines = [];
   readTable(ss, SHEET_NAMES.USERS).rows.forEach(u => {
     const pin = randomPin();
-    writePin(ss, u.name, pin);
+    writePin(ss, u.name, pin, { issued: true });
     lines.push(u.name + " → " + pin);
   });
   bumpDataVersions([SHEET_NAMES.USERS]);
-  Logger.log("New PINs (hand them out privately — they are not stored anywhere in plain text):\n" + lines.join("\n"));
+  Logger.log("New PINs (hand them out privately; they also show under Admin → Show PINs until each person picks their own):\n" + lines.join("\n"));
   return lines.length;
 }
 
@@ -793,7 +833,7 @@ function setPinForUser(name, pin) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ensureSchema(ss);
   if (!isPinFormat(pin)) throw new Error("PIN must be " + PIN_MIN + " to " + PIN_MAX + " digits.");
-  writePin(ss, name, String(pin));
+  writePin(ss, name, String(pin), { issued: true });
   bumpDataVersions([SHEET_NAMES.USERS]);
   Logger.log("PIN updated for " + name + ".");
 }
@@ -1332,7 +1372,7 @@ function actionUpdatePin(ss, session, p) {
   const target = findUser(ss, p.targetMember);
   if (!target) throw apiError("Member not found in roster.", "NOT_FOUND");
   checkNewPin(newPin, target.user.role, "PIN");
-  writePin(ss, target.user.name, newPin);
+  writePin(ss, target.user.name, newPin, { issued: true });
   audit(ss, session, "resetPin", String(target.user.name), {});
   return { ok: true };
 }
@@ -1366,14 +1406,30 @@ function actionSetReminders(ss, session, p) {
   return { ok: true };
 }
 
-function writePin(ss, name, pin) {
+/** Sets a PIN. `opts.issued` keeps an encrypted copy for leaders; otherwise any copy is cleared. */
+function writePin(ss, name, pin, opts) {
   const found = findUser(ss, name);
   if (!found) throw apiError("Member not found in roster: " + name, "NOT_FOUND");
   if (isPublishedPin(found.user.name, pin)) {
     throw apiError("That PIN was published online in an old version of the portal. Choose a different one.", "VALIDATION");
   }
   const salt = newSalt();
-  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { pinHash: hashPin(pin, salt), salt: salt });
+  const pinHash = hashPin(pin, salt);
+  const issued = opts && opts.issued ? sealIssuedPin(found.user.name, pinHash, pin) : "";
+  writeFields(readTable(ss, SHEET_NAMES.USERS), found.row, { pinHash: pinHash, salt: salt, issuedPin: issued });
+}
+
+/**
+ * The PINs a leader set that the person hasn't replaced yet. Each look is
+ * written to the activity log. A write action only so it runs under the lock.
+ */
+function actionIssuedPins(ss, session) {
+  const pins = readTable(ss, SHEET_NAMES.USERS).rows.map(u => {
+    const pin = openIssuedPin(u);
+    return { name: String(u.name), pin: pin, status: pin ? "issued" : u.pinHash ? "own" : "none" };
+  });
+  audit(ss, session, "viewPins", "", { shown: pins.filter(p => p.pin).length });
+  return { ok: true, pins: pins };
 }
 
 function actionRequestGrading(ss, session, p) {
@@ -1748,7 +1804,7 @@ function readTable(ss, name) {
 function stripRow(row) {
   const out = {};
   Object.keys(row).forEach(k => {
-    if (k === "_row" || k === "pinHash" || k === "salt" || k === "pin") return;
+    if (k === "_row" || k === "pinHash" || k === "salt" || k === "pin" || k === "issuedPin") return;
     out[k] = row[k];
   });
   return out;

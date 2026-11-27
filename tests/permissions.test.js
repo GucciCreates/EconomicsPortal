@@ -34,6 +34,7 @@ const RULES = {
   deleteQuiz: LEADS,
   setGoal: ALL,
   updatePin: LEADS,
+  issuedPins: LEADS,
   changeMyPin: ALL,
   setReminders: ALL,
   linkGoogle: ALL,

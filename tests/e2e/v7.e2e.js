@@ -253,3 +253,57 @@ test('PIN reset: leaders are told when the class server runs old code, and why a
     await browser.close();
   }
 });
+
+test('Show PINs: the instructor sees PINs leaders set, and "Chosen by them" once a student picks their own', { timeout: 90000 }, async () => {
+  const { browser, page, errors } = await openApp({ demo: true });
+  const pinOf = (name) => page.textContent(`#pins-tbody tr[data-member="${name}"] td[data-label="PIN"]`).then((t) => t.trim());
+  const openPins = async () => {
+    await page.click('.tab-btn[data-tab="admin"]');
+    await page.waitForSelector('#pins-tbody [data-action="reset"][data-name="Bilal"]');
+    await page.click('#btn-show-pins');
+    await page.waitForSelector('#btn-show-pins[aria-pressed="true"]');
+  };
+  const signOut = async () => {
+    await page.click('#btn-account-menu');
+    await page.click('#btn-logout');
+  };
+  try {
+    await page.click('.quick-login-chip[data-demo-name="Dr. Numan"]');
+    await openPins();
+    assert.equal(await pinOf('Bilal'), '2002');
+
+    // A reset while PINs are shown updates the row.
+    await page.click('#pins-tbody [data-action="reset"][data-name="Bilal"]');
+    await page.fill('#input-new-pin', '5317');
+    await page.click('#btn-save-pin');
+    await page.click('.modal-overlay [data-action="done"]');
+    assert.equal(await pinOf('Bilal'), '5317');
+    await page.click('#btn-show-pins');
+    assert.equal(await pinOf('Bilal'), 'Set');
+    await signOut();
+
+    // Bilal chooses his own PIN.
+    await page.fill('#login-name', 'Bilal');
+    await page.fill('#login-pin', '5317');
+    await page.click('#btn-submit-login');
+    await page.click('#btn-account-menu');
+    await page.click('#btn-change-my-pin');
+    await page.fill('#my-pin-current', '5317');
+    await page.fill('#my-pin-new', '8642');
+    await page.fill('#my-pin-confirm', '8642');
+    await page.click('#btn-save-my-pin');
+    await page.waitForSelector('#form-change-my-pin', { state: 'detached' });
+    assert.equal(await page.$('.tab-btn[data-tab="admin"]'), null);
+    await signOut();
+
+    await page.fill('#login-name', 'Shehroz');
+    await page.fill('#login-pin', '111222');
+    await page.click('#btn-submit-login');
+    await openPins();
+    assert.equal(await pinOf('Bilal'), 'Chosen by them');
+    assert.equal(await pinOf('Amina'), '2101');
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});

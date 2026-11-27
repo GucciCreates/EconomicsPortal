@@ -870,3 +870,47 @@ test('every dashboard says which server version built it, and Demo Mode claims t
   }
   assert.equal(b.login('Shehroz').data.serverVersion, version, 'sign-in dashboard too');
 });
+
+test('Show PINs: leaders see PINs they set, never a PIN someone chose, and the sheet holds no plain PIN', () => {
+  const b = freshBackend();
+  const gl = b.tokenFor('Shehroz');
+  const doc = b.tokenFor('Dr. Numan');
+  assert.equal(b.post({ action: 'updatePin', token: gl, targetMember: 'Ramesh', newPin: '583920' }).ok, true);
+  assert.equal(b.post({ action: 'updatePin', token: doc, targetMember: 'Sajal', newPin: '771204' }).ok, true);
+
+  const byName = (res) => Object.fromEntries(res.pins.map((p) => [p.name, p]));
+  let pins = byName(b.post({ action: 'issuedPins', token: doc }));
+  assert.equal(pins.Ramesh.pin, '583920');
+  assert.equal(pins.Sajal.pin, '771204');
+  assert.equal(pins.Shehroz.pin, '1201'); // set with setPinForUser from the editor
+
+  // The sheet keeps only an encrypted copy, never the digits.
+  const row = b.sheetRows('Users').find((u) => u.name === 'Ramesh');
+  assert.match(String(row.issuedPin), /^e1\$/);
+  assert.ok(!String(row.issuedPin).includes('583920'));
+
+  // Ramesh picks his own PIN: nobody can see it any more.
+  const ramesh = b.post({ action: 'login', name: 'Ramesh', pin: '583920' }).token;
+  assert.equal(b.post({ action: 'changeMyPin', token: ramesh, currentPin: '583920', newPin: '4826' }).ok, true);
+  pins = byName(b.post({ action: 'issuedPins', token: gl }));
+  assert.equal(pins.Ramesh.pin, '');
+  assert.equal(pins.Ramesh.status, 'own');
+  assert.equal(b.sheetRows('Users').find((u) => u.name === 'Ramesh').issuedPin, '');
+
+  // A copied or edited issuedPin cell doesn't open for another person.
+  const users = b.ss.getSheetByName('Users').data;
+  const col = users[0].indexOf('issuedPin');
+  const sajalRow = users.findIndex((r) => r[0] === 'Sajal');
+  const mamoonRow = users.findIndex((r) => r[0] === 'Mamoon');
+  users[mamoonRow][col] = users[sajalRow][col];
+  b.api.clearCache();
+  pins = byName(b.post({ action: 'issuedPins', token: gl }));
+  assert.equal(pins.Mamoon.pin, '');
+  assert.equal(pins.Sajal.pin, '771204');
+
+  // Others can't look, dashboards never carry it, and each look is logged.
+  assert.equal(b.post({ action: 'issuedPins', token: b.tokenFor('Amina') }).code, 'FORBIDDEN');
+  assert.equal(b.post({ action: 'issuedPins', token: b.login('Sajal', '771204').token }).code, 'FORBIDDEN');
+  assert.equal(deepHasKey(b.post({ action: 'dashboard', token: gl }), 'issuedPin'), false);
+  assert.equal(b.sheetRows('AuditLog').filter((r) => r.action === 'viewPins').length, 3);
+});

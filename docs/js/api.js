@@ -256,5 +256,6 @@ export const apiDeleteTeamMessage = (payload) => call('deleteTeamMessage', paylo
 // PINS & MENTORSHIP
 // ─────────────────────────────────────────────────────────────────────────────
 export const apiUpdatePin = (payload) => call('updatePin', payload);
+export const apiIssuedPins = () => call('issuedPins', { withDashboard: false });
 export const apiCreateMentorshipPlan = (payload) => call('createMentorshipPlan', payload);
 export const apiUpdateMentorshipStatus = (id, status) => call('updateMentorshipStatus', { id, status });

@@ -1098,6 +1098,19 @@ input[type='checkbox'] {
   font-size: 0.85em;
 }
 /* PIN reset: the new PIN stays on screen until "Done". */
+.pins-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pin-shown {
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+
 .pin-reset-done .pin-reveal {
   display: block;
   margin: 0.75rem 0;

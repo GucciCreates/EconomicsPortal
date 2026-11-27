@@ -33,7 +33,7 @@ export { normalizeUserName };
 const DEMO_STORAGE_KEY = 'economics_portal_demo_db_v7';
 const TEAMS = ['Shehroz', 'Amina', 'Ayesha', 'Lareb'];
 const LEADERBOARD_TOP = 5;
-const SERVER_VERSION = '7'; // same as Code.gs SCHEMA_VERSION
+const SERVER_VERSION = '8'; // same as Code.gs SCHEMA_VERSION
 const ROLES = ['instructor', 'group_leader', 'assistant', 'team_leader', 'member'];
 const LEADERS = ['group_leader', 'instructor'];
 const MARK_EDITORS = ['group_leader', 'instructor', 'assistant'];
@@ -71,7 +71,8 @@ function clone(v) {
 
 function initialStore() {
   return {
-    users: clone(MOCK_USERS),
+    // Like setup() in Code.gs: the starting PINs count as issued by a leader.
+    users: clone(MOCK_USERS).map((u) => ({ ...u, issuedPin: u.pin })),
     tasks: clone(MOCK_TASKS),
     marks: clone(MOCK_MARKS),
     submissions: clone(MOCK_SUBMISSIONS),
@@ -777,8 +778,22 @@ const ACTIONS = {
       if (!target) throw apiError('Member not found in roster.', 'NOT_FOUND');
       checkNewPin(newPin, target.role, 'PIN');
       target.pin = newPin;
+      target.issuedPin = newPin;
       audit(store, s, 'resetPin', target.name, {});
       return { ok: true };
+    },
+  },
+  // Same rule as Code.gs: only a PIN a leader set, and only while it's still the person's PIN.
+  issuedPins: {
+    write: true,
+    roles: ['group_leader', 'instructor'],
+    fn(store, s) {
+      const pins = store.users.map((u) => {
+        const pin = u.issuedPin && String(u.issuedPin) === String(u.pin) ? String(u.pin) : '';
+        return { name: u.name, pin, status: pin ? 'issued' : u.pin ? 'own' : 'none' };
+      });
+      audit(store, s, 'viewPins', '', { shown: pins.filter((p) => p.pin).length });
+      return { ok: true, pins };
     },
   },
   changeMyPin: {
@@ -796,6 +811,7 @@ const ACTIONS = {
       checkNewPin(newPin, s.role, 'New PIN');
       if (newPin === currentPin) throw apiError('Choose a PIN that is different from your current one.', 'VALIDATION');
       me.pin = newPin;
+      me.issuedPin = ''; // a PIN people choose themselves is never shown to anyone
       audit(store, s, 'changeMyPin', s.name, {});
       return { ok: true, token: issueToken(me) };
     },
