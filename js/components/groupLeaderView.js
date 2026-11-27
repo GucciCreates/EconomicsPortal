@@ -29,6 +29,7 @@ import { renderExportToolbar } from './exportUtils.js';
 import { openReportCardModal } from './reportCardModal.js';
 import { renderMentorshipPanel } from './mentorshipPanel.js';
 import { renderActivityLog } from './activityLog.js';
+import { renderSubmissionTracker } from './submissionTracker.js';
 
 export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -203,6 +204,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
       icon: '📢',
     },
     { id: 'tasks', label: `Tasks & Submissions (${tasks.length})`, icon: '📝' },
+    { id: 'tracker', label: 'Submission Tracker', icon: '📋' },
     { id: 'doubts', label: `Doubts & Escalations (${openDoubts})`, icon: '❓' },
     { id: 'export', label: 'Export CSV', icon: '📥' },
   ];
@@ -221,6 +223,8 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     else if (tabId === 'quizzes') renderQuizzesTab(contentShell);
     else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);
     else if (tabId === 'tasks') renderTasksTab(contentShell);
+    else if (tabId === 'tracker')
+      renderSubmissionTracker(contentShell, { tasks, submissions, roster: data.roster || [] });
     else if (tabId === 'doubts') renderDoubtsTab(contentShell);
     else if (tabId === 'export') renderExportTab(contentShell);
     else if (tabId === 'pins') renderPinsTab(contentShell);

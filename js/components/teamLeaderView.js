@@ -16,6 +16,7 @@ import { renderAnnouncementsPanel } from './announcementsPanel.js';
 import { renderQuizScheduler, cleanupQuizCountdowns } from './quizScheduler.js';
 import { renderLeaderboard } from './leaderboard.js';
 import { openReportCardModal } from './reportCardModal.js';
+import { renderSubmissionTracker } from './submissionTracker.js';
 
 export const TEAM_ROSTER = {
   Shehroz: ['Gorsi', 'Haris'],
@@ -143,6 +144,7 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
       icon: '💬',
     },
     { id: 'tasks', label: `Team Tasks (${tasks.length})`, icon: '📋' },
+    { id: 'tracker', label: 'Submission Tracker', icon: '✅' },
     { id: 'quizzes', label: `Quizzes & Tests (${quizzes.length})`, icon: '⏱️' },
     { id: 'leaderboard', label: 'Class Leaderboard', icon: '🏆' },
     {
@@ -157,6 +159,8 @@ export function renderTeamLeaderDashboard(container, user, data, onRefresh) {
     else if (tabId === 'submissions') renderSubmissionsTab(contentShell);
     else if (tabId === 'noticeboard') renderNoticeboardTab(contentShell);
     else if (tabId === 'tasks') renderTasksTab(contentShell);
+    else if (tabId === 'tracker')
+      renderSubmissionTracker(contentShell, { tasks, submissions, roster: data.roster || [] });
     else if (tabId === 'quizzes') renderQuizzesTab(contentShell);
     else if (tabId === 'leaderboard') renderLeaderboardTab(contentShell);
     else if (tabId === 'announcements') renderAnnouncementsTab(contentShell);

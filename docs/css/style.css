@@ -2507,3 +2507,71 @@ a:hover {
   margin-right: 0.6rem;
   white-space: nowrap;
 }
+
+/* Submission tracker */
+.tracker-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0 1rem;
+}
+.tracker-pill {
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+.tracker-team {
+  margin-bottom: 1rem;
+}
+.tracker-team-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.45rem;
+}
+.tracker-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+.tracker-cell {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.45rem;
+  align-items: center;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: 0.85rem;
+}
+.tracker-cell .tracker-name {
+  font-weight: 700;
+}
+.tracker-cell .tracker-status {
+  grid-column: 2;
+  font-size: 0.72rem;
+  opacity: 0.9;
+}
+.tracker-on-time {
+  background: var(--teal-soft);
+  border-color: var(--teal-border);
+  color: var(--teal-text, var(--teal));
+}
+.tracker-late {
+  background: var(--amber-soft);
+  border-color: var(--amber-border);
+  color: var(--amber-text, var(--amber));
+}
+.tracker-missing {
+  background: var(--red-soft);
+  border-color: var(--red-border);
+  color: var(--red-text, var(--red));
+}
