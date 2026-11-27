@@ -2494,3 +2494,16 @@ a:hover {
 .account-menu-item:focus-visible {
   background: var(--bg-subtle);
 }
+
+/* Activity log */
+.audit-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+.audit-change {
+  display: inline-block;
+  margin-right: 0.6rem;
+  white-space: nowrap;
+}

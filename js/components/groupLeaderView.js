@@ -28,6 +28,7 @@ import { renderLeaderboard } from './leaderboard.js';
 import { renderExportToolbar } from './exportUtils.js';
 import { openReportCardModal } from './reportCardModal.js';
 import { renderMentorshipPanel } from './mentorshipPanel.js';
+import { renderActivityLog } from './activityLog.js';
 
 export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
   cleanupQuizCountdowns();
@@ -206,6 +207,9 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     { id: 'export', label: 'Export CSV', icon: '📥' },
   ];
 
+  if (canLead) {
+    tabs.push({ id: 'activity', label: 'Activity Log', icon: '🧾' });
+  }
   if (isGroupLeader) {
     tabs.push({ id: 'pins', label: 'Member Access & PINs', icon: '🔑' });
   }
@@ -220,6 +224,7 @@ export function renderGroupLeaderDashboard(container, user, data, onRefresh) {
     else if (tabId === 'doubts') renderDoubtsTab(contentShell);
     else if (tabId === 'export') renderExportTab(contentShell);
     else if (tabId === 'pins') renderPinsTab(contentShell);
+    else if (tabId === 'activity') renderActivityLog(contentShell);
   }
 
   createTabNav(container.querySelector('.kpi-grid'), tabs, switchTab);
